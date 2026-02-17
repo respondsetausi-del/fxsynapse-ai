@@ -1,0 +1,28 @@
+import { NextResponse } from "next/server";
+import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
+import { checkCredits } from "@/lib/credits";
+
+export async function GET() {
+  try {
+    // Auth check with anon client
+    const supabase = await createServerSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Fetch profile with service role (bypasses RLS)
+    const service = createServiceSupabase();
+    const { data: profile } = await service
+      .from("profiles")
+      .select("*, plans(name, daily_scans, price_cents)")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+
+    const credits = await checkCredits(user.id);
+
+    return NextResponse.json({ profile, credits });
+  } catch {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
