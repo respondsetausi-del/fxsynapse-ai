@@ -54,12 +54,18 @@ export async function middleware(request: NextRequest) {
   // Fetch profile once for all checks
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, is_blocked")
+    .select("role")
     .eq("id", user.id)
     .single();
 
-  // Check if user is blocked
-  if (profile?.is_blocked && !pathname.startsWith("/blocked")) {
+  // Check if user is blocked (query is_blocked separately to avoid breaking if column missing)
+  const { data: blockCheck } = await supabase
+    .from("profiles")
+    .select("is_blocked")
+    .eq("id", user.id)
+    .single();
+
+  if (blockCheck?.is_blocked && !pathname.startsWith("/blocked")) {
     // Sign them out and redirect
     await supabase.auth.signOut();
     const url = request.nextUrl.clone();
