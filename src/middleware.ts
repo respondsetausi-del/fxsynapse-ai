@@ -32,11 +32,9 @@ export async function middleware(request: NextRequest) {
 
   // Allow public routes and API routes
   if (PUBLIC_ROUTES.some((r) => pathname === r || (r !== "/" && pathname.startsWith(r))) || pathname.startsWith("/api/")) {
-    // If logged in user visits landing page, send to dashboard
     if (user && pathname === "/") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    // If logged in user visits login/signup, send to dashboard
     if (user && (pathname === "/login" || pathname === "/signup")) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
@@ -51,44 +49,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Fetch profile once for all checks
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  // Single profile query - only role needed for routing
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
 
-  // Check if user is blocked (query is_blocked separately to avoid breaking if column missing)
-  const { data: blockCheck } = await supabase
-    .from("profiles")
-    .select("is_blocked")
-    .eq("id", user.id)
-    .single();
-
-  if (blockCheck?.is_blocked && !pathname.startsWith("/blocked")) {
-    // Sign them out and redirect
-    await supabase.auth.signOut();
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("blocked", "true");
-    return NextResponse.redirect(url);
-  }
-
-  // Track last_seen_at (fire-and-forget, non-blocking)
-  supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", user.id).then(() => {});
-
-  // Admin auto-redirect: if admin lands on /dashboard, send to /admin (unless they explicitly want scanner)
-  if (pathname === "/dashboard" && !request.nextUrl.searchParams.has("scanner")) {
-    if (profile?.role === "admin") {
-      return NextResponse.redirect(new URL("/admin", request.url));
+    // Admin auto-redirect: dashboard → admin
+    if (pathname === "/dashboard" && !request.nextUrl.searchParams.has("scanner")) {
+      if (profile?.role === "admin") {
+        return NextResponse.redirect(new URL("/admin", request.url));
+      }
     }
-  }
 
-  // Admin route protection
-  if (pathname.startsWith("/admin")) {
-    if (profile?.role !== "admin") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    // Admin route protection
+    if (pathname.startsWith("/admin")) {
+      if (profile?.role !== "admin") {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
     }
+  } catch {
+    // If profile query fails, allow through (page-level auth will handle it)
   }
 
   return supabaseResponse;
