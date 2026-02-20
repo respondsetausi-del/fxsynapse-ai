@@ -8,15 +8,8 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const service = createServiceSupabase();
-    const { data: admin } = await service
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (admin?.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const { data: admin } = await service.from("profiles").select("role").eq("id", user.id).single();
+    if (admin?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { userId, days = 7 } = await req.json();
     if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
@@ -30,7 +23,6 @@ export async function POST(req: NextRequest) {
       subscription_expires_at: expiry.toISOString(),
     }).eq("id", userId);
 
-    // Log the gift
     await service.from("credit_transactions").insert({
       user_id: userId,
       amount: 0,

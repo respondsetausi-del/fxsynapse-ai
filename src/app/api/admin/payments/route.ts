@@ -8,7 +8,6 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const service = createServiceSupabase();
-
     const { data: admin } = await service.from("profiles").select("role").eq("id", user.id).single();
     if (admin?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -23,7 +22,6 @@ export async function GET(req: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
-
     return NextResponse.json({ payments: payments || [], total: count || 0, page, limit });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

@@ -51,14 +51,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Fetch profile once for all checks
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, is_blocked")
+    .eq("id", user.id)
+    .single();
+
+  // Check if user is blocked
+  if (profile?.is_blocked && !pathname.startsWith("/blocked")) {
+    // Sign them out and redirect
+    await supabase.auth.signOut();
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("blocked", "true");
+    return NextResponse.redirect(url);
+  }
+
+  // Track last_seen_at (fire-and-forget, non-blocking)
+  supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", user.id).then(() => {});
+
   // Admin auto-redirect: if admin lands on /dashboard, send to /admin (unless they explicitly want scanner)
   if (pathname === "/dashboard" && !request.nextUrl.searchParams.has("scanner")) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
     if (profile?.role === "admin") {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
@@ -66,12 +80,6 @@ export async function middleware(request: NextRequest) {
 
   // Admin route protection
   if (pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
     if (profile?.role !== "admin") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }

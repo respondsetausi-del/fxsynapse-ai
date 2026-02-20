@@ -9,7 +9,6 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const service = createServiceSupabase();
-
     const { data: admin } = await service.from("profiles").select("role").eq("id", user.id).single();
     if (admin?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -26,7 +25,7 @@ export async function POST(req: NextRequest) {
       const { userId, planId } = body;
       const { error } = await service
         .from("profiles")
-        .update({ plan_id: planId, subscription_status: planId === "free" ? "inactive" : "active" })
+        .update({ plan_id: planId, subscription_status: planId === "free" ? "none" : "active" })
         .eq("id", userId);
       if (error) throw error;
       return NextResponse.json({ success: true });
@@ -35,9 +34,26 @@ export async function POST(req: NextRequest) {
     if (action === "set_role") {
       const { userId, role } = body;
       if (!["user", "admin"].includes(role)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      const { error } = await service.from("profiles").update({ role }).eq("id", userId);
+      if (error) throw error;
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "block_user") {
+      const { userId, reason } = body;
       const { error } = await service
         .from("profiles")
-        .update({ role })
+        .update({ is_blocked: true, blocked_reason: reason || "Blocked by admin" })
+        .eq("id", userId);
+      if (error) throw error;
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "unblock_user") {
+      const { userId } = body;
+      const { error } = await service
+        .from("profiles")
+        .update({ is_blocked: false, blocked_reason: null })
         .eq("id", userId);
       if (error) throw error;
       return NextResponse.json({ success: true });
