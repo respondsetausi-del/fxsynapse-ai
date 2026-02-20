@@ -23,13 +23,8 @@ function LoginForm() {
       setError(error.message);
       setLoading(false);
     } else {
-      // Check if user is admin — redirect to admin dashboard
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
-      if (profile?.role === "admin") {
-        window.location.href = "/admin";
-      } else {
-        window.location.href = redirect;
-      }
+      // Redirect — middleware handles admin routing automatically
+      window.location.href = "/dashboard";
     }
   };
 

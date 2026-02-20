@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/", "/login", "/signup", "/pricing", "/auth/callback"];
 
+// Admin emails - add yours here
+const ADMIN_EMAILS = ["respondsetausi@gmail.com"];
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -49,29 +52,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Single profile query - only role needed for routing
-  try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+  const isAdmin = ADMIN_EMAILS.includes(user.email || "");
 
-    // Admin auto-redirect: dashboard → admin
-    if (pathname === "/dashboard" && !request.nextUrl.searchParams.has("scanner")) {
-      if (profile?.role === "admin") {
-        return NextResponse.redirect(new URL("/admin", request.url));
-      }
+  // Admin auto-redirect: dashboard → admin
+  if (pathname === "/dashboard" && !request.nextUrl.searchParams.has("scanner")) {
+    if (isAdmin) {
+      return NextResponse.redirect(new URL("/admin", request.url));
     }
+  }
 
-    // Admin route protection
-    if (pathname.startsWith("/admin")) {
-      if (profile?.role !== "admin") {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
-      }
+  // Admin route protection
+  if (pathname.startsWith("/admin")) {
+    if (!isAdmin) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-  } catch {
-    // If profile query fails, allow through (page-level auth will handle it)
   }
 
   return supabaseResponse;
