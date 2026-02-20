@@ -179,6 +179,22 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* Upgrade Banner for Free Users */}
+        {user?.plan_id === "free" && stage !== "analyzing" && (
+          <div className="mx-4 mt-2 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm">⚡</span>
+              <div>
+                <span className="text-[11px] font-semibold text-white">Unlock full trade setups, confluence grading & unlimited history</span>
+                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Pro from R99/mo</span>
+              </div>
+            </div>
+            <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+              Upgrade Now
+            </Link>
+          </div>
+        )}
+
         {/* Main content */}
         <main className="flex-1 flex items-center justify-center" style={{ padding: stage === "result" ? "16px 20px" : "36px 22px" }}>
 
@@ -195,6 +211,11 @@ export default function Dashboard() {
                 <p className="text-sm max-w-[400px] mx-auto" style={{ color: "rgba(255,255,255,.55)" }}>
                   Upload a forex chart screenshot — FXSynapse AI annotates your chart with key levels, zones, and trade setups.
                 </p>
+                {user?.plan_id === "free" && credits && (
+                  <p className="text-[10px] font-mono mt-2" style={{ color: credits.dailyRemaining > 0 ? "rgba(0,229,160,.6)" : "rgba(255,77,106,.6)" }}>
+                    {credits.dailyRemaining > 0 ? `${credits.dailyRemaining} free scan remaining today` : "No scans remaining — resets at midnight"}
+                  </p>
+                )}
               </div>
               <div className="glass text-center cursor-pointer transition-all" style={{ padding: "50px 34px", borderColor: isDrag ? "#00e5a0" : undefined, background: isDrag ? "rgba(0,229,160,.15)" : undefined }}
                 onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }} onDragLeave={() => setIsDrag(false)} onDrop={handleDrop} onClick={() => fileRef.current?.click()}>
@@ -332,8 +353,18 @@ export default function Dashboard() {
                               <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#00e5a0" }}>⚡ AI ANALYSIS</div>
                               <p className="text-xs leading-relaxed" style={{ color: "rgba(255,255,255,.55)" }}>{A.notes}</p>
                             </div>
-                            <div className="rounded-lg" style={{ padding: "11px 13px", background: "rgba(77,160,255,.04)", border: "1px solid rgba(77,160,255,.1)" }}>
+                            <div className="rounded-lg relative" style={{ padding: "11px 13px", background: "rgba(77,160,255,.04)", border: "1px solid rgba(77,160,255,.1)" }}>
                               <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#4da0ff" }}>🎯 TRADE SETUP</div>
+                              {user?.plan_id === "free" ? (
+                                <div className="text-center py-3">
+                                  <div className="text-lg mb-1">🔒</div>
+                                  <div className="text-[11px] font-semibold text-white mb-1">Upgrade to unlock trade setups</div>
+                                  <div className="text-[10px] mb-2" style={{ color: "rgba(255,255,255,.35)" }}>Entry, TP, SL & Risk:Reward</div>
+                                  <Link href="/pricing" className="inline-block px-4 py-1.5 rounded-lg text-[10px] font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+                                    Unlock Pro — R99/mo
+                                  </Link>
+                                </div>
+                              ) : (
                               <div className="flex flex-col gap-1">
                                 {[{ l: "Entry Zone", v: A.entry_zone || "—", c: "#00e5a0" }, { l: "Take Profit", v: A.take_profit || "—", c: "#4da0ff" }, { l: "Stop Loss", v: A.stop_loss || "—", c: "#ff4d6a" }, { l: "Risk:Reward", v: A.risk_reward || "—", c: "#f0b90b" }].map((r, i) => (
                                   <div key={i} className="flex justify-between">
@@ -342,6 +373,7 @@ export default function Dashboard() {
                                   </div>
                                 ))}
                               </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -395,10 +427,20 @@ export default function Dashboard() {
               <span className="text-2xl">🔒</span>
             </div>
             <h3 className="text-lg font-bold text-white mb-1">Scan Limit Reached</h3>
-            <p className="text-xs mb-5" style={{ color: "rgba(255,255,255,.45)" }}>You&apos;ve used all your free scans for today. Upgrade for more.</p>
+            <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,.45)" }}>
+              You&apos;ve used your free scan for today.
+            </p>
+            <div className="rounded-lg px-3 py-2 mb-4 inline-block" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
+              <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Next free scan resets at midnight</span>
+            </div>
+            <div className="rounded-xl p-3 mb-4" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.12)" }}>
+              <div className="text-[10px] font-mono font-bold mb-1" style={{ color: "#00e5a0" }}>🔥 LAUNCH SPECIAL</div>
+              <div className="text-sm font-bold text-white mb-0.5">50% off your first month</div>
+              <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Pro at R49 • Premium at R124</div>
+            </div>
             <div className="flex flex-col gap-2">
-              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>View Plans & Credits</Link>
-              <button onClick={() => setShowPaywall(false)} className="w-full py-3 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.4)" }}>Maybe Later</button>
+              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>Upgrade to Pro — R99/mo</Link>
+              <button onClick={() => setShowPaywall(false)} className="w-full py-3 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.4)" }}>Wait for Tomorrow</button>
             </div>
           </div>
         </div>

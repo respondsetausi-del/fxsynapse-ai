@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 const CREDIT_PACKS = [
+  { id: "pack_10", credits: 10, price_cents: 1500, label: "10 Credits" },
   { id: "pack_50", credits: 50, price_cents: 4900, label: "50 Credits" },
   { id: "pack_100", credits: 100, price_cents: 7900, label: "100 Credits" },
   { id: "pack_500", credits: 500, price_cents: 29900, label: "500 Credits" },

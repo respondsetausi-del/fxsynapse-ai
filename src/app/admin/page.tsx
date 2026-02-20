@@ -52,7 +52,7 @@ export default function AdminDashboard() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [paymentsTotal, setPaymentsTotal] = useState(0);
   const [paymentsPage, setPaymentsPage] = useState(1);
-  const [modal, setModal] = useState<{ user: UserRow; type: "credits" | "plan" | "role" } | null>(null);
+  const [modal, setModal] = useState<{ user: UserRow; type: "credits" | "plan" | "role" | "trial" } | null>(null);
   const [modalValue, setModalValue] = useState("");
   const [modalDesc, setModalDesc] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
@@ -96,6 +96,15 @@ export default function AdminDashboard() {
         body = { action: "change_plan", userId: modal.user.id, planId: modalValue };
       } else if (modal.type === "role") {
         body = { action: "set_role", userId: modal.user.id, role: modalValue };
+      } else if (modal.type === "trial") {
+        const res2 = await fetch("/api/admin/gift-trial", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: modal.user.id, days: parseInt(modalValue) || 7 }),
+        });
+        if (res2.ok) { setModal(null); setModalValue(""); setModalDesc(""); fetchUsers(); fetchStats(); }
+        setActionLoading(false);
+        return;
       }
       const res = await fetch("/api/admin/credits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) { setModal(null); setModalValue(""); setModalDesc(""); fetchUsers(); fetchStats(); }
@@ -218,13 +227,17 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 flex-wrap">
                           <button onClick={() => { setModal({ user: u, type: "credits" }); setModalValue("10"); setModalDesc(""); }}
                             className="px-2 py-1 rounded text-[10px] font-mono cursor-pointer" style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.2)", color: "#00e5a0" }}>Credits</button>
                           <button onClick={() => { setModal({ user: u, type: "plan" }); setModalValue(u.plan_id); }}
                             className="px-2 py-1 rounded text-[10px] font-mono cursor-pointer" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Plan</button>
                           <button onClick={() => { setModal({ user: u, type: "role" }); setModalValue(u.role); }}
                             className="px-2 py-1 rounded text-[10px] font-mono cursor-pointer" style={{ background: "rgba(240,185,11,.1)", border: "1px solid rgba(240,185,11,.2)", color: "#f0b90b" }}>Role</button>
+                          {u.plan_id === "free" && (
+                            <button onClick={() => { setModal({ user: u, type: "trial" }); setModalValue("7"); }}
+                              className="px-2 py-1 rounded text-[10px] font-mono cursor-pointer" style={{ background: "rgba(168,85,247,.1)", border: "1px solid rgba(168,85,247,.2)", color: "#a855f7" }}>🎁 Trial</button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -320,7 +333,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,.8)", backdropFilter: "blur(10px)" }} onClick={() => setModal(null)}>
           <div className="w-full max-w-md rounded-2xl p-6" onClick={(e) => e.stopPropagation()} style={{ background: "#12131a", border: "1px solid rgba(255,255,255,.08)" }}>
             <h3 className="text-lg font-bold text-white mb-1">
-              {modal.type === "credits" ? "Allocate Credits" : modal.type === "plan" ? "Change Plan" : "Change Role"}
+              {modal.type === "credits" ? "Allocate Credits" : modal.type === "plan" ? "Change Plan" : modal.type === "trial" ? "Gift Pro Trial" : "Change Role"}
             </h3>
             <p className="text-xs font-mono mb-4" style={{ color: "rgba(255,255,255,.4)" }}>
               {modal.user.email} — {modal.user.full_name || "No name"}
@@ -377,6 +390,31 @@ export default function AdminDashboard() {
                   </button>
                 ))}
               </div>
+            )}
+
+            {modal.type === "trial" && (
+              <>
+                <div className="rounded-lg p-3 mb-3" style={{ background: "rgba(168,85,247,.06)", border: "1px solid rgba(168,85,247,.15)" }}>
+                  <div className="text-xs font-semibold text-white mb-1">🎁 Gift a free Pro trial</div>
+                  <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>
+                    This will upgrade the user to Pro for the specified number of days, no payment required.
+                  </div>
+                </div>
+                <label className="block text-xs font-mono mb-1.5" style={{ color: "rgba(255,255,255,.4)" }}>TRIAL DURATION (DAYS)</label>
+                <div className="flex gap-2 mb-4">
+                  {["3", "7", "14", "30"].map((d) => (
+                    <button key={d} onClick={() => setModalValue(d)}
+                      className="flex-1 px-3 py-2.5 rounded-xl text-sm font-mono font-bold cursor-pointer"
+                      style={{
+                        background: modalValue === d ? "rgba(168,85,247,.15)" : "rgba(255,255,255,.03)",
+                        border: `1px solid ${modalValue === d ? "rgba(168,85,247,.3)" : "rgba(255,255,255,.06)"}`,
+                        color: modalValue === d ? "#a855f7" : "rgba(255,255,255,.4)",
+                      }}>
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
 
             <div className="flex gap-2">

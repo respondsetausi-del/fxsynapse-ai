@@ -29,6 +29,7 @@ interface SidebarProps {
 
 export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps) {
   const [history, setHistory] = useState<ScanRecord[]>([]);
+  const [hiddenCount, setHiddenCount] = useState(0);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -40,6 +41,7 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
         .then((res) => res.json())
         .then((data) => {
           setHistory(data.scans || []);
+          setHiddenCount(data.hiddenCount || 0);
           setLoadingHistory(false);
         })
         .catch(() => setLoadingHistory(false));
@@ -177,6 +179,16 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
                     </div>
                   </div>
                 ))}
+                {hiddenCount > 0 && (
+                  <Link href="/pricing" onClick={onClose} className="rounded-lg p-3 text-center no-underline block" style={{ background: "rgba(0,229,160,.04)", border: "1px dashed rgba(0,229,160,.2)" }}>
+                    <div className="text-[10px] font-mono font-bold mb-1" style={{ color: "#00e5a0" }}>
+                      🔒 {hiddenCount} more scan{hiddenCount > 1 ? "s" : ""} hidden
+                    </div>
+                    <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>
+                      Upgrade to Pro to unlock full history
+                    </div>
+                  </Link>
+                )}
               </div>
             )}
           </div>

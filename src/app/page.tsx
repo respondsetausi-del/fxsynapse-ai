@@ -17,9 +17,9 @@ const FEATURES = [
 ];
 
 const PLANS = [
-  { name: "Free", price: "R0", period: "forever", scans: "3 / day", features: ["3 scans per day", "Basic annotations", "Standard processing"], cta: "Get Started" },
-  { name: "Pro", price: "R99", period: "/month", scans: "50 / day", features: ["50 scans per day", "Full annotations", "Trade setups", "Credit top-ups", "Priority support"], cta: "Upgrade to Pro", popular: true },
-  { name: "Premium", price: "R249", period: "/month", scans: "Unlimited", features: ["Unlimited scans", "Advanced annotations", "Trade setups", "Credit top-ups", "Priority processing"], cta: "Go Premium" },
+  { name: "Free", price: "R0", period: "forever", scans: "1 / day", features: ["1 scan per day", "Basic trend & S/R", "Last 3 scans in history"], cta: "Get Started" },
+  { name: "Pro", price: "R99", period: "/month", scans: "15 / day", features: ["15 scans per day", "Full annotations", "Trade setups (Entry/TP/SL)", "Confluence grading", "Full scan history"], cta: "Upgrade to Pro", popular: true },
+  { name: "Premium", price: "R249", period: "/month", scans: "Unlimited", features: ["Unlimited scans", "All Pro features", "Priority processing", "Chart download", "Priority support"], cta: "Go Premium" },
 ];
 
 const STEPS = [
@@ -87,13 +87,13 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-3 mb-4">
             <Link href="/signup" className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
-              Start Free — 3 Scans/Day
+              Start Free — 1 Scan/Day
             </Link>
             <Link href="/login" className="no-underline px-7 py-3.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
               Sign In
             </Link>
           </div>
-          <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>No credit card required • 3 free scans daily</p>
+          <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>No credit card required • Free scan daily</p>
 
           {/* Platform badges */}
           <div className="flex gap-2 mt-8 flex-wrap justify-center">
@@ -229,13 +229,37 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* SOCIAL PROOF */}
+        <section className="text-center" style={{ padding: "40px 24px 0" }}>
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-center justify-center gap-6 flex-wrap mb-4">
+              <div className="text-center">
+                <div className="text-2xl font-extrabold" style={{ color: "#00e5a0" }}>40+</div>
+                <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Active Traders</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-extrabold" style={{ color: "#4da0ff" }}>500+</div>
+                <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Charts Analyzed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-extrabold" style={{ color: "#f0b90b" }}>&lt;10s</div>
+                <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Avg Analysis Time</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* CTA */}
-        <section className="text-center" style={{ padding: "80px 24px" }}>
-          <h2 className="text-2xl font-extrabold text-white mb-3" style={{ letterSpacing: "-1px" }}>Ready to level up your trading?</h2>
-          <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.4)" }}>Join traders using AI to analyze charts in seconds.</p>
-          <Link href="/signup" className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
-            Start Free Today →
-          </Link>
+        <section className="text-center" style={{ padding: "60px 24px 80px" }}>
+          <div className="max-w-lg mx-auto rounded-2xl px-6 py-8" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.06), rgba(77,160,255,.04))", border: "1px solid rgba(0,229,160,.12)" }}>
+            <div className="text-[10px] font-mono font-bold mb-2" style={{ color: "#f0b90b" }}>🔥 LAUNCH SPECIAL — 50% OFF FIRST MONTH</div>
+            <h2 className="text-2xl font-extrabold text-white mb-3" style={{ letterSpacing: "-1px" }}>Ready to level up your trading?</h2>
+            <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.4)" }}>Join 40+ traders using AI to analyze charts in seconds.</p>
+            <Link href="/signup" className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
+              Start Free Today →
+            </Link>
+            <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.25)" }}>Use code LAUNCH50 for 50% off Pro or Premium</p>
+          </div>
         </section>
 
         {/* FOOTER */}

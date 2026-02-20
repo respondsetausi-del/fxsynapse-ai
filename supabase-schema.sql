@@ -13,9 +13,14 @@ CREATE TABLE plans (
 );
 
 INSERT INTO plans (id, name, price_cents, daily_scans, features) VALUES
-  ('free', 'Free', 0, 3, '["3 scans per day", "Basic annotations", "Standard processing"]'),
-  ('pro', 'Pro', 9900, 50, '["50 scans per day", "Full annotations", "Trade setups", "Credit top-ups", "Priority support"]'),
-  ('premium', 'Premium', 24900, -1, '["Unlimited scans", "Advanced annotations", "Trade setups", "Credit top-ups", "Priority processing", "Priority support"]');
+  ('free', 'Free', 0, 1, '["1 scan per day", "Basic trend & S/R only", "Last 3 scans in history"]'),
+  ('pro', 'Pro', 9900, 15, '["15 scans per day", "Full annotations & trade setups", "Entry/TP/SL/R:R unlocked", "Confluence grading", "Full scan history", "Credit top-ups"]'),
+  ('premium', 'Premium', 24900, -1, '["Unlimited scans", "Full annotations & trade setups", "Entry/TP/SL/R:R unlocked", "Confluence grading", "Full scan history", "Priority processing", "Chart download", "Priority support"]');
+
+-- UPDATE existing plans (run this if plans already exist)
+-- UPDATE plans SET daily_scans = 1, features = '["1 scan per day", "Basic trend & S/R only", "Last 3 scans in history"]' WHERE id = 'free';
+-- UPDATE plans SET price_cents = 9900, daily_scans = 15, features = '["15 scans per day", "Full annotations & trade setups", "Entry/TP/SL/R:R unlocked", "Confluence grading", "Full scan history", "Credit top-ups"]' WHERE id = 'pro';
+-- UPDATE plans SET price_cents = 24900, features = '["Unlimited scans", "Full annotations & trade setups", "Entry/TP/SL/R:R unlocked", "Confluence grading", "Full scan history", "Priority processing", "Chart download", "Priority support"]' WHERE id = 'premium';
 
 -- 2. Profiles table (extends Supabase auth.users)
 CREATE TABLE profiles (
