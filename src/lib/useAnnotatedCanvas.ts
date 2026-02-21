@@ -178,44 +178,122 @@ export function useAnnotatedCanvas(
           );
         }
       }
+    });
 
-      // ── POINT ── (Entry/TP/SL — within chart bounds)
-      if (a.type === "point" && a.x !== undefined && a.y !== undefined && prog > 0.5) {
-        let px = toPixelX(a.x);
-        let py = toPixelY(a.y);
+    // ── TRADE SETUP (Entry/TP/SL as right-edge price tags + connector) ──
+    if (prog > 0.5) {
+      const points = annotations.filter(a => a.type === "point" && a.y !== undefined);
+      const entry = points.find(a => a.label === "Entry");
+      const tp = points.find(a => a.label === "TP");
+      const sl = points.find(a => a.label === "SL");
 
-        // Clamp within chart bounds with padding
-        const pad = 15;
-        px = Math.max(bx + pad, Math.min(bx + bw - pad, px));
-        py = Math.max(by + pad, Math.min(by + bh - pad, py));
+      if (points.length > 0) {
+        const tagW = w > 700 ? 58 : w > 400 ? 50 : 44;
+        const tagH = w > 700 ? 20 : w > 400 ? 18 : 16;
+        const tagX = bx + bw - tagW - 2; // Right edge of chart area
+        const tagFontSize = w > 700 ? 10 : w > 400 ? 9 : 8;
+        const ap = Math.min((prog - 0.5) / 0.5, 1); // animation progress
 
-        const r = (w > 700 ? 16 : w > 400 ? 14 : 12) * prog;
+        // Collect y positions for connector
+        const pointYs: { py: number; color: string; label: string }[] = [];
 
-        // Outer glow
-        ctx.beginPath();
-        ctx.arc(px, py, r + 5, 0, Math.PI * 2);
-        ctx.strokeStyle = a.color + "25";
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        points.forEach((a) => {
+          if (a.y === undefined) return;
+          let py = toPixelY(a.y);
+          py = Math.max(by + 8, Math.min(by + bh - 8, py));
+          const color = a.color;
+          pointYs.push({ py, color, label: a.label || "" });
 
-        // Inner fill
-        ctx.beginPath();
-        ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.fillStyle = a.color + "15";
-        ctx.fill();
-        ctx.strokeStyle = a.color + "99";
-        ctx.lineWidth = lw;
-        ctx.stroke();
+          // Horizontal dashed line from left edge to tag
+          ctx.globalAlpha = ap * 0.4;
+          ctx.beginPath();
+          ctx.setLineDash([3, 4]);
+          ctx.strokeStyle = color + "55";
+          ctx.lineWidth = 1;
+          ctx.moveTo(bx, py);
+          ctx.lineTo(tagX, py);
+          ctx.stroke();
+          ctx.setLineDash([]);
 
-        // Label — position to the left if too close to right edge
-        if (a.label) {
-          const labelAlign = px > bx + bw * 0.75 ? "right" : "left";
-          const labelX = labelAlign === "right" ? px - 20 : px + 20;
-          lbl(a.label, labelX, py, a.color + "28", a.color, labelAlign);
+          // Price tag badge on right edge
+          ctx.globalAlpha = ap * 0.95;
+          const tagY = py - tagH / 2;
+
+          // Tag background with left arrow notch
+          ctx.beginPath();
+          ctx.moveTo(tagX + 4, tagY);
+          ctx.lineTo(tagX + tagW, tagY);
+          if (ctx.roundRect) {
+            // Top-right corner
+          }
+          ctx.lineTo(tagX + tagW, tagY + tagH);
+          ctx.lineTo(tagX + 4, tagY + tagH);
+          ctx.lineTo(tagX - 3, py); // Arrow notch pointing left
+          ctx.closePath();
+          ctx.fillStyle = color + "dd";
+          ctx.fill();
+
+          // Label text
+          ctx.font = `bold ${tagFontSize}px monospace`;
+          ctx.fillStyle = "#0a0b0f";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(a.label || "", tagX + tagW / 2 + 2, py);
+        });
+
+        // ── Vertical connector line between SL → Entry → TP ──
+        if (pointYs.length >= 2) {
+          const sortedYs = [...pointYs].sort((a, b) => a.py - b.py);
+          const topY = sortedYs[0].py;
+          const botY = sortedYs[sortedYs.length - 1].py;
+          const connX = tagX - 8;
+
+          ctx.globalAlpha = ap * 0.7;
+          ctx.beginPath();
+          ctx.strokeStyle = "rgba(255,255,255,0.2)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([]);
+          ctx.moveTo(connX, topY);
+          ctx.lineTo(connX, botY);
+          ctx.stroke();
+
+          // Small dots at each level on the connector
+          pointYs.forEach(({ py, color }) => {
+            ctx.beginPath();
+            ctx.arc(connX, py, 3, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+          });
+
+          // Risk/Reward bracket labels
+          if (entry && tp && sl && prog > 0.8) {
+            const entryY = toPixelY(entry.y!);
+            const tpY = toPixelY(tp.y!);
+            const slY = toPixelY(sl.y!);
+            const bracketX = connX - 12;
+
+            // TP zone (green) — between Entry and TP
+            const tpMidY = (entryY + tpY) / 2;
+            ctx.globalAlpha = ap * 0.5;
+            ctx.font = `bold ${tagFontSize - 1}px monospace`;
+            ctx.fillStyle = "#00e5a0";
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.fillText("TP", bracketX, tpMidY);
+
+            // SL zone (red) — between Entry and SL
+            const slMidY = (entryY + slY) / 2;
+            ctx.fillStyle = "#ff4d6a";
+            ctx.fillText("SL", bracketX, slMidY);
+          }
         }
-      }
 
-      // ── ARROW ── (directional, within chart bounds)
+        ctx.globalAlpha = ap;
+      }
+    }
+
+    // ── ARROW ── (directional, within chart bounds)
+    annotations.forEach((a) => {
       if (
         a.type === "arrow" &&
         a.x !== undefined &&
@@ -223,29 +301,32 @@ export function useAnnotatedCanvas(
         a.y2 !== undefined &&
         prog > 0.6
       ) {
-        let px = toPixelX(a.x);
+        const tagW = w > 700 ? 58 : w > 400 ? 50 : 44;
+        const arrowX = bx + bw - tagW - 18; // Just left of the trade tags
         const sy = toPixelY(a.y1);
         const ey = toPixelY(a.y2);
-
-        // Clamp x within chart bounds
-        px = Math.max(bx + 10, Math.min(bx + bw - 10, px));
 
         const ap = Math.min((prog - 0.6) / 0.4, 1);
         const cy = sy + (ey - sy) * ap;
 
+        ctx.globalAlpha = ap * 0.8;
+
+        // Arrow shaft
         ctx.beginPath();
         ctx.strokeStyle = a.color;
-        ctx.lineWidth = 2.5;
-        ctx.moveTo(px, sy);
-        ctx.lineTo(px, cy);
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.moveTo(arrowX, sy);
+        ctx.lineTo(arrowX, cy);
         ctx.stroke();
 
         // Arrow head
+        const headSize = w > 700 ? 7 : 5;
         ctx.beginPath();
         ctx.fillStyle = a.color;
-        ctx.moveTo(px, cy);
-        ctx.lineTo(px - 6, cy + (ey < sy ? -10 : 10));
-        ctx.lineTo(px + 6, cy + (ey < sy ? -10 : 10));
+        ctx.moveTo(arrowX, cy);
+        ctx.lineTo(arrowX - headSize, cy + (ey < sy ? -headSize * 1.5 : headSize * 1.5));
+        ctx.lineTo(arrowX + headSize, cy + (ey < sy ? -headSize * 1.5 : headSize * 1.5));
         ctx.closePath();
         ctx.fill();
       }
