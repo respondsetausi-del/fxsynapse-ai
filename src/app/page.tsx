@@ -30,7 +30,51 @@ const STEPS = [
 
 export default function LandingPage() {
   const [visible, setVisible] = useState(false);
-  useEffect(() => { setVisible(true); }, []);
+  const [showBrokerPopup, setShowBrokerPopup] = useState(false);
+
+  const BROKER_LINK = "https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/";
+
+  // Generate/retrieve visitor ID
+  const getVisitorId = () => {
+    if (typeof window === "undefined") return null;
+    let vid = localStorage.getItem("fxs_vid");
+    if (!vid) { vid = crypto.randomUUID(); localStorage.setItem("fxs_vid", vid); }
+    return vid;
+  };
+
+  const trackEvent = (event_type: string, source?: string) => {
+    fetch("/api/tracking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_type, source, visitor_id: getVisitorId() }),
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    setVisible(true);
+    // Track landing visit
+    trackEvent("landing_visit");
+    // Show broker popup after 3 seconds
+    const t = setTimeout(() => {
+      setShowBrokerPopup(true);
+      trackEvent("broker_popup_shown", "landing");
+    }, 3000);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleBrokerClick = (source: string) => {
+    trackEvent("broker_click", source);
+  };
+
+  const handleSignupClick = (source: string) => {
+    trackEvent("signup_click", source);
+  };
+
+  const dismissPopup = () => {
+    setShowBrokerPopup(false);
+    trackEvent("broker_popup_dismissed", "landing");
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "#0a0b0f" }}>
@@ -55,7 +99,7 @@ export default function LandingPage() {
             <div className="text-lg font-bold text-white" style={{ letterSpacing: "-.5px" }}>FXSynapse<span className="font-extrabold" style={{ color: "#00e5a0" }}> AI</span></div>
           </div>
           <div className="flex items-center gap-3">
-            <a href="https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/" target="_blank" rel="noopener noreferrer" className="text-xs font-semibold no-underline px-3 py-1.5 rounded-lg flex items-center gap-1.5" style={{ background: "rgba(240,185,11,.08)", border: "1px solid rgba(240,185,11,.12)", color: "#f0b90b" }}>
+            <a href="https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/" target="_blank" rel="noopener noreferrer" onClick={() => handleBrokerClick("landing_nav")} className="text-xs font-semibold no-underline px-3 py-1.5 rounded-lg flex items-center gap-1.5" style={{ background: "rgba(240,185,11,.08)", border: "1px solid rgba(240,185,11,.12)", color: "#f0b90b" }}>
               📈 Trade Now
             </a>
             <Link href="/pricing" className="text-xs font-semibold no-underline px-3 py-1.5 rounded-lg" style={{ color: "rgba(255,255,255,.5)" }}>
@@ -64,7 +108,7 @@ export default function LandingPage() {
             <Link href="/login" className="text-xs font-semibold no-underline px-4 py-2 rounded-lg" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
               Sign In
             </Link>
-            <Link href="/signup" className="text-xs font-bold no-underline px-4 py-2 rounded-lg" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+            <Link href="/signup" onClick={() => handleSignupClick("nav")} className="text-xs font-bold no-underline px-4 py-2 rounded-lg" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
               Start Free
             </Link>
           </div>
@@ -89,7 +133,7 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center gap-3 mb-4">
-            <Link href="/signup" className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
+            <Link href="/signup" onClick={() => handleSignupClick("hero")} className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
               Start Free — 1 Scan/Day
             </Link>
             <Link href="/login" className="no-underline px-7 py-3.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
@@ -258,7 +302,7 @@ export default function LandingPage() {
             <div className="text-[10px] font-mono font-bold mb-2" style={{ color: "#f0b90b" }}>🔥 LAUNCH SPECIAL — 50% OFF FIRST MONTH</div>
             <h2 className="text-2xl font-extrabold text-white mb-3" style={{ letterSpacing: "-1px" }}>Ready to level up your trading?</h2>
             <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.4)" }}>Join 40+ traders using AI to analyze charts in seconds.</p>
-            <Link href="/signup" className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
+            <Link href="/signup" onClick={() => handleSignupClick("cta")} className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
               Start Free Today →
             </Link>
             <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.25)" }}>Use code LAUNCH50 for 50% off Pro or Premium</p>
@@ -267,7 +311,7 @@ export default function LandingPage() {
 
         {/* Recommended Broker */}
         <section style={{ padding: "0 24px 60px" }}>
-          <a href="https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/" target="_blank" rel="noopener noreferrer" className="block no-underline max-w-2xl mx-auto">
+          <a href="https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/" target="_blank" rel="noopener noreferrer" onClick={() => handleBrokerClick("landing_banner")} className="block no-underline max-w-2xl mx-auto">
             <div className="rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(240,185,11,.05), rgba(0,229,160,.03))", border: "1px solid rgba(240,185,11,.1)" }}>
               <div className="flex items-center justify-between px-5 py-4 gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
@@ -300,6 +344,104 @@ export default function LandingPage() {
           </p>
         </footer>
       </div>
+
+      {/* ─── BIG BROKER POPUP ─── */}
+      {showBrokerPopup && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,.75)", backdropFilter: "blur(16px)", animation: "fadeUp 0.5s ease" }}
+          onClick={dismissPopup}
+        >
+          <div
+            className="relative w-full max-w-[480px] mx-4 rounded-3xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#12131a",
+              border: "1px solid rgba(240,185,11,.15)",
+              boxShadow: "0 25px 80px rgba(0,0,0,.6), 0 0 60px rgba(240,185,11,.08)",
+              animation: "scaleIn 0.5s cubic-bezier(0.16,1,0.3,1)",
+            }}
+          >
+            {/* Close button */}
+            <button
+              onClick={dismissPopup}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer z-10"
+              style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", color: "rgba(255,255,255,.5)", fontSize: 14 }}
+            >
+              ✕
+            </button>
+
+            {/* Gold gradient header */}
+            <div className="relative px-7 pt-8 pb-6 text-center" style={{ background: "linear-gradient(180deg, rgba(240,185,11,.1) 0%, transparent 100%)" }}>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[200px] h-[200px] rounded-full" style={{ background: "radial-gradient(circle, rgba(240,185,11,.12) 0%, transparent 70%)", filter: "blur(40px)" }} />
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", boxShadow: "0 8px 30px rgba(240,185,11,.35)" }}>
+                  <span className="text-3xl">📈</span>
+                </div>
+                <h2 className="text-[22px] font-extrabold text-white mb-1.5" style={{ letterSpacing: "-.5px" }}>
+                  Start Trading Today
+                </h2>
+                <p className="text-[13px]" style={{ color: "rgba(255,255,255,.45)" }}>
+                  Our recommended broker for FXSynapse traders
+                </p>
+              </div>
+            </div>
+
+            {/* Benefits */}
+            <div className="px-7 pb-2">
+              <div className="flex flex-col gap-3">
+                {[
+                  { icon: "⚡", title: "Instant Execution", desc: "Lightning-fast order fills with minimal slippage" },
+                  { icon: "📊", title: "All Markets", desc: "Forex, Synthetics, Crypto & Commodities" },
+                  { icon: "💰", title: "Low Spreads", desc: "Competitive spreads from 0.0 pips" },
+                  { icon: "🔒", title: "Regulated & Secure", desc: "Licensed broker with segregated client funds" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(240,185,11,.08)", border: "1px solid rgba(240,185,11,.1)" }}>
+                      <span className="text-base">{item.icon}</span>
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-semibold text-white">{item.title}</div>
+                      <div className="text-[11px]" style={{ color: "rgba(255,255,255,.35)" }}>{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="px-7 pt-5 pb-6">
+              <a
+                href={BROKER_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => { handleBrokerClick("popup"); dismissPopup(); }}
+                className="block w-full py-4 rounded-xl text-[15px] font-bold no-underline text-center"
+                style={{
+                  background: "linear-gradient(135deg, #f0b90b, #e6a800)",
+                  color: "#0a0b0f",
+                  boxShadow: "0 6px 25px rgba(240,185,11,.3)",
+                  letterSpacing: "-.3px",
+                }}
+              >
+                Open Free Account →
+              </a>
+              <div className="flex items-center justify-center gap-4 mt-3">
+                <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>Free to register</span>
+                <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.1)" }}>•</span>
+                <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>No minimum deposit</span>
+              </div>
+              <button
+                onClick={dismissPopup}
+                className="w-full py-2.5 mt-2 text-[12px] cursor-pointer"
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,.3)" }}
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

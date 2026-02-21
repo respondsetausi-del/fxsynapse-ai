@@ -146,6 +146,52 @@ export async function POST(req: NextRequest) {
       return clamped;
     });
 
+    // ── TRADE SETUP VALIDATION ──
+    // Ensure Entry/TP/SL follow correct logic for the bias
+    const bias = (analysis.bias || "Neutral").toLowerCase();
+    const points = analysis.annotations.filter((a: Record<string, unknown>) => a.type === "point");
+    const entry = points.find((a: Record<string, unknown>) => a.label === "Entry");
+    const tp = points.find((a: Record<string, unknown>) => a.label === "TP");
+    const sl = points.find((a: Record<string, unknown>) => a.label === "SL");
+    const sLine = analysis.annotations.find((a: Record<string, unknown>) => a.type === "line" && typeof a.label === "string" && (a.label as string).startsWith("S"));
+    const rLine = analysis.annotations.find((a: Record<string, unknown>) => a.type === "line" && typeof a.label === "string" && (a.label as string).startsWith("R"));
+
+    if (entry && tp && sl && sLine && rLine) {
+      const sY = sLine.y as number;
+      const rY = rLine.y as number;
+      const alignX = 0.80; // Align all trade points vertically
+
+      if (bias === "long" || bias === "neutral") {
+        // Long: Entry near support, TP near resistance, SL below support
+        // y=0 is top (high price), y=1 is bottom (low price)
+        // So: TP.y < Entry.y < SL.y
+        entry.y = sY;                           // Entry at support
+        entry.x = alignX;
+        tp.y = rY;                              // TP at resistance
+        tp.x = alignX;
+        sl.y = Math.min(1, sY + (sY - rY) * 0.3); // SL below support
+        sl.x = alignX;
+      } else if (bias === "short") {
+        // Short: Entry near resistance, TP near support, SL above resistance
+        // So: SL.y < Entry.y < TP.y
+        entry.y = rY;                           // Entry at resistance
+        entry.x = alignX;
+        tp.y = sY;                              // TP at support
+        tp.x = alignX;
+        sl.y = Math.max(0, rY - (sY - rY) * 0.3); // SL above resistance
+        sl.x = alignX;
+      }
+
+      // Fix arrow to match Entry → TP direction
+      const arrow = analysis.annotations.find((a: Record<string, unknown>) => a.type === "arrow");
+      if (arrow) {
+        arrow.x = alignX - 0.06;
+        arrow.y1 = entry.y as number;
+        arrow.y2 = tp.y as number;
+        arrow.color = bias === "short" ? "#ff4d6a" : "#00e5a0";
+      }
+    }
+
     // 7. Deduct credit AFTER successful analysis
     await deductCredit(user.id, creditCheck.source);
 

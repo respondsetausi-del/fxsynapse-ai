@@ -30,7 +30,7 @@ interface EmailLog {
   body: string; status: string; created_at: string;
 }
 
-type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email";
+type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel";
 type ModalType = "credits" | "plan" | "role" | "trial" | "block" | "email";
 type UserFilter = "all" | "free" | "pro" | "premium" | "blocked";
 
@@ -143,6 +143,8 @@ export default function AdminDashboard() {
   const [paymentsTotal, setPaymentsTotal] = useState(0);
   const [paymentsPage, setPaymentsPage] = useState(1);
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [funnelData, setFunnelData] = useState<any>(null);
   const [emailLogsTotal, setEmailLogsTotal] = useState(0);
   const [emailLogsPage, setEmailLogsPage] = useState(1);
   const [modal, setModal] = useState<{ user: UserRow; type: ModalType } | null>(null);
@@ -190,6 +192,11 @@ export default function AdminDashboard() {
   useEffect(() => { if (tab === "users" || tab === "overview") fetchUsers(); }, [tab, fetchUsers]);
   useEffect(() => { if (tab === "payments") fetchPayments(); }, [tab, fetchPayments]);
   useEffect(() => { if (tab === "email") fetchEmailLogs(); }, [tab, fetchEmailLogs]);
+  useEffect(() => {
+    if (tab === "funnel") {
+      fetch("/api/tracking?days=30").then(r => r.json()).then(d => setFunnelData(d)).catch(() => {});
+    }
+  }, [tab]);
 
   const handleSearchChange = (val: string) => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -273,6 +280,8 @@ export default function AdminDashboard() {
     { id: "retention", label: "Retention", icon: "◇" },
     { id: "payments", label: "Payments", icon: "◆" },
     { id: "email", label: "Email", icon: "◁" },
+    { id: "funnel", label: "Funnel", icon: "◐" },
+    { id: "funnel", label: "Funnel", icon: "◐" },
   ];
 
   if (loading) return (
@@ -739,9 +748,157 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ═══════════════════════ FUNNEL TAB ═══════════════════════ */}
+        {tab === "funnel" && (
+          <div className="space-y-5" style={{ animation: "fadeUp 0.3s ease" }}>
+            {!funnelData ? (
+              <div className="text-center py-20"><div className="text-2xl mb-2">◌</div><div className="text-sm" style={{ color: "rgba(255,255,255,.3)" }}>Loading funnel data...</div></div>
+            ) : (
+              <>
+                {/* Funnel Stats Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { label: "Landing Visits", value: funnelData.stats?.landing_visits || 0, color: "#4da0ff" },
+                    { label: "Signup Clicks", value: funnelData.stats?.signup_clicks || 0, color: "#00e5a0" },
+                    { label: "Signup Rate", value: `${funnelData.stats?.signup_rate || 0}%`, color: "#f0b90b" },
+                    { label: "Unique Visitors", value: funnelData.stats?.unique_visitors || 0, color: "#fff" },
+                  ].map((s, i) => (
+                    <div key={i} className="rounded-xl p-4" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+                      <div className="text-[9px] font-mono uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,.3)" }}>{s.label}</div>
+                      <div className="text-xl font-bold font-mono" style={{ color: s.color }}>{s.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Broker Stats */}
+                <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+                  <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                    <h2 className="text-sm font-bold text-white">Broker Performance</h2>
+                    <p className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>IB link click tracking across all placements</p>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                      {[
+                        { label: "Total Broker Clicks", value: funnelData.stats?.broker_clicks || 0, color: "#f0b90b" },
+                        { label: "Popup Shown", value: funnelData.stats?.broker_popup_shown || 0, color: "#4da0ff" },
+                        { label: "Popup Dismissed", value: funnelData.stats?.broker_popup_dismissed || 0, color: "#ff4d6a" },
+                        { label: "Popup Click Rate", value: `${funnelData.stats?.broker_click_rate || 0}%`, color: "#00e5a0" },
+                      ].map((s, i) => (
+                        <div key={i} className="rounded-lg p-3" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+                          <div className="text-[9px] font-mono uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,.25)" }}>{s.label}</div>
+                          <div className="text-lg font-bold font-mono" style={{ color: s.color }}>{s.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Clicks by Source */}
+                    <div className="text-[10px] font-mono uppercase tracking-wider mb-2 mt-4" style={{ color: "rgba(255,255,255,.3)" }}>Broker Clicks by Source</div>
+                    <div className="space-y-2">
+                      {Object.entries(funnelData.stats?.broker_by_source || {}).length === 0 ? (
+                        <div className="text-[11px] py-4 text-center" style={{ color: "rgba(255,255,255,.2)" }}>No broker clicks yet</div>
+                      ) : Object.entries(funnelData.stats?.broker_by_source || {}).sort(([,a],[,b]) => (b as number) - (a as number)).map(([source, count]) => {
+                        const total = funnelData.stats?.broker_clicks || 1;
+                        const pct = Math.round(((count as number) / total) * 100);
+                        return (
+                          <div key={source} className="flex items-center gap-3">
+                            <div className="w-24 text-[11px] font-mono font-semibold" style={{ color: "rgba(255,255,255,.5)" }}>{source}</div>
+                            <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,.04)" }}>
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #f0b90b, #e6a800)" }} />
+                            </div>
+                            <div className="text-[11px] font-mono font-bold" style={{ color: "#f0b90b" }}>{count as number}</div>
+                            <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{pct}%</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Signup Clicks by Source */}
+                    <div className="text-[10px] font-mono uppercase tracking-wider mb-2 mt-5" style={{ color: "rgba(255,255,255,.3)" }}>Signup Clicks by Source</div>
+                    <div className="space-y-2">
+                      {Object.entries(funnelData.stats?.signup_by_source || {}).length === 0 ? (
+                        <div className="text-[11px] py-4 text-center" style={{ color: "rgba(255,255,255,.2)" }}>No signup clicks yet</div>
+                      ) : Object.entries(funnelData.stats?.signup_by_source || {}).sort(([,a],[,b]) => (b as number) - (a as number)).map(([source, count]) => {
+                        const total = funnelData.stats?.signup_clicks || 1;
+                        const pct = Math.round(((count as number) / total) * 100);
+                        return (
+                          <div key={source} className="flex items-center gap-3">
+                            <div className="w-24 text-[11px] font-mono font-semibold" style={{ color: "rgba(255,255,255,.5)" }}>{source}</div>
+                            <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: "rgba(255,255,255,.04)" }}>
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #00e5a0, #00b87d)" }} />
+                            </div>
+                            <div className="text-[11px] font-mono font-bold" style={{ color: "#00e5a0" }}>{count as number}</div>
+                            <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{pct}%</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Visual Funnel */}
+                <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+                  <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                    <h2 className="text-sm font-bold text-white">Conversion Funnel</h2>
+                    <p className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Landing → Signup → Broker click flow</p>
+                  </div>
+                  <div className="p-6 flex flex-col items-center gap-2">
+                    {[
+                      { label: "Landed on Site", value: funnelData.stats?.landing_visits || 0, color: "#4da0ff", width: "100%" },
+                      { label: "Saw Broker Popup", value: funnelData.stats?.broker_popup_shown || 0, color: "#f0b90b", width: "75%" },
+                      { label: "Clicked Signup", value: funnelData.stats?.signup_clicks || 0, color: "#00e5a0", width: "50%" },
+                      { label: "Clicked Broker Link", value: funnelData.stats?.broker_clicks || 0, color: "#f0b90b", width: "30%" },
+                    ].map((step, i) => (
+                      <div key={i} className="text-center" style={{ width: step.width, transition: "all 0.3s" }}>
+                        <div className="rounded-xl py-3 px-4 flex items-center justify-between" style={{ background: step.color + "12", border: `1px solid ${step.color}25` }}>
+                          <span className="text-[11px] font-semibold" style={{ color: step.color }}>{step.label}</span>
+                          <span className="text-lg font-bold font-mono" style={{ color: step.color }}>{step.value}</span>
+                        </div>
+                        {i < 3 && <div className="text-[16px] my-1" style={{ color: "rgba(255,255,255,.15)" }}>▼</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Events */}
+                <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+                  <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                    <h2 className="text-sm font-bold text-white">Recent Events</h2>
+                    <p className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Last 50 tracked actions</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                          {["Time", "Event", "Source", "Visitor"].map((h) => (
+                            <th key={h} className="text-left px-4 py-3 font-mono font-semibold text-[10px] tracking-wider" style={{ color: "rgba(255,255,255,.3)" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(funnelData.recent || []).length === 0 ? (
+                          <tr><td colSpan={4} className="px-4 py-12 text-center"><div className="text-2xl mb-2">📊</div><div className="text-sm" style={{ color: "rgba(255,255,255,.3)" }}>No events tracked yet</div></td></tr>
+                        ) : (funnelData.recent || []).map((e: { id: string; created_at: string; event_type: string; source: string; visitor_id: string }) => {
+                          const evColor = e.event_type === "signup_click" ? "#00e5a0" : e.event_type === "broker_click" ? "#f0b90b" : e.event_type === "broker_popup_dismissed" ? "#ff4d6a" : "#4da0ff";
+                          return (
+                            <tr key={e.id} className="hover:bg-white/[.02]" style={{ borderBottom: "1px solid rgba(255,255,255,.03)" }}>
+                              <td className="px-4 py-2.5 font-mono text-[10px]" style={{ color: "rgba(255,255,255,.35)" }}>{fmtDate(e.created_at)}</td>
+                              <td className="px-4 py-2.5"><span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded" style={{ background: evColor + "12", color: evColor }}>{e.event_type}</span></td>
+                              <td className="px-4 py-2.5 font-mono text-[10px]" style={{ color: "rgba(255,255,255,.45)" }}>{e.source || "—"}</td>
+                              <td className="px-4 py-2.5 font-mono text-[10px]" style={{ color: "rgba(255,255,255,.25)" }}>{e.visitor_id ? e.visitor_id.slice(0, 8) + "…" : "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ═══════════════════════════════════ ACTION MODAL ═══════════════════════════════════ */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,.75)", backdropFilter: "blur(12px)" }} onClick={() => setModal(null)}>
           <div className="w-full max-w-md rounded-2xl p-6 mx-4" onClick={(e) => e.stopPropagation()} style={{ background: "#111218", border: "1px solid rgba(255,255,255,.08)", animation: "scaleIn 0.2s ease" }}>

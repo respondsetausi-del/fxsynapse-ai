@@ -75,6 +75,14 @@ export default function Dashboard() {
 
   const BROKER_LINK = "https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/";
 
+  const trackEvent = (event_type: string, source?: string) => {
+    fetch("/api/tracking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_type, source, user_id: user?.id }),
+    }).catch(() => {});
+  };
+
   const submitRating = async (stars: number) => {
     setRating(stars);
     setRatingSubmitted(true);
@@ -177,7 +185,7 @@ export default function Dashboard() {
               </div>
             )}
             {/* Recommended Broker */}
-            <a href={BROKER_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-1 rounded-full no-underline transition-all hover:opacity-90" style={{ background: "rgba(240,185,11,.1)", border: "1px solid rgba(240,185,11,.15)" }}>
+            <a href={BROKER_LINK} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("broker_click", "header")} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full no-underline transition-all hover:opacity-90" style={{ background: "rgba(240,185,11,.1)", border: "1px solid rgba(240,185,11,.15)" }}>
               <span className="text-[10px]">📈</span>
               <span className="text-[10px] font-mono font-medium" style={{ color: "#f0b90b" }}>Trade Now</span>
             </a>
@@ -473,7 +481,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Broker CTA */}
-                <a href={BROKER_LINK} target="_blank" rel="noopener noreferrer" className="block no-underline group">
+                <a href={BROKER_LINK} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("broker_click", "post_scan")} className="block no-underline group">
                   <div className="rounded-xl overflow-hidden transition-all" style={{ background: "linear-gradient(135deg, rgba(240,185,11,.06), rgba(0,229,160,.04))", border: "1px solid rgba(240,185,11,.12)" }}>
                     <div className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
@@ -581,7 +589,7 @@ export default function Dashboard() {
                 rel="noopener noreferrer"
                 className="block w-full py-3 rounded-xl text-sm font-bold no-underline text-center transition-all"
                 style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#0a0b0f", boxShadow: "0 4px 20px rgba(240,185,11,.25)" }}
-                onClick={() => setShowBrokerPopup(false)}
+                onClick={() => { trackEvent("broker_click", "dashboard_popup"); setShowBrokerPopup(false); }}
               >
                 Open Trading Account →
               </a>
