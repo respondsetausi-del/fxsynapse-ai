@@ -55,6 +55,9 @@ export default function LandingPage() {
             <div className="text-lg font-bold text-white" style={{ letterSpacing: "-.5px" }}>FXSynapse<span className="font-extrabold" style={{ color: "#00e5a0" }}> AI</span></div>
           </div>
           <div className="flex items-center gap-3">
+            <a href="https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/" target="_blank" rel="noopener noreferrer" className="text-xs font-semibold no-underline px-3 py-1.5 rounded-lg flex items-center gap-1.5" style={{ background: "rgba(240,185,11,.08)", border: "1px solid rgba(240,185,11,.12)", color: "#f0b90b" }}>
+              📈 Trade Now
+            </a>
             <Link href="/pricing" className="text-xs font-semibold no-underline px-3 py-1.5 rounded-lg" style={{ color: "rgba(255,255,255,.5)" }}>
               Pricing
             </Link>
@@ -250,7 +253,7 @@ export default function LandingPage() {
         </section>
 
         {/* CTA */}
-        <section className="text-center" style={{ padding: "60px 24px 80px" }}>
+        <section className="text-center" style={{ padding: "60px 24px 40px" }}>
           <div className="max-w-lg mx-auto rounded-2xl px-6 py-8" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.06), rgba(77,160,255,.04))", border: "1px solid rgba(0,229,160,.12)" }}>
             <div className="text-[10px] font-mono font-bold mb-2" style={{ color: "#f0b90b" }}>🔥 LAUNCH SPECIAL — 50% OFF FIRST MONTH</div>
             <h2 className="text-2xl font-extrabold text-white mb-3" style={{ letterSpacing: "-1px" }}>Ready to level up your trading?</h2>
@@ -260,6 +263,28 @@ export default function LandingPage() {
             </Link>
             <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.25)" }}>Use code LAUNCH50 for 50% off Pro or Premium</p>
           </div>
+        </section>
+
+        {/* Recommended Broker */}
+        <section style={{ padding: "0 24px 60px" }}>
+          <a href="https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/" target="_blank" rel="noopener noreferrer" className="block no-underline max-w-2xl mx-auto">
+            <div className="rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(240,185,11,.05), rgba(0,229,160,.03))", border: "1px solid rgba(240,185,11,.1)" }}>
+              <div className="flex items-center justify-between px-5 py-4 gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, rgba(240,185,11,.15), rgba(240,185,11,.08))", border: "1px solid rgba(240,185,11,.2)" }}>
+                    <span className="text-lg">📊</span>
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-semibold text-white">Recommended Broker</div>
+                    <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Trade Forex, Synthetics & Crypto • Regulated • Fast Execution</div>
+                  </div>
+                </div>
+                <div className="px-4 py-2 rounded-lg text-[11px] font-bold" style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#0a0b0f" }}>
+                  Open Account →
+                </div>
+              </div>
+            </div>
+          </a>
         </section>
 
         {/* FOOTER */}

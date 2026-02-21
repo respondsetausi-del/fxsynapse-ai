@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
+        max_tokens: 3000,
         system: SYSTEM_PROMPT,
         messages: [{
           role: "user",
@@ -118,6 +118,33 @@ export async function POST(req: NextRequest) {
     }
     analysis.confidence = Math.max(0, Math.min(100, Number(analysis.confidence) || 50));
     if (!Array.isArray(analysis.annotations)) analysis.annotations = [];
+
+    // Validate chart_bounds — ensure it exists and has reasonable values
+    if (!analysis.chart_bounds || typeof analysis.chart_bounds !== "object") {
+      // Default bounds for typical mobile chart screenshot
+      analysis.chart_bounds = { x: 0.02, y: 0.18, w: 0.78, h: 0.65 };
+    } else {
+      const cb = analysis.chart_bounds;
+      cb.x = Math.max(0, Math.min(0.3, Number(cb.x) || 0.02));
+      cb.y = Math.max(0, Math.min(0.4, Number(cb.y) || 0.18));
+      cb.w = Math.max(0.4, Math.min(1.0, Number(cb.w) || 0.78));
+      cb.h = Math.max(0.3, Math.min(1.0, Number(cb.h) || 0.65));
+      // Ensure bounds don't exceed image
+      if (cb.x + cb.w > 1.0) cb.w = 1.0 - cb.x;
+      if (cb.y + cb.h > 1.0) cb.h = 1.0 - cb.y;
+    }
+
+    // Clamp annotation coordinates to valid 0-1 range within chart bounds
+    analysis.annotations = analysis.annotations.map((a: Record<string, unknown>) => {
+      const clamped = { ...a };
+      if (typeof clamped.x === "number") clamped.x = Math.max(0, Math.min(1, clamped.x as number));
+      if (typeof clamped.y === "number") clamped.y = Math.max(0, Math.min(1, clamped.y as number));
+      if (typeof clamped.y1 === "number") clamped.y1 = Math.max(0, Math.min(1, clamped.y1 as number));
+      if (typeof clamped.y2 === "number") clamped.y2 = Math.max(0, Math.min(1, clamped.y2 as number));
+      if (typeof clamped.x1 === "number") clamped.x1 = Math.max(0, Math.min(1, clamped.x1 as number));
+      if (typeof clamped.x2 === "number") clamped.x2 = Math.max(0, Math.min(1, clamped.x2 as number));
+      return clamped;
+    });
 
     // 7. Deduct credit AFTER successful analysis
     await deductCredit(user.id, creditCheck.source);

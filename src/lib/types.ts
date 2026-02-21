@@ -16,6 +16,13 @@ export interface Annotation {
   // arrow
 }
 
+export interface ChartBounds {
+  x: number; // left edge of chart area (0-1 of full image)
+  y: number; // top edge of chart area (0-1 of full image)
+  w: number; // width of chart area (0-1 of full image)
+  h: number; // height of chart area (0-1 of full image)
+}
+
 export interface AnalysisResult {
   pair: string;
   timeframe: string;
@@ -33,6 +40,7 @@ export interface AnalysisResult {
   take_profit: string;
   stop_loss: string;
   risk_reward: string;
+  chart_bounds?: ChartBounds;
   annotations: Annotation[];
 }
 

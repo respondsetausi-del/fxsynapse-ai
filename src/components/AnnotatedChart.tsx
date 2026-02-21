@@ -1,11 +1,12 @@
 "use client";
 import { useRef, useState, useEffect } from "react";
-import { Annotation } from "@/lib/types";
+import { Annotation, ChartBounds } from "@/lib/types";
 import { useAnnotatedCanvas } from "@/lib/useAnnotatedCanvas";
 
 interface Props {
   dataUrl: string | null;
   annotations: Annotation[];
+  chartBounds?: ChartBounds;
   isVisible: boolean;
   onClick?: () => void;
 }
@@ -16,7 +17,7 @@ const LEGEND = [
   { c: "#4da0ff", l: "Trend / TP" },
 ];
 
-export default function AnnotatedChart({ dataUrl, annotations, isVisible, onClick }: Props) {
+export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVisible, onClick }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
@@ -43,12 +44,14 @@ export default function AnnotatedChart({ dataUrl, annotations, isVisible, onClic
     img.onload = () => {
       const maxW = boxRef.current!.clientWidth;
       const ratio = img.height / img.width;
-      setDims({ w: maxW, h: Math.min(maxW * ratio, 460) });
+      // Allow taller canvas for mobile screenshots (portrait images)
+      const maxH = ratio > 1.2 ? 600 : 460;
+      setDims({ w: maxW, h: Math.min(maxW * ratio, maxH) });
     };
     img.src = dataUrl;
   }, [dataUrl]);
 
-  useAnnotatedCanvas(canvasRef, dataUrl, annotations, dims, prog, showAnn);
+  useAnnotatedCanvas(canvasRef, dataUrl, annotations, dims, prog, showAnn, chartBounds);
 
   return (
     <div ref={boxRef} className="w-full relative">

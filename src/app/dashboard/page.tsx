@@ -41,6 +41,10 @@ export default function Dashboard() {
   const [credits, setCredits] = useState<CreditCheck | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingHover, setRatingHover] = useState(0);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [showBrokerPopup, setShowBrokerPopup] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileObjRef = useRef<File | null>(null);
   const supabase = createClient();
@@ -57,6 +61,25 @@ export default function Dashboard() {
       }
     })();
   }, [supabase]);
+
+  // Smart broker popup — show once per session after 8 seconds
+  useEffect(() => {
+    const dismissed = sessionStorage.getItem("broker_popup_seen");
+    if (dismissed) return;
+    const t = setTimeout(() => {
+      setShowBrokerPopup(true);
+      sessionStorage.setItem("broker_popup_seen", "1");
+    }, 8000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const BROKER_LINK = "https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/";
+
+  const submitRating = async (stars: number) => {
+    setRating(stars);
+    setRatingSubmitted(true);
+    try { await fetch("/api/ratings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rating: stars }) }); } catch {}
+  };
 
   const handleFile = useCallback((file: File) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -98,6 +121,7 @@ export default function Dashboard() {
     setStage("upload"); setDataUrl(null); setFileName(""); setProgress(0);
     setShowResult(false); setActiveTab("overview"); setViewMode("split");
     setFullscreen(false); setAnalysis(null); setError(null);
+    setRating(0); setRatingHover(0); setRatingSubmitted(false);
     fileObjRef.current = null;
   };
 
@@ -152,6 +176,11 @@ export default function Dashboard() {
                 )}
               </div>
             )}
+            {/* Recommended Broker */}
+            <a href={BROKER_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-1 rounded-full no-underline transition-all hover:opacity-90" style={{ background: "rgba(240,185,11,.1)", border: "1px solid rgba(240,185,11,.15)" }}>
+              <span className="text-[10px]">📈</span>
+              <span className="text-[10px] font-mono font-medium" style={{ color: "#f0b90b" }}>Trade Now</span>
+            </a>
             {/* Admin button */}
             {user?.role === "admin" && (
               <Link href="/admin" className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold no-underline" style={{
@@ -311,7 +340,7 @@ export default function Dashboard() {
               <div className="result-layout flex gap-3" style={{ flexDirection: viewMode === "analysis" ? "column" : "row" }}>
                 {viewMode !== "analysis" && (
                   <div className="result-chart glass overflow-hidden animate-fadeUp" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
-                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} isVisible={showResult} onClick={() => setFullscreen(true)} />
+                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => setFullscreen(true)} />
                     <div className="flex items-center justify-between" style={{ padding: "9px 13px", borderTop: "1px solid rgba(255,255,255,.04)" }}>
                       <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>ANNOTATED BY FXSYNAPSE AI</span>
                       <div className="flex gap-1">
@@ -408,6 +437,64 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+              {/* Rating + Broker CTA */}
+              <div className="mt-4 flex flex-col gap-3">
+                {/* Star Rating */}
+                <div className="glass" style={{ padding: "16px 20px" }}>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold text-white mb-1">
+                        {ratingSubmitted ? "Thanks for your feedback!" : "How was this analysis?"}
+                      </div>
+                      <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>
+                        {ratingSubmitted ? `You rated ${rating}/5 stars` : "Your rating helps us improve"}
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => !ratingSubmitted && submitRating(star)}
+                          onMouseEnter={() => !ratingSubmitted && setRatingHover(star)}
+                          onMouseLeave={() => !ratingSubmitted && setRatingHover(0)}
+                          className="text-[22px] cursor-pointer transition-transform hover:scale-110"
+                          style={{
+                            background: "none", border: "none", padding: "2px",
+                            filter: (ratingHover || rating) >= star ? "none" : "grayscale(1) opacity(0.3)",
+                            transform: (ratingHover || rating) >= star ? "scale(1.1)" : "scale(1)",
+                          }}
+                          disabled={ratingSubmitted}
+                        >
+                          ⭐
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Broker CTA */}
+                <a href={BROKER_LINK} target="_blank" rel="noopener noreferrer" className="block no-underline group">
+                  <div className="rounded-xl overflow-hidden transition-all" style={{ background: "linear-gradient(135deg, rgba(240,185,11,.06), rgba(0,229,160,.04))", border: "1px solid rgba(240,185,11,.12)" }}>
+                    <div className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(240,185,11,.12)", border: "1px solid rgba(240,185,11,.2)" }}>
+                          <span className="text-base">📊</span>
+                        </div>
+                        <div>
+                          <div className="text-[12px] font-semibold text-white">Ready to execute this trade?</div>
+                          <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>Open a live account with our recommended broker</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#0a0b0f" }}>
+                          Start Trading →
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              </div>
+
               <div className="text-center mt-3">
                 <p className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>FXSynapse AI provides analysis for educational purposes only. Not financial advice.</p>
               </div>
@@ -441,6 +528,70 @@ export default function Dashboard() {
             <div className="flex flex-col gap-2">
               <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>Upgrade to Pro — R99/mo</Link>
               <button onClick={() => setShowPaywall(false)} className="w-full py-3 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.4)" }}>Wait for Tomorrow</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Broker Popup */}
+      {showBrokerPopup && (
+        <div className="fixed inset-0 z-[9997] flex items-end sm:items-center justify-center" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(8px)" }} onClick={() => setShowBrokerPopup(false)}>
+          <div
+            className="w-full sm:max-w-[400px] mx-0 sm:mx-4 rounded-t-2xl sm:rounded-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#12131a",
+              border: "1px solid rgba(255,255,255,.08)",
+              boxShadow: "0 -20px 60px rgba(0,0,0,.5)",
+              animation: "slideUp 0.4s cubic-bezier(0.16,1,0.3,1)",
+            }}
+          >
+            {/* Gradient header */}
+            <div className="relative px-5 pt-5 pb-4" style={{ background: "linear-gradient(135deg, rgba(240,185,11,.08), rgba(0,229,160,.05))" }}>
+              <button onClick={() => setShowBrokerPopup(false)} className="absolute top-3 right-3 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", color: "rgba(255,255,255,.4)", fontSize: 13 }}>✕</button>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", boxShadow: "0 4px 15px rgba(240,185,11,.3)" }}>
+                  <span className="text-xl">📈</span>
+                </div>
+                <div>
+                  <div className="text-[14px] font-bold text-white">Recommended Broker</div>
+                  <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>Trusted • Regulated • Fast Execution</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 pb-5">
+              <div className="flex flex-col gap-2 mb-4 mt-3">
+                {[
+                  { icon: "⚡", text: "Instant deposits & withdrawals" },
+                  { icon: "📊", text: "Trade Forex, Synthetics & Crypto" },
+                  { icon: "🎯", text: "Tight spreads from 0.0 pips" },
+                  { icon: "🔒", text: "Regulated & secure platform" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <span className="text-sm">{item.icon}</span>
+                    <span className="text-[12px]" style={{ color: "rgba(255,255,255,.6)" }}>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              <a
+                href={BROKER_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full py-3 rounded-xl text-sm font-bold no-underline text-center transition-all"
+                style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#0a0b0f", boxShadow: "0 4px 20px rgba(240,185,11,.25)" }}
+                onClick={() => setShowBrokerPopup(false)}
+              >
+                Open Trading Account →
+              </a>
+              <button
+                onClick={() => setShowBrokerPopup(false)}
+                className="w-full py-2.5 mt-2 text-[11px] font-mono cursor-pointer"
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,.3)" }}
+              >
+                Maybe later
+              </button>
             </div>
           </div>
         </div>

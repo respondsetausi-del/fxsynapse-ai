@@ -1,6 +1,15 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { Annotation } from "@/lib/types";
+import { Annotation, ChartBounds } from "@/lib/types";
+
+// Default bounds fallback if Claude doesn't return them
+// Conservative estimate that works for most chart screenshots
+const DEFAULT_BOUNDS: ChartBounds = {
+  x: 0.02,
+  y: 0.18,
+  w: 0.78,
+  h: 0.65,
+};
 
 export function useAnnotatedCanvas(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -8,7 +17,8 @@ export function useAnnotatedCanvas(
   annotations: Annotation[],
   dims: { w: number; h: number },
   prog: number,
-  showAnn: boolean
+  showAnn: boolean,
+  chartBounds?: ChartBounds
 ) {
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -39,7 +49,20 @@ export function useAnnotatedCanvas(
 
     if (!showAnn || prog === 0) return;
 
-    const fontSize = w > 700 ? 12 : 10;
+    // ── Chart bounds (pixel coords) ──
+    const b = chartBounds && chartBounds.w > 0 ? chartBounds : DEFAULT_BOUNDS;
+    const bx = b.x * w; // chart area left edge in pixels
+    const by = b.y * h; // chart area top edge in pixels
+    const bw = b.w * w; // chart area width in pixels
+    const bh = b.h * h; // chart area height in pixels
+
+    // Helper: convert annotation coords (0-1 within bounds) to pixel coords
+    const toPixelX = (ax: number) => bx + ax * bw;
+    const toPixelY = (ay: number) => by + ay * bh;
+
+    const fontSize = w > 700 ? 12 : w > 400 ? 11 : 10;
+
+    // ── Label drawing helper ──
     const lbl = (
       text: string,
       x: number,
@@ -50,19 +73,27 @@ export function useAnnotatedCanvas(
     ) => {
       ctx.font = `bold ${fontSize}px monospace`;
       const m = ctx.measureText(text);
-      const p = 5,
-        bw = m.width + p * 2,
-        bh = fontSize + 6;
-      const bx = align === "right" ? x - bw : x;
+      const p = 5;
+      const bw2 = m.width + p * 2;
+      const bh2 = fontSize + 6;
+      let lx = align === "right" ? x - bw2 : x;
+
+      // Clamp label within chart bounds
+      if (lx < bx) lx = bx + 2;
+      if (lx + bw2 > bx + bw) lx = bx + bw - bw2 - 2;
+      let ly = y - bh2 / 2;
+      if (ly < by) ly = by + 2;
+      if (ly + bh2 > by + bh) ly = by + bh - bh2 - 2;
+
       ctx.fillStyle = bg;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(bx, y - bh / 2, bw, bh, 3);
-      else ctx.rect(bx, y - bh / 2, bw, bh);
+      if (ctx.roundRect) ctx.roundRect(lx, ly, bw2, bh2, 3);
+      else ctx.rect(lx, ly, bw2, bh2);
       ctx.fill();
       ctx.fillStyle = fg;
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
-      ctx.fillText(text, bx + p, y);
+      ctx.fillText(text, lx + p, ly + bh2 / 2);
     };
 
     const lw = w > 700 ? 2 : 1.5;
@@ -70,39 +101,51 @@ export function useAnnotatedCanvas(
     annotations.forEach((a) => {
       ctx.globalAlpha = prog * 0.9;
 
+      // ── ZONE ── (spans chart area width only)
       if (a.type === "zone" && a.y1 !== undefined && a.y2 !== undefined) {
-        const zh = (a.y2 - a.y1) * h;
+        const zy1 = toPixelY(a.y1);
+        const zy2 = toPixelY(a.y2);
+        const zh = zy2 - zy1;
+        const zoneDrawW = bw * prog;
+
         ctx.fillStyle = a.color;
-        ctx.fillRect(0, a.y1 * h, w * prog, zh);
+        ctx.fillRect(bx, zy1, zoneDrawW, zh);
         ctx.strokeStyle = (a.bc || a.color) + "50";
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        ctx.strokeRect(0, a.y1 * h, w * prog, zh);
+        ctx.strokeRect(bx, zy1, zoneDrawW, zh);
         ctx.setLineDash([]);
-        if (prog > 0.5 && a.label)
+        if (prog > 0.5 && a.label) {
           lbl(
             a.label,
-            8,
-            (a.y1 + (a.y2 - a.y1) / 2) * h,
+            bx + 8,
+            zy1 + zh / 2,
             (a.bc || a.color) + "25",
             a.bc || a.color,
             "left"
           );
+        }
       }
 
+      // ── LINE ── (horizontal, spans chart area width only)
       if (a.type === "line" && a.y !== undefined) {
+        const ly2 = toPixelY(a.y);
+        const lineEndX = bx + bw * prog;
+
         ctx.beginPath();
         ctx.setLineDash([8, 5]);
         ctx.strokeStyle = a.color + "bb";
         ctx.lineWidth = lw;
-        ctx.moveTo(0, a.y * h);
-        ctx.lineTo(w * prog, a.y * h);
+        ctx.moveTo(bx, ly2);
+        ctx.lineTo(lineEndX, ly2);
         ctx.stroke();
         ctx.setLineDash([]);
-        if (prog > 0.3 && a.label)
-          lbl(a.label, w * prog - 6, a.y * h - 13, a.color + "22", a.color, "right");
+        if (prog > 0.3 && a.label) {
+          lbl(a.label, lineEndX - 6, ly2 - 13, a.color + "22", a.color, "right");
+        }
       }
 
+      // ── TRENDLINE ── (within chart bounds)
       if (
         a.type === "trend" &&
         a.x1 !== undefined &&
@@ -110,30 +153,52 @@ export function useAnnotatedCanvas(
         a.x2 !== undefined &&
         a.y2 !== undefined
       ) {
-        const dx = (a.x2 - a.x1) * w * prog;
-        const dy = (a.y2 - a.y1) * h * prog;
+        const tx1 = toPixelX(a.x1);
+        const ty1 = toPixelY(a.y1);
+        const tx2 = toPixelX(a.x2);
+        const ty2 = toPixelY(a.y2);
+        const dx = (tx2 - tx1) * prog;
+        const dy = (ty2 - ty1) * prog;
+
         ctx.beginPath();
         ctx.strokeStyle = a.color + "99";
         ctx.lineWidth = lw;
         ctx.setLineDash([]);
-        ctx.moveTo(a.x1 * w, a.y1 * h);
-        ctx.lineTo(a.x1 * w + dx, a.y1 * h + dy);
+        ctx.moveTo(tx1, ty1);
+        ctx.lineTo(tx1 + dx, ty1 + dy);
         ctx.stroke();
-        if (prog > 0.7 && a.label)
+        if (prog > 0.7 && a.label) {
           lbl(
             a.label,
-            a.x1 * w + dx / 2,
-            a.y1 * h + dy / 2 - 12,
+            tx1 + dx / 2,
+            ty1 + dy / 2 - 12,
             a.color + "28",
             a.color,
             "left"
           );
+        }
       }
 
+      // ── POINT ── (Entry/TP/SL — within chart bounds)
       if (a.type === "point" && a.x !== undefined && a.y !== undefined && prog > 0.5) {
-        const px = a.x * w,
-          py = a.y * h;
-        const r = (w > 700 ? 16 : 13) * prog;
+        let px = toPixelX(a.x);
+        let py = toPixelY(a.y);
+
+        // Clamp within chart bounds with padding
+        const pad = 15;
+        px = Math.max(bx + pad, Math.min(bx + bw - pad, px));
+        py = Math.max(by + pad, Math.min(by + bh - pad, py));
+
+        const r = (w > 700 ? 16 : w > 400 ? 14 : 12) * prog;
+
+        // Outer glow
+        ctx.beginPath();
+        ctx.arc(px, py, r + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = a.color + "25";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Inner fill
         ctx.beginPath();
         ctx.arc(px, py, r, 0, Math.PI * 2);
         ctx.fillStyle = a.color + "15";
@@ -141,14 +206,16 @@ export function useAnnotatedCanvas(
         ctx.strokeStyle = a.color + "99";
         ctx.lineWidth = lw;
         ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(px, py, r + 5, 0, Math.PI * 2);
-        ctx.strokeStyle = a.color + "25";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        if (a.label) lbl(a.label, px + 20, py, a.color + "28", a.color, "left");
+
+        // Label — position to the left if too close to right edge
+        if (a.label) {
+          const labelAlign = px > bx + bw * 0.75 ? "right" : "left";
+          const labelX = labelAlign === "right" ? px - 20 : px + 20;
+          lbl(a.label, labelX, py, a.color + "28", a.color, labelAlign);
+        }
       }
 
+      // ── ARROW ── (directional, within chart bounds)
       if (
         a.type === "arrow" &&
         a.x !== undefined &&
@@ -156,17 +223,24 @@ export function useAnnotatedCanvas(
         a.y2 !== undefined &&
         prog > 0.6
       ) {
-        const px = a.x * w,
-          sy = a.y1 * h,
-          ey = a.y2 * h;
+        let px = toPixelX(a.x);
+        const sy = toPixelY(a.y1);
+        const ey = toPixelY(a.y2);
+
+        // Clamp x within chart bounds
+        px = Math.max(bx + 10, Math.min(bx + bw - 10, px));
+
         const ap = Math.min((prog - 0.6) / 0.4, 1);
         const cy = sy + (ey - sy) * ap;
+
         ctx.beginPath();
         ctx.strokeStyle = a.color;
         ctx.lineWidth = 2.5;
         ctx.moveTo(px, sy);
         ctx.lineTo(px, cy);
         ctx.stroke();
+
+        // Arrow head
         ctx.beginPath();
         ctx.fillStyle = a.color;
         ctx.moveTo(px, cy);
@@ -178,14 +252,16 @@ export function useAnnotatedCanvas(
     });
 
     ctx.globalAlpha = 1;
+
+    // Watermark — bottom-right of chart area
     if (prog > 0.8) {
       ctx.globalAlpha = 0.45;
       ctx.font = `bold ${w > 700 ? 13 : 11}px monospace`;
       ctx.fillStyle = "#00e5a0";
       ctx.textAlign = "right";
       ctx.textBaseline = "bottom";
-      ctx.fillText("FXSynapse AI", w - 10, h - 10);
+      ctx.fillText("FXSynapse AI", bx + bw - 5, by + bh - 5);
       ctx.globalAlpha = 1;
     }
-  }, [canvasRef, dims, prog, annotations, showAnn, dataUrl]);
+  }, [canvasRef, dims, prog, annotations, showAnn, dataUrl, chartBounds]);
 }

@@ -51,7 +51,7 @@ export default function FullscreenModal({ dataUrl, annotations, analysis, onClos
     img.src = dataUrl;
   }, [dataUrl]);
 
-  useAnnotatedCanvas(canvasRef, dataUrl, annotations, dims, prog, showAnn);
+  useAnnotatedCanvas(canvasRef, dataUrl, annotations, dims, prog, showAnn, analysis.chart_bounds);
 
   const cc = (v: number) => (v >= 75 ? "#00e5a0" : v >= 50 ? "#f0b90b" : "#ff4d6a");
 
