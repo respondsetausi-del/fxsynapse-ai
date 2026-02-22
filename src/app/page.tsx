@@ -18,8 +18,8 @@ const FEATURES = [
 
 const PLANS = [
   { name: "Free", price: "R0", period: "forever", scans: "1 / day", features: ["1 scan per day", "Basic trend & S/R", "Last 3 scans in history"], cta: "Get Started" },
-  { name: "Pro", price: "R99", period: "/month", scans: "15 / day", features: ["15 scans per day", "Full annotations", "Trade setups (Entry/TP/SL)", "Confluence grading", "Full scan history"], cta: "Upgrade to Pro", popular: true },
-  { name: "Premium", price: "R249", period: "/month", scans: "Unlimited", features: ["Unlimited scans", "All Pro features", "Priority processing", "Chart download", "Priority support"], cta: "Go Premium" },
+  { name: "Pro", price: "R99", period: "/month", scans: "15 / day", features: ["15 scans per day", "Full annotations", "Trade setups (Entry/TP/SL)", "AI Fundamentals & News", "Confluence grading", "Full scan history"], cta: "Upgrade to Pro", popular: true },
+  { name: "Premium", price: "R249", period: "/month", scans: "Unlimited", features: ["Unlimited scans", "All Pro features", "AI Fundamentals & News", "Priority processing", "Chart download", "Priority support"], cta: "Go Premium" },
 ];
 
 const STEPS = [

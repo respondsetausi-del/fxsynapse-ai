@@ -6,6 +6,7 @@ import { CreditCheck } from "@/lib/credits";
 import AnnotatedChart from "@/components/AnnotatedChart";
 import FullscreenModal from "@/components/FullscreenModal";
 import Sidebar from "@/components/Sidebar";
+import AIFundamentals from "@/components/AIFundamentals";
 import Link from "next/link";
 
 const PX = Array.from({ length: 25 }, (_, i) => ({
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [progress, setProgress] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "indicators">("overview");
+  const [dashView, setDashView] = useState<"scanner" | "fundamentals">("scanner");
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [fullscreen, setFullscreen] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -215,6 +217,37 @@ export default function Dashboard() {
             )}
           </div>
         </header>
+
+        {/* ── Dashboard View Toggle ── */}
+        <div className="flex items-center gap-1 mx-4 mt-2 p-1 rounded-xl" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+          {([
+            { id: "scanner", label: "📸 Chart Scanner", color: "#00e5a0" },
+            { id: "fundamentals", label: "📊 AI Fundamentals", color: "#f0b90b" },
+          ] as const).map(v => (
+            <button
+              key={v.id}
+              onClick={() => setDashView(v.id)}
+              className="flex-1 py-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
+              style={{
+                background: dashView === v.id ? `${v.color}12` : "transparent",
+                border: dashView === v.id ? `1px solid ${v.color}25` : "1px solid transparent",
+                color: dashView === v.id ? v.color : "rgba(255,255,255,.3)",
+              }}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── AI FUNDAMENTALS VIEW ── */}
+        {dashView === "fundamentals" && (
+          <div className="px-4 py-4">
+            <AIFundamentals userPlan={user?.plan_id || "free"} userRole={user?.role || ""} />
+          </div>
+        )}
+
+        {/* ── SCANNER VIEW ── */}
+        {dashView === "scanner" && (<>
 
         {/* Upgrade Banner for Free Users */}
         {user?.plan_id === "free" && stage !== "analyzing" && (
@@ -510,6 +543,7 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+      </>)}
 
       {/* Fullscreen */}
       {fullscreen && A && dataUrl && <FullscreenModal dataUrl={dataUrl} annotations={A.annotations} analysis={A} onClose={() => setFullscreen(false)} />}
