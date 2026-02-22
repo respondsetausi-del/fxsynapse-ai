@@ -543,6 +543,7 @@ export default function Dashboard() {
           )}
         </main>
       </>)}
+      </div>
 
       {/* Fullscreen */}
       {fullscreen && A && dataUrl && <FullscreenModal dataUrl={dataUrl} annotations={A.annotations} analysis={A} onClose={() => setFullscreen(false)} />}
