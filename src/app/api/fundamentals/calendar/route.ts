@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // Country code to flag emoji mapping
 const FLAGS: Record<string, string> = {
@@ -42,7 +44,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch from cache
-    const { data: events } = await supabaseAdmin
+    const { data: events } = await getSupabase()
       .from("economic_events")
       .select("*")
       .gte("event_date", fromDate)
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest) {
     // If no cached events, try refresh
     if (!events || events.length === 0) {
       await refreshCalendar(fromDate, toDate);
-      const { data: freshEvents } = await supabaseAdmin
+      const { data: freshEvents } = await getSupabase()
         .from("economic_events")
         .select("*")
         .gte("event_date", fromDate)
@@ -123,7 +125,7 @@ async function refreshCalendar(from: string, to: string) {
       const eventDate = ev.time?.split(" ")[0] || from;
       const eventTime = ev.time?.split(" ")[1]?.slice(0, 5) || null;
 
-      await supabaseAdmin.from("economic_events").upsert({
+      await getSupabase().from("economic_events").upsert({
         event_date: eventDate,
         event_time: eventTime,
         country: countryMap[ev.country] || ev.country,
@@ -147,7 +149,7 @@ async function refreshCalendar(from: string, to: string) {
 // Seed default high-impact events when no API key
 async function seedDefaultEvents(from: string, to: string) {
   // Check if we already have events for this range
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await getSupabase()
     .from("economic_events")
     .select("id")
     .gte("event_date", from)
@@ -202,7 +204,7 @@ async function seedDefaultEvents(from: string, to: string) {
     const count = 3 + Math.floor(Math.random() * 3);
     for (let i = 0; i < count && eventIdx < majorEvents.length; i++) {
       const ev = majorEvents[eventIdx % majorEvents.length];
-      await supabaseAdmin.from("economic_events").insert({
+      await getSupabase().from("economic_events").insert({
         event_date: day,
         event_time: ev.event_time,
         country: ev.country,

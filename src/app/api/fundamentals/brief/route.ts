@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 const BRIEF_PROMPT = `You are FXSynapse AI Fundamentals Analyst. You analyze economic calendar events and produce a market intelligence brief for forex traders.
 
@@ -61,7 +63,7 @@ export async function GET(req: NextRequest) {
     const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
     // Get latest brief for the date
-    const { data: brief } = await supabaseAdmin
+    const { data: brief } = await getSupabase()
       .from("ai_market_briefs")
       .select("*")
       .eq("report_date", date)
@@ -75,7 +77,7 @@ export async function GET(req: NextRequest) {
       yesterday.setDate(yesterday.getDate() - 1);
       const yStr = yesterday.toISOString().split("T")[0];
 
-      const { data: yBrief } = await supabaseAdmin
+      const { data: yBrief } = await getSupabase()
         .from("ai_market_briefs")
         .select("*")
         .eq("report_date", yStr)
@@ -116,7 +118,7 @@ export async function POST(req: NextRequest) {
     const today = new Date().toISOString().split("T")[0];
 
     // Check if already generated for this session today
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await getSupabase()
       .from("ai_market_briefs")
       .select("id")
       .eq("report_date", today)
@@ -132,7 +134,7 @@ export async function POST(req: NextRequest) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yStr = yesterday.toISOString().split("T")[0];
 
-    const { data: events } = await supabaseAdmin
+    const { data: events } = await getSupabase()
       .from("economic_events")
       .select("*")
       .gte("event_date", yStr)
@@ -189,7 +191,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Store brief
-    const { data: saved, error: saveError } = await supabaseAdmin
+    const { data: saved, error: saveError } = await getSupabase()
       .from("ai_market_briefs")
       .insert({
         session: briefSession,
