@@ -1,134 +1,173 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Frankfurter time series → daily candles (free, no key)
-// For indicators, daily close is what matters (SMA, RSI, MACD all use close)
+// Twelve Data for intraday candles (1min, 5min, 15min, 1H)
+// Frankfurter for daily candles (free fallback)
 
-// Map OANDA symbols to Frankfurter currencies
-function parseSymbol(symbol: string): { base: string; quote: string } | null {
-  // OANDA:EUR_USD → base=EUR, quote=USD
+const TWELVE_DATA_BASE = "https://api.twelvedata.com";
+
+// Convert OANDA:EUR_USD → EUR/USD for Twelve Data
+function toTwelveSymbol(symbol: string): string {
+  return symbol.replace("OANDA:", "").replace("_", "/");
+}
+
+// Frankfurter daily candles (free, no key)
+async function fetchDailyCandles(symbol: string, count: number) {
   const clean = symbol.replace("OANDA:", "");
-  const parts = clean.split("_");
-  if (parts.length !== 2) return null;
-  return { base: parts[0], quote: parts[1] };
-}
+  const [base, quote] = clean.split("_");
+  if (!base || !quote) return [];
 
-// Convert Frankfurter rates to a pair price
-function calcPrice(rates: Record<string, number>, base: string, quote: string, frankfurterBase: string): number | null {
-  // Frankfurter returns rates relative to frankfurterBase
-  if (base === frankfurterBase) {
-    // e.g., USD/JPY with frankfurterBase=USD → just return JPY rate
-    return rates[quote] ?? null;
-  }
-  if (quote === frankfurterBase) {
-    // e.g., EUR/USD with frankfurterBase=USD → 1/EUR_rate
-    return rates[base] ? 1 / rates[base] : null;
-  }
-  // Cross pair: e.g., EUR/GBP with frankfurterBase=USD
-  // EUR/GBP = (1/EUR_in_USD) / (1/GBP_in_USD) = GBP_rate / EUR_rate
-  if (rates[base] && rates[quote]) {
-    return rates[quote] / rates[base];
-  }
-  return null;
-}
-
-let candleCache: Record<string, { candles: any[]; timestamp: number }> = {};
-const CACHE_TTL = 300000; // 5 min cache for candles
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const symbol = searchParams.get("symbol") || "OANDA:EUR_USD";
-  const count = Math.min(parseInt(searchParams.get("count") || "200"), 365);
-
-  const cacheKey = `${symbol}-${count}`;
-  if (candleCache[cacheKey] && Date.now() - candleCache[cacheKey].timestamp < CACHE_TTL) {
-    return NextResponse.json({
-      candles: candleCache[cacheKey].candles,
-      symbol,
-      resolution: "D",
-      count: candleCache[cacheKey].candles.length,
-    });
+  if (["XAU", "XAG"].includes(base) || ["XAU", "XAG"].includes(quote)) {
+    return [];
   }
 
-  const pair = parseSymbol(symbol);
-  if (!pair) {
-    return NextResponse.json({ error: "Invalid symbol", candles: [] }, { status: 400 });
-  }
-
-  // Calculate date range
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - Math.ceil(count * 1.5)); // Extra days for weekends/holidays
+  startDate.setDate(startDate.getDate() - Math.ceil(count * 1.5));
 
   const from = startDate.toISOString().split("T")[0];
   const to = endDate.toISOString().split("T")[0];
 
-  // Determine which currencies to fetch
   const symbols = new Set<string>();
-  if (pair.base !== "USD") symbols.add(pair.base);
-  if (pair.quote !== "USD") symbols.add(pair.quote);
-
-  // Handle XAU/XAG — Frankfurter doesn't support metals
-  if (pair.base === "XAU" || pair.base === "XAG" || pair.quote === "XAU" || pair.quote === "XAG") {
-    return NextResponse.json({ candles: [], symbol, resolution: "D", count: 0, note: "Metals not available on free feed" });
-  }
-
+  if (base !== "USD") symbols.add(base);
+  if (quote !== "USD") symbols.add(quote);
   const symbolsParam = symbols.size > 0 ? `&symbols=${Array.from(symbols).join(",")}` : "";
 
+  const res = await fetch(`https://api.frankfurter.dev/v1/${from}..${to}?base=USD${symbolsParam}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const ratesByDate = data.rates || {};
+  const dates = Object.keys(ratesByDate).sort();
+
+  const candles: any[] = [];
+  let prevClose: number | null = null;
+
+  for (const date of dates) {
+    const dayRates = ratesByDate[date];
+    let close: number | null = null;
+
+    if (base === "USD") close = dayRates[quote] ?? null;
+    else if (quote === "USD") close = dayRates[base] ? 1 / dayRates[base] : null;
+    else if (dayRates[base] && dayRates[quote]) close = dayRates[quote] / dayRates[base];
+
+    if (close === null) continue;
+
+    const open = prevClose ?? close;
+    const range = Math.abs(close - open);
+    const minRange = close * 0.0005;
+    const wick = Math.max(range * 0.3, minRange);
+
+    candles.push({
+      time: Math.floor(new Date(date).getTime() / 1000),
+      open: parseFloat(open.toFixed(6)),
+      high: parseFloat((Math.max(open, close) + wick).toFixed(6)),
+      low: parseFloat((Math.min(open, close) - wick).toFixed(6)),
+      close: parseFloat(close.toFixed(6)),
+      volume: 0,
+    });
+    prevClose = close;
+  }
+
+  return candles.slice(-count);
+}
+
+// Twelve Data intraday candles
+async function fetchIntradayCandles(symbol: string, interval: string, count: number, apiKey: string) {
+  const tdSymbol = toTwelveSymbol(symbol);
+  const url = `${TWELVE_DATA_BASE}/time_series?symbol=${encodeURIComponent(tdSymbol)}&interval=${interval}&outputsize=${count}&apikey=${apiKey}`;
+
+  const res = await fetch(url);
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  if (data.status === "error" || !data.values) return null;
+
+  // Twelve Data returns newest first, we want oldest first
+  const candles = data.values.reverse().map((v: any) => ({
+    time: Math.floor(new Date(v.datetime).getTime() / 1000),
+    open: parseFloat(v.open),
+    high: parseFloat(v.high),
+    low: parseFloat(v.low),
+    close: parseFloat(v.close),
+    volume: parseFloat(v.volume || "0"),
+  }));
+
+  return candles;
+}
+
+// Cache
+const cache: Record<string, { candles: any[]; timestamp: number }> = {};
+const CACHE_TTL: Record<string, number> = {
+  "1min": 60000,      // 1 min
+  "5min": 120000,     // 2 min
+  "15min": 300000,    // 5 min
+  "1h": 600000,       // 10 min
+  "D": 300000,        // 5 min (daily doesn't change often)
+};
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const symbol = searchParams.get("symbol") || "OANDA:EUR_USD";
+  const resolution = searchParams.get("resolution") || "1h";
+  const count = Math.min(parseInt(searchParams.get("count") || "200"), 500);
+
+  // Map resolution
+  const resMap: Record<string, string> = {
+    "1": "1min", "1min": "1min",
+    "5": "5min", "5min": "5min",
+    "15": "15min", "15min": "15min",
+    "30": "30min", "30min": "30min",
+    "60": "1h", "1h": "1h",
+    "D": "D", "1D": "D", "1d": "D",
+  };
+  const interval = resMap[resolution] || "1h";
+
+  // Check cache
+  const cacheKey = `${symbol}-${interval}-${count}`;
+  const ttl = CACHE_TTL[interval] || 300000;
+  if (cache[cacheKey] && Date.now() - cache[cacheKey].timestamp < ttl) {
+    return NextResponse.json({
+      candles: cache[cacheKey].candles,
+      symbol, resolution: interval, count: cache[cacheKey].candles.length,
+    });
+  }
+
   try {
-    const url = `https://api.frankfurter.dev/v1/${from}..${to}?base=USD${symbolsParam}`;
-    const res = await fetch(url);
+    let candles: any[] = [];
 
-    if (!res.ok) {
-      return NextResponse.json({ error: "Failed to fetch historical data", candles: [] }, { status: 500 });
+    if (interval === "D") {
+      // Daily → use Frankfurter (free, no key)
+      candles = await fetchDailyCandles(symbol, count);
+    } else {
+      // Intraday → use Twelve Data
+      const apiKey = process.env.TWELVE_DATA_API_KEY;
+      if (!apiKey) {
+        // Fallback to daily if no Twelve Data key
+        candles = await fetchDailyCandles(symbol, count);
+        return NextResponse.json({
+          candles, symbol, resolution: "D", count: candles.length,
+          note: "Intraday requires TWELVE_DATA_API_KEY — showing daily",
+        });
+      }
+
+      const result = await fetchIntradayCandles(symbol, interval, count, apiKey);
+      if (result && result.length > 0) {
+        candles = result;
+      } else {
+        // Fallback to daily
+        candles = await fetchDailyCandles(symbol, count);
+        return NextResponse.json({
+          candles, symbol, resolution: "D", count: candles.length,
+          note: "Intraday unavailable — showing daily",
+        });
+      }
     }
 
-    const data = await res.json();
-    const ratesByDate = data.rates || {};
-    const dates = Object.keys(ratesByDate).sort();
-
-    if (dates.length === 0) {
-      return NextResponse.json({ candles: [], symbol, resolution: "D", count: 0 });
+    if (candles.length > 0) {
+      cache[cacheKey] = { candles, timestamp: Date.now() };
     }
-
-    // Build candles from daily rates
-    const candles: any[] = [];
-    let prevClose: number | null = null;
-
-    for (const date of dates) {
-      const dayRates = ratesByDate[date];
-      const close = calcPrice(dayRates, pair.base, pair.quote, "USD");
-      if (close === null) continue;
-
-      const open = prevClose ?? close;
-      // Estimate high/low from open/close with small variance
-      const range = Math.abs(close - open);
-      const minRange = close * 0.0005; // Minimum 0.05% range
-      const wick = Math.max(range * 0.3, minRange);
-      const high = Math.max(open, close) + wick;
-      const low = Math.min(open, close) - wick;
-
-      candles.push({
-        time: Math.floor(new Date(date).getTime() / 1000),
-        open: parseFloat(open.toFixed(6)),
-        high: parseFloat(high.toFixed(6)),
-        low: parseFloat(low.toFixed(6)),
-        close: parseFloat(close.toFixed(6)),
-        volume: 0,
-      });
-
-      prevClose = close;
-    }
-
-    // Trim to requested count
-    const trimmed = candles.slice(-count);
-
-    candleCache[cacheKey] = { candles: trimmed, timestamp: Date.now() };
 
     return NextResponse.json({
-      candles: trimmed,
-      symbol,
-      resolution: "D",
-      count: trimmed.length,
+      candles, symbol, resolution: interval, count: candles.length,
     });
   } catch (err) {
     console.error("Candles error:", err);
