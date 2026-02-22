@@ -87,7 +87,7 @@ export function useAnnotatedCanvas(
 
       ctx.fillStyle = bg;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(lx, ly, bw2, bh2, 3);
+      if ('roundRect' in ctx) (ctx as any).roundRect(lx, ly, bw2, bh2, 3);
       else ctx.rect(lx, ly, bw2, bh2);
       ctx.fill();
       ctx.fillStyle = fg;
@@ -223,9 +223,6 @@ export function useAnnotatedCanvas(
           ctx.beginPath();
           ctx.moveTo(tagX + 4, tagY);
           ctx.lineTo(tagX + tagW, tagY);
-          if (ctx.roundRect) {
-            // Top-right corner
-          }
           ctx.lineTo(tagX + tagW, tagY + tagH);
           ctx.lineTo(tagX + 4, tagY + tagH);
           ctx.lineTo(tagX - 3, py); // Arrow notch pointing left
