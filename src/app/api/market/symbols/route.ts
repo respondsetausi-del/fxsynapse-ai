@@ -26,9 +26,10 @@ const FOREX_PAIRS = [
   { symbol: "OANDA:AUD_CAD", display: "AUD/CAD", base: "AUD", quote: "CAD", category: "Cross", popular: false },
   { symbol: "OANDA:AUD_NZD", display: "AUD/NZD", base: "AUD", quote: "NZD", category: "Cross", popular: false },
   { symbol: "OANDA:NZD_CAD", display: "NZD/CAD", base: "NZD", quote: "CAD", category: "Cross", popular: false },
-  // Metals
-  { symbol: "OANDA:XAU_USD", display: "XAU/USD", base: "XAU", quote: "USD", category: "Metal", popular: true },
-  { symbol: "OANDA:XAG_USD", display: "XAG/USD", base: "XAG", quote: "USD", category: "Metal", popular: false },
+  // Exotics
+  { symbol: "OANDA:USD_ZAR", display: "USD/ZAR", base: "USD", quote: "ZAR", category: "Exotic", popular: false },
+  { symbol: "OANDA:USD_TRY", display: "USD/TRY", base: "USD", quote: "TRY", category: "Exotic", popular: false },
+  { symbol: "OANDA:USD_MXN", display: "USD/MXN", base: "USD", quote: "MXN", category: "Exotic", popular: false },
 ];
 
 export async function GET() {

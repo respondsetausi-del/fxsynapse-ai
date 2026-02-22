@@ -52,7 +52,7 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [signalHistory, setSignalHistory] = useState<Signal[]>([]);
   const [conditions, setConditions] = useState<SignalCondition[]>(DEFAULT_SIGNAL_CONDITIONS);
-  const [timeframe, setTimeframe] = useState("60");
+  const [timeframe, setTimeframe] = useState("D");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"indicators" | "signals" | "conditions">("indicators");
   const [wsConnected, setWsConnected] = useState(false);
@@ -87,7 +87,7 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
       } catch { }
     } else {
       // Default watchlist
-      const defaults = ["OANDA:EUR_USD", "OANDA:GBP_USD", "OANDA:XAU_USD"];
+      const defaults = ["OANDA:EUR_USD", "OANDA:GBP_USD", "OANDA:USD_JPY"];
       const initial = defaults.map(symbol => ({
         symbol,
         display: symbol.replace("OANDA:", "").replace("_", "/"),
@@ -105,33 +105,52 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
     }
   }, [watchlist]);
 
-  // WebSocket for live prices
+  // Poll live prices using quotes endpoint
   useEffect(() => {
     if (watchlist.length === 0) return;
 
-    const apiKey = ""; // Will be proxied through server, but Finnhub WS works client-side
-    // Use quote polling instead of WebSocket for reliability
     const pollPrices = async () => {
+      try {
+        // Single API call gets all forex rates
+        const res = await fetch("/api/market/quotes");
+        const data = await res.json();
+        if (data.pairs) {
+          for (const pair of watchlist) {
+            const quote = data.pairs[pair.symbol];
+            if (quote) {
+              pricesRef.current[pair.symbol] = {
+                bid: quote.bid,
+                ask: quote.ask,
+                prevClose: quote.bid * (1 - (quote.change || 0) / 100),
+              };
+            }
+          }
+          updateWatchlistPrices();
+        }
+      } catch {}
+
+      // Also fetch daily candles for change calculation
       for (const pair of watchlist) {
+        if (pricesRef.current[pair.symbol]?.bid) continue; // Already have data
         try {
           const res = await fetch(`/api/market/candles?symbol=${encodeURIComponent(pair.symbol)}&resolution=D&count=2`);
           const data = await res.json();
-          if (data.candles && data.candles.length >= 2) {
-            const prev = data.candles[data.candles.length - 2];
+          if (data.candles && data.candles.length >= 1) {
             const curr = data.candles[data.candles.length - 1];
+            const prev = data.candles.length >= 2 ? data.candles[data.candles.length - 2] : curr;
             pricesRef.current[pair.symbol] = {
               bid: curr.close,
-              ask: curr.close + (curr.high - curr.low) * 0.001,
+              ask: curr.close * 1.00005,
               prevClose: prev.close,
             };
           }
-        } catch { }
+        } catch {}
       }
       updateWatchlistPrices();
     };
 
     pollPrices();
-    const interval = setInterval(pollPrices, 30000); // Poll every 30s
+    const interval = setInterval(pollPrices, 30000);
     setWsConnected(true);
 
     return () => {
@@ -237,18 +256,22 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
           <div className={`w-2 h-2 rounded-full ${wsConnected ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
           <span className="text-xs text-zinc-500 font-mono">{wsConnected ? "LIVE" : "OFFLINE"}</span>
         </div>
-        <div className="flex gap-1">
-          {["1", "5", "15", "60", "D"].map(tf => (
+        <div className="flex gap-1 items-center">
+          <span className="text-[10px] text-zinc-600 mr-1">TF:</span>
+          {[
+            { key: "D", label: "1D" },
+          ].map(tf => (
             <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={`px-3 py-1 text-xs font-mono rounded ${timeframe === tf
+              key={tf.key}
+              onClick={() => setTimeframe(tf.key)}
+              className={`px-3 py-1 text-xs font-mono rounded ${timeframe === tf.key
                 ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                 : "text-zinc-500 hover:text-zinc-300 border border-zinc-800"}`}
             >
-              {tf === "60" ? "1H" : tf === "D" ? "1D" : `${tf}M`}
+              {tf.label}
             </button>
           ))}
+          <span className="text-[9px] text-zinc-600 ml-2">Daily • ECB Data</span>
         </div>
       </div>
 
