@@ -87,8 +87,7 @@ export function useAnnotatedCanvas(
 
       ctx.fillStyle = bg;
       ctx.beginPath();
-      if ('roundRect' in ctx) (ctx as any).roundRect(lx, ly, bw2, bh2, 3);
-      else ctx.rect(lx, ly, bw2, bh2);
+      (ctx as any).roundRect ? (ctx as any).roundRect(lx, ly, bw2, bh2, 3) : ctx.rect(lx, ly, bw2, bh2);
       ctx.fill();
       ctx.fillStyle = fg;
       ctx.textBaseline = "middle";
