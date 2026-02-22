@@ -100,8 +100,7 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
 
     const pollPrices = async () => {
       try {
-        const symbolsParam = watchlist.map(w => w.symbol).join(",");
-        const res = await fetch(`/api/market/quotes?symbols=${encodeURIComponent(symbolsParam)}`);
+        const res = await fetch("/api/market/quotes");
         const data = await res.json();
 
         if (data.pairs) {
@@ -142,8 +141,8 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
     };
 
     pollPrices();
-    // Poll every 10 seconds (within Twelve Data's 8 credits/min)
-    pollRef.current = setInterval(pollPrices, 10000);
+    // Poll every 30 seconds — prices come from free unlimited API
+    pollRef.current = setInterval(pollPrices, 30000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);

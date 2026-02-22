@@ -1,80 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-// Priority:
-// 1. Twelve Data /price (real-time, free 8 credits/min)
-// 2. Frankfurter (daily ECB rates, free unlimited)
+// Frankfurter ONLY for live quotes — free, unlimited, no key
+// Twelve Data is reserved exclusively for intraday candles
 
-const TWELVE_DATA_BASE = "https://api.twelvedata.com";
+let cache: { data: any; timestamp: number } | null = null;
+const CACHE_TTL = 30000; // 30s
 
-function toTwelveSymbol(oandaSymbol: string): string {
-  return oandaSymbol.replace("OANDA:", "").replace("_", "/");
-}
-
-function toOandaSymbol(tdSymbol: string): string {
-  return "OANDA:" + tdSymbol.replace("/", "_");
-}
-
-// Cache: separate for Twelve Data (short TTL) and Frankfurter (longer TTL)
-let tdCache: { data: any; timestamp: number } | null = null;
-let ffCache: { data: any; timestamp: number } | null = null;
-const TD_CACHE_TTL = 8000;   // 8 seconds (matches ~8 calls/min limit)
-const FF_CACHE_TTL = 60000;  // 60 seconds
-
-async function fetchTwelveDataPrices(symbols: string[], apiKey: string): Promise<Record<string, { bid: number; ask: number }> | null> {
-  try {
-    // Batch up to 8 symbols per call (free tier limit)
-    const batch = symbols.slice(0, 8);
-    const tdSymbols = batch.map(toTwelveSymbol).join(",");
-
-    const res = await fetch(
-      `${TWELVE_DATA_BASE}/price?symbol=${encodeURIComponent(tdSymbols)}&apikey=${apiKey}`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const pairs: Record<string, { bid: number; ask: number }> = {};
-
-    if (batch.length === 1) {
-      // Single symbol returns { price: "1.0869" }
-      if (data.price) {
-        const price = parseFloat(data.price);
-        const spread = price * 0.00003;
-        pairs[batch[0]] = { bid: price, ask: price + spread };
-      }
-    } else {
-      // Multiple symbols returns { "EUR/USD": { price: "1.0869" }, ... }
-      for (const [tdSym, val] of Object.entries(data)) {
-        const v = val as any;
-        if (v.price) {
-          const oandaSym = toOandaSymbol(tdSym);
-          const price = parseFloat(v.price);
-          const spread = price * 0.00003;
-          pairs[oandaSym] = { bid: price, ask: price + spread };
-        }
-      }
-    }
-
-    return Object.keys(pairs).length > 0 ? pairs : null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchFrankfurterPrices(): Promise<Record<string, { bid: number; ask: number }>> {
+async function fetchRates(): Promise<Record<string, { bid: number; ask: number }>> {
   const res = await fetch(
-    "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,GBP,JPY,CHF,AUD,CAD,NZD,ZAR,TRY,MXN,SGD"
+    "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR,GBP,JPY,CHF,AUD,CAD,NZD,ZAR,TRY,MXN,SGD,NOK,SEK,HKD,CNY"
   );
   if (!res.ok) return {};
   const data = await res.json();
   const r = data.rates || {};
-
   const pairs: Record<string, { bid: number; ask: number }> = {};
+
   const add = (sym: string, bid: number, sp: number = 1.00003) => {
     pairs[sym] = { bid: parseFloat(bid.toFixed(6)), ask: parseFloat((bid * sp).toFixed(6)) };
   };
 
-  // Majors
   if (r.EUR) add("OANDA:EUR_USD", 1 / r.EUR);
   if (r.GBP) add("OANDA:GBP_USD", 1 / r.GBP);
   if (r.JPY) add("OANDA:USD_JPY", r.JPY);
@@ -82,7 +26,6 @@ async function fetchFrankfurterPrices(): Promise<Record<string, { bid: number; a
   if (r.AUD) add("OANDA:AUD_USD", 1 / r.AUD);
   if (r.CAD) add("OANDA:USD_CAD", r.CAD);
   if (r.NZD) add("OANDA:NZD_USD", 1 / r.NZD);
-  // Crosses
   if (r.EUR && r.GBP) add("OANDA:EUR_GBP", r.GBP / r.EUR);
   if (r.EUR && r.JPY) add("OANDA:EUR_JPY", r.JPY / r.EUR);
   if (r.GBP && r.JPY) add("OANDA:GBP_JPY", r.JPY / r.GBP);
@@ -105,44 +48,18 @@ async function fetchFrankfurterPrices(): Promise<Record<string, { bid: number; a
   return pairs;
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const requestedSymbols = searchParams.get("symbols")?.split(",") || [];
-
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
-
-  // Try Twelve Data first (real-time)
-  if (apiKey && requestedSymbols.length > 0) {
-    // Check cache
-    if (tdCache && Date.now() - tdCache.timestamp < TD_CACHE_TTL) {
-      return NextResponse.json(tdCache.data);
-    }
-
-    const tdPrices = await fetchTwelveDataPrices(requestedSymbols, apiKey);
-    if (tdPrices) {
-      // Merge with Frankfurter for any missing pairs
-      if (!ffCache || Date.now() - ffCache.timestamp > FF_CACHE_TTL) {
-        const ffPrices = await fetchFrankfurterPrices();
-        ffCache = { data: ffPrices, timestamp: Date.now() };
-      }
-      const merged = { ...ffCache.data, ...tdPrices };
-      const result = { pairs: merged, timestamp: Date.now() };
-      tdCache = { data: result, timestamp: Date.now() };
-      return NextResponse.json(result);
-    }
-  }
-
-  // Fallback: Frankfurter only
-  if (ffCache && Date.now() - ffCache.timestamp < FF_CACHE_TTL) {
-    return NextResponse.json({ pairs: ffCache.data, timestamp: Date.now() });
+export async function GET() {
+  if (cache && Date.now() - cache.timestamp < CACHE_TTL) {
+    return NextResponse.json(cache.data);
   }
 
   try {
-    const ffPrices = await fetchFrankfurterPrices();
-    ffCache = { data: ffPrices, timestamp: Date.now() };
-    return NextResponse.json({ pairs: ffPrices, timestamp: Date.now() });
+    const pairs = await fetchRates();
+    const result = { pairs, timestamp: Date.now() };
+    cache = { data: result, timestamp: Date.now() };
+    return NextResponse.json(result);
   } catch (err) {
     console.error("Quotes error:", err);
-    return NextResponse.json({ error: "Failed", pairs: {} }, { status: 500 });
+    return NextResponse.json({ pairs: {}, timestamp: Date.now() }, { status: 500 });
   }
 }

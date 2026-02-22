@@ -224,7 +224,7 @@ export default function Dashboard() {
           {([
             { id: "scanner", label: "📸 Chart Scanner", color: "#00e5a0" },
             { id: "fundamentals", label: "📊 AI Fundamentals", color: "#f0b90b" },
-            { id: "markets", label: "📈 Live Markets", color: "#3b82f6" },
+            // { id: "markets", label: "📈 Live Markets", color: "#3b82f6" }, // Phase 2 — ready but hidden
           ] as const).map(v => (
             <button
               key={v.id}
