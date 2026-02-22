@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
         ffCache = { data: ffPrices, timestamp: Date.now() };
       }
       const merged = { ...ffCache.data, ...tdPrices };
-      const result = { pairs: merged, source: "twelvedata", timestamp: Date.now() };
+      const result = { pairs: merged, timestamp: Date.now() };
       tdCache = { data: result, timestamp: Date.now() };
       return NextResponse.json(result);
     }
@@ -134,13 +134,13 @@ export async function GET(req: NextRequest) {
 
   // Fallback: Frankfurter only
   if (ffCache && Date.now() - ffCache.timestamp < FF_CACHE_TTL) {
-    return NextResponse.json({ pairs: ffCache.data, source: "frankfurter", timestamp: Date.now() });
+    return NextResponse.json({ pairs: ffCache.data, timestamp: Date.now() });
   }
 
   try {
     const ffPrices = await fetchFrankfurterPrices();
     ffCache = { data: ffPrices, timestamp: Date.now() };
-    return NextResponse.json({ pairs: ffPrices, source: "frankfurter", timestamp: Date.now() });
+    return NextResponse.json({ pairs: ffPrices, timestamp: Date.now() });
   } catch (err) {
     console.error("Quotes error:", err);
     return NextResponse.json({ error: "Failed", pairs: {} }, { status: 500 });

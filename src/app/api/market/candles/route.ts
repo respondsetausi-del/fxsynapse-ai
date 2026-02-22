@@ -145,7 +145,6 @@ export async function GET(req: NextRequest) {
         candles = await fetchDailyCandles(symbol, count);
         return NextResponse.json({
           candles, symbol, resolution: "D", count: candles.length,
-          note: "Intraday requires TWELVE_DATA_API_KEY — showing daily",
         });
       }
 
@@ -157,7 +156,6 @@ export async function GET(req: NextRequest) {
         candles = await fetchDailyCandles(symbol, count);
         return NextResponse.json({
           candles, symbol, resolution: "D", count: candles.length,
-          note: "Intraday unavailable — showing daily",
         });
       }
     }

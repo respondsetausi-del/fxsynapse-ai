@@ -105,7 +105,7 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
         const data = await res.json();
 
         if (data.pairs) {
-          setDataSource(data.source || "unknown");
+          setDataSource("live");
           setLastPriceUpdate(Date.now());
 
           setWatchlist(prev => prev.map(pair => {
@@ -170,7 +170,7 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
             setSignalHistory(prev => [...newSignals, ...prev].slice(0, 50));
           }
 
-          if (data.note) setDataSource(prev => prev + ` (${data.note})`);
+          if (data.note) {} // Internal only
         } else {
           setCandles([]);
           setSummary(null);
@@ -242,7 +242,7 @@ export default function LiveMarketEngine({ userTier }: LiveMarketEngineProps) {
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-[10px] text-zinc-500 font-mono">
-              LIVE • {dataSource.toUpperCase()} • {timeSince(lastPriceUpdate)}
+              LIVE • Updated {timeSince(lastPriceUpdate)}
             </span>
           </div>
         </div>
