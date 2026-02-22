@@ -7,6 +7,7 @@ import AnnotatedChart from "@/components/AnnotatedChart";
 import FullscreenModal from "@/components/FullscreenModal";
 import Sidebar from "@/components/Sidebar";
 import AIFundamentals from "@/components/AIFundamentals";
+import LiveMarketEngine from "@/components/LiveMarketEngine";
 import Link from "next/link";
 
 const PX = Array.from({ length: 25 }, (_, i) => ({
@@ -34,7 +35,7 @@ export default function Dashboard() {
   const [progress, setProgress] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "indicators">("overview");
-  const [dashView, setDashView] = useState<"scanner" | "fundamentals">("scanner");
+  const [dashView, setDashView] = useState<"scanner" | "fundamentals" | "markets">("scanner");
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [fullscreen, setFullscreen] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -223,6 +224,7 @@ export default function Dashboard() {
           {([
             { id: "scanner", label: "📸 Chart Scanner", color: "#00e5a0" },
             { id: "fundamentals", label: "📊 AI Fundamentals", color: "#f0b90b" },
+            { id: "markets", label: "📈 Live Markets", color: "#3b82f6" },
           ] as const).map(v => (
             <button
               key={v.id}
@@ -243,6 +245,13 @@ export default function Dashboard() {
         {dashView === "fundamentals" && (
           <div className="px-4 py-4">
             <AIFundamentals userPlan={user?.plan_id || "free"} userRole={user?.role || ""} />
+          </div>
+        )}
+
+        {/* ── LIVE MARKETS VIEW ── */}
+        {dashView === "markets" && (
+          <div className="px-4 py-4">
+            <LiveMarketEngine userTier={user?.plan_id === "premium" ? "premium" : user?.plan_id === "pro" ? "pro" : "free"} />
           </div>
         )}
 

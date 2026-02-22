@@ -1,0 +1,517 @@
+// Technical Indicator Library — Pure math, no API calls
+// All calculations happen client-side for zero cost
+
+export interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface IndicatorResult {
+  name: string;
+  values: (number | null)[];
+  signal?: "buy" | "sell" | "neutral";
+  color: string;
+}
+
+// ============================================================
+// MOVING AVERAGES
+// ============================================================
+
+export function SMA(closes: number[], period: number): (number | null)[] {
+  const result: (number | null)[] = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (i < period - 1) {
+      result.push(null);
+    } else {
+      let sum = 0;
+      for (let j = i - period + 1; j <= i; j++) sum += closes[j];
+      result.push(sum / period);
+    }
+  }
+  return result;
+}
+
+export function EMA(closes: number[], period: number): (number | null)[] {
+  const result: (number | null)[] = [];
+  const k = 2 / (period + 1);
+
+  for (let i = 0; i < closes.length; i++) {
+    if (i < period - 1) {
+      result.push(null);
+    } else if (i === period - 1) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) sum += closes[j];
+      result.push(sum / period);
+    } else {
+      const prev = result[i - 1];
+      if (prev === null) { result.push(null); continue; }
+      result.push(closes[i] * k + prev * (1 - k));
+    }
+  }
+  return result;
+}
+
+// ============================================================
+// RSI — Relative Strength Index (Wilder's smoothing)
+// ============================================================
+
+export function RSI(closes: number[], period: number = 14): (number | null)[] {
+  const result: (number | null)[] = [];
+  if (closes.length < period + 1) return closes.map(() => null);
+
+  const gains: number[] = [];
+  const losses: number[] = [];
+
+  for (let i = 1; i < closes.length; i++) {
+    const change = closes[i] - closes[i - 1];
+    gains.push(change > 0 ? change : 0);
+    losses.push(change < 0 ? -change : 0);
+  }
+
+  // First value: simple average
+  result.push(null); // index 0
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 0; i < period; i++) {
+    avgGain += gains[i];
+    avgLoss += losses[i];
+  }
+  avgGain /= period;
+  avgLoss /= period;
+
+  for (let i = 1; i < closes.length; i++) {
+    if (i < period) {
+      result.push(null);
+    } else if (i === period) {
+      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      result.push(100 - 100 / (1 + rs));
+    } else {
+      avgGain = (avgGain * (period - 1) + gains[i - 1]) / period;
+      avgLoss = (avgLoss * (period - 1) + losses[i - 1]) / period;
+      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      result.push(100 - 100 / (1 + rs));
+    }
+  }
+  return result;
+}
+
+// ============================================================
+// MACD — Moving Average Convergence Divergence
+// ============================================================
+
+export interface MACDResult {
+  macd: (number | null)[];
+  signal: (number | null)[];
+  histogram: (number | null)[];
+}
+
+export function MACD(
+  closes: number[],
+  fastPeriod: number = 12,
+  slowPeriod: number = 26,
+  signalPeriod: number = 9
+): MACDResult {
+  const fastEMA = EMA(closes, fastPeriod);
+  const slowEMA = EMA(closes, slowPeriod);
+
+  const macdLine: (number | null)[] = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (fastEMA[i] === null || slowEMA[i] === null) {
+      macdLine.push(null);
+    } else {
+      macdLine.push(fastEMA[i]! - slowEMA[i]!);
+    }
+  }
+
+  // Signal line = EMA of MACD line
+  const validMacd = macdLine.filter(v => v !== null) as number[];
+  const signalEMA = EMA(validMacd, signalPeriod);
+
+  const signalLine: (number | null)[] = [];
+  const histogram: (number | null)[] = [];
+  let validIdx = 0;
+
+  for (let i = 0; i < closes.length; i++) {
+    if (macdLine[i] === null) {
+      signalLine.push(null);
+      histogram.push(null);
+    } else {
+      const sig = signalEMA[validIdx] ?? null;
+      signalLine.push(sig);
+      histogram.push(sig !== null ? macdLine[i]! - sig : null);
+      validIdx++;
+    }
+  }
+
+  return { macd: macdLine, signal: signalLine, histogram };
+}
+
+// ============================================================
+// BOLLINGER BANDS
+// ============================================================
+
+export interface BollingerResult {
+  upper: (number | null)[];
+  middle: (number | null)[];
+  lower: (number | null)[];
+  bandwidth: (number | null)[];
+}
+
+export function BollingerBands(
+  closes: number[],
+  period: number = 20,
+  stdDev: number = 2
+): BollingerResult {
+  const middle = SMA(closes, period);
+  const upper: (number | null)[] = [];
+  const lower: (number | null)[] = [];
+  const bandwidth: (number | null)[] = [];
+
+  for (let i = 0; i < closes.length; i++) {
+    if (middle[i] === null || i < period - 1) {
+      upper.push(null);
+      lower.push(null);
+      bandwidth.push(null);
+    } else {
+      let sumSqDiff = 0;
+      for (let j = i - period + 1; j <= i; j++) {
+        sumSqDiff += (closes[j] - middle[i]!) ** 2;
+      }
+      const sd = Math.sqrt(sumSqDiff / period);
+      upper.push(middle[i]! + stdDev * sd);
+      lower.push(middle[i]! - stdDev * sd);
+      bandwidth.push(middle[i]! > 0 ? ((upper[i]! - lower[i]!) / middle[i]!) * 100 : null);
+    }
+  }
+
+  return { upper, middle, lower, bandwidth };
+}
+
+// ============================================================
+// ATR — Average True Range
+// ============================================================
+
+export function ATR(candles: Candle[], period: number = 14): (number | null)[] {
+  const result: (number | null)[] = [null];
+
+  const trueRanges: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    const tr = Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close)
+    );
+    trueRanges.push(tr);
+  }
+
+  for (let i = 0; i < trueRanges.length; i++) {
+    if (i < period - 1) {
+      result.push(null);
+    } else if (i === period - 1) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) sum += trueRanges[j];
+      result.push(sum / period);
+    } else {
+      const prev = result[result.length - 1];
+      if (prev === null) { result.push(null); continue; }
+      result.push((prev * (period - 1) + trueRanges[i]) / period);
+    }
+  }
+  return result;
+}
+
+// ============================================================
+// STOCHASTIC OSCILLATOR
+// ============================================================
+
+export interface StochasticResult {
+  k: (number | null)[];
+  d: (number | null)[];
+}
+
+export function Stochastic(
+  candles: Candle[],
+  kPeriod: number = 14,
+  dPeriod: number = 3
+): StochasticResult {
+  const k: (number | null)[] = [];
+
+  for (let i = 0; i < candles.length; i++) {
+    if (i < kPeriod - 1) {
+      k.push(null);
+    } else {
+      let highestHigh = -Infinity;
+      let lowestLow = Infinity;
+      for (let j = i - kPeriod + 1; j <= i; j++) {
+        if (candles[j].high > highestHigh) highestHigh = candles[j].high;
+        if (candles[j].low < lowestLow) lowestLow = candles[j].low;
+      }
+      const range = highestHigh - lowestLow;
+      k.push(range === 0 ? 50 : ((candles[i].close - lowestLow) / range) * 100);
+    }
+  }
+
+  // %D = SMA of %K
+  const validK = k.filter(v => v !== null) as number[];
+  const dSMA = SMA(validK, dPeriod);
+  const d: (number | null)[] = [];
+  let vIdx = 0;
+  for (let i = 0; i < candles.length; i++) {
+    if (k[i] === null) {
+      d.push(null);
+    } else {
+      d.push(dSMA[vIdx] ?? null);
+      vIdx++;
+    }
+  }
+
+  return { k, d };
+}
+
+// ============================================================
+// SIGNAL DETECTION ENGINE
+// ============================================================
+
+export interface SignalCondition {
+  id: string;
+  name: string;
+  type: "buy" | "sell";
+  indicator: string;
+  condition: string;
+  value: number;
+  enabled: boolean;
+}
+
+export interface Signal {
+  id: string;
+  pair: string;
+  type: "buy" | "sell";
+  condition: string;
+  price: number;
+  time: number;
+  indicator: string;
+  value: number;
+}
+
+export const DEFAULT_SIGNAL_CONDITIONS: SignalCondition[] = [
+  { id: "rsi_oversold", name: "RSI Oversold", type: "buy", indicator: "RSI", condition: "crosses_below", value: 30, enabled: true },
+  { id: "rsi_overbought", name: "RSI Overbought", type: "sell", indicator: "RSI", condition: "crosses_above", value: 70, enabled: true },
+  { id: "macd_bull_cross", name: "MACD Bullish Cross", type: "buy", indicator: "MACD", condition: "crosses_above_signal", value: 0, enabled: true },
+  { id: "macd_bear_cross", name: "MACD Bearish Cross", type: "sell", indicator: "MACD", condition: "crosses_below_signal", value: 0, enabled: true },
+  { id: "price_above_sma50", name: "Price > SMA 50", type: "buy", indicator: "SMA", condition: "price_crosses_above", value: 50, enabled: true },
+  { id: "price_below_sma50", name: "Price < SMA 50", type: "sell", indicator: "SMA", condition: "price_crosses_below", value: 50, enabled: true },
+  { id: "bb_lower_touch", name: "Bollinger Lower Touch", type: "buy", indicator: "BB", condition: "price_below_lower", value: 20, enabled: false },
+  { id: "bb_upper_touch", name: "Bollinger Upper Touch", type: "sell", indicator: "BB", condition: "price_above_upper", value: 20, enabled: false },
+  { id: "stoch_oversold", name: "Stochastic Oversold", type: "buy", indicator: "STOCH", condition: "k_crosses_above_d_below", value: 20, enabled: false },
+  { id: "stoch_overbought", name: "Stochastic Overbought", type: "sell", indicator: "STOCH", condition: "k_crosses_below_d_above", value: 80, enabled: false },
+];
+
+export function detectSignals(
+  pair: string,
+  candles: Candle[],
+  conditions: SignalCondition[]
+): Signal[] {
+  if (candles.length < 50) return [];
+
+  const closes = candles.map(c => c.close);
+  const signals: Signal[] = [];
+  const lastIdx = closes.length - 1;
+  const prevIdx = closes.length - 2;
+  const lastCandle = candles[lastIdx];
+
+  for (const cond of conditions) {
+    if (!cond.enabled) continue;
+
+    if (cond.indicator === "RSI") {
+      const rsi = RSI(closes, 14);
+      const curr = rsi[lastIdx];
+      const prev = rsi[prevIdx];
+      if (curr === null || prev === null) continue;
+
+      if (cond.condition === "crosses_below" && prev >= cond.value && curr < cond.value) {
+        signals.push({ id: cond.id, pair, type: "buy", condition: `RSI crossed below ${cond.value} (${curr.toFixed(1)})`, price: lastCandle.close, time: lastCandle.time, indicator: "RSI", value: curr });
+      }
+      if (cond.condition === "crosses_above" && prev <= cond.value && curr > cond.value) {
+        signals.push({ id: cond.id, pair, type: "sell", condition: `RSI crossed above ${cond.value} (${curr.toFixed(1)})`, price: lastCandle.close, time: lastCandle.time, indicator: "RSI", value: curr });
+      }
+    }
+
+    if (cond.indicator === "MACD") {
+      const macd = MACD(closes);
+      const currM = macd.macd[lastIdx], currS = macd.signal[lastIdx];
+      const prevM = macd.macd[prevIdx], prevS = macd.signal[prevIdx];
+      if (currM === null || currS === null || prevM === null || prevS === null) continue;
+
+      if (cond.condition === "crosses_above_signal" && prevM <= prevS && currM > currS) {
+        signals.push({ id: cond.id, pair, type: "buy", condition: "MACD crossed above signal line", price: lastCandle.close, time: lastCandle.time, indicator: "MACD", value: currM });
+      }
+      if (cond.condition === "crosses_below_signal" && prevM >= prevS && currM < currS) {
+        signals.push({ id: cond.id, pair, type: "sell", condition: "MACD crossed below signal line", price: lastCandle.close, time: lastCandle.time, indicator: "MACD", value: currM });
+      }
+    }
+
+    if (cond.indicator === "SMA") {
+      const sma = SMA(closes, cond.value);
+      const currSMA = sma[lastIdx], prevSMA = sma[prevIdx];
+      if (currSMA === null || prevSMA === null) continue;
+
+      if (cond.condition === "price_crosses_above" && closes[prevIdx] <= prevSMA && closes[lastIdx] > currSMA) {
+        signals.push({ id: cond.id, pair, type: "buy", condition: `Price crossed above SMA(${cond.value})`, price: lastCandle.close, time: lastCandle.time, indicator: "SMA", value: currSMA });
+      }
+      if (cond.condition === "price_crosses_below" && closes[prevIdx] >= prevSMA && closes[lastIdx] < currSMA) {
+        signals.push({ id: cond.id, pair, type: "sell", condition: `Price crossed below SMA(${cond.value})`, price: lastCandle.close, time: lastCandle.time, indicator: "SMA", value: currSMA });
+      }
+    }
+
+    if (cond.indicator === "BB") {
+      const bb = BollingerBands(closes, cond.value);
+      const currLower = bb.lower[lastIdx], currUpper = bb.upper[lastIdx];
+      if (currLower === null || currUpper === null) continue;
+
+      if (cond.condition === "price_below_lower" && closes[lastIdx] < currLower) {
+        signals.push({ id: cond.id, pair, type: "buy", condition: "Price below Bollinger lower band", price: lastCandle.close, time: lastCandle.time, indicator: "BB", value: currLower });
+      }
+      if (cond.condition === "price_above_upper" && closes[lastIdx] > currUpper) {
+        signals.push({ id: cond.id, pair, type: "sell", condition: "Price above Bollinger upper band", price: lastCandle.close, time: lastCandle.time, indicator: "BB", value: currUpper });
+      }
+    }
+
+    if (cond.indicator === "STOCH") {
+      const stoch = Stochastic(candles);
+      const currK = stoch.k[lastIdx], currD = stoch.d[lastIdx];
+      const prevK = stoch.k[prevIdx], prevD = stoch.d[prevIdx];
+      if (currK === null || currD === null || prevK === null || prevD === null) continue;
+
+      if (cond.condition === "k_crosses_above_d_below" && prevK <= prevD && currK > currD && currK < cond.value) {
+        signals.push({ id: cond.id, pair, type: "buy", condition: `Stochastic %K crossed %D below ${cond.value}`, price: lastCandle.close, time: lastCandle.time, indicator: "STOCH", value: currK });
+      }
+      if (cond.condition === "k_crosses_below_d_above" && prevK >= prevD && currK < currD && currK > cond.value) {
+        signals.push({ id: cond.id, pair, type: "sell", condition: `Stochastic %K crossed %D above ${cond.value}`, price: lastCandle.close, time: lastCandle.time, indicator: "STOCH", value: currK });
+      }
+    }
+  }
+
+  return signals;
+}
+
+// ============================================================
+// INDICATOR SUMMARY for display
+// ============================================================
+
+export interface IndicatorSummary {
+  rsi: number | null;
+  rsiSignal: "overbought" | "oversold" | "neutral";
+  sma20: number | null;
+  sma50: number | null;
+  ema20: number | null;
+  macd: number | null;
+  macdSignal: number | null;
+  macdHistogram: number | null;
+  macdTrend: "bullish" | "bearish" | "neutral";
+  bbUpper: number | null;
+  bbMiddle: number | null;
+  bbLower: number | null;
+  bbPosition: "above" | "below" | "inside";
+  atr: number | null;
+  stochK: number | null;
+  stochD: number | null;
+  overallBias: "strong_buy" | "buy" | "neutral" | "sell" | "strong_sell";
+  buyScore: number;
+  sellScore: number;
+}
+
+export function calculateSummary(candles: Candle[]): IndicatorSummary | null {
+  if (candles.length < 50) return null;
+
+  const closes = candles.map(c => c.close);
+  const lastClose = closes[closes.length - 1];
+  const lastIdx = closes.length - 1;
+
+  const rsiVals = RSI(closes, 14);
+  const rsi = rsiVals[lastIdx];
+
+  const sma20Vals = SMA(closes, 20);
+  const sma50Vals = SMA(closes, 50);
+  const ema20Vals = EMA(closes, 20);
+  const sma20 = sma20Vals[lastIdx];
+  const sma50 = sma50Vals[lastIdx];
+  const ema20 = ema20Vals[lastIdx];
+
+  const macdResult = MACD(closes);
+  const macd = macdResult.macd[lastIdx];
+  const macdSig = macdResult.signal[lastIdx];
+  const macdHist = macdResult.histogram[lastIdx];
+
+  const bb = BollingerBands(closes, 20);
+  const bbUpper = bb.upper[lastIdx];
+  const bbMiddle = bb.middle[lastIdx];
+  const bbLower = bb.lower[lastIdx];
+
+  const atrVals = ATR(candles, 14);
+  const atr = atrVals[lastIdx];
+
+  const stoch = Stochastic(candles);
+  const stochK = stoch.k[lastIdx];
+  const stochD = stoch.d[lastIdx];
+
+  // Score calculation
+  let buyScore = 0, sellScore = 0;
+
+  // RSI
+  if (rsi !== null) {
+    if (rsi < 30) buyScore += 2;
+    else if (rsi < 40) buyScore += 1;
+    else if (rsi > 70) sellScore += 2;
+    else if (rsi > 60) sellScore += 1;
+  }
+
+  // Price vs MAs
+  if (sma20 !== null) { lastClose > sma20 ? buyScore++ : sellScore++; }
+  if (sma50 !== null) { lastClose > sma50 ? buyScore++ : sellScore++; }
+  if (ema20 !== null) { lastClose > ema20 ? buyScore++ : sellScore++; }
+
+  // MACD
+  if (macd !== null && macdSig !== null) {
+    macd > macdSig ? buyScore++ : sellScore++;
+    if (macdHist !== null) { macdHist > 0 ? buyScore++ : sellScore++; }
+  }
+
+  // Bollinger
+  if (bbLower !== null && bbUpper !== null) {
+    if (lastClose < bbLower) buyScore += 2;
+    else if (lastClose > bbUpper) sellScore += 2;
+  }
+
+  // Stochastic
+  if (stochK !== null) {
+    if (stochK < 20) buyScore++;
+    else if (stochK > 80) sellScore++;
+  }
+
+  const total = buyScore + sellScore;
+  const buyPct = total > 0 ? buyScore / total : 0.5;
+
+  let overallBias: IndicatorSummary["overallBias"] = "neutral";
+  if (buyPct >= 0.75) overallBias = "strong_buy";
+  else if (buyPct >= 0.6) overallBias = "buy";
+  else if (buyPct <= 0.25) overallBias = "strong_sell";
+  else if (buyPct <= 0.4) overallBias = "sell";
+
+  return {
+    rsi,
+    rsiSignal: rsi !== null ? (rsi > 70 ? "overbought" : rsi < 30 ? "oversold" : "neutral") : "neutral",
+    sma20, sma50, ema20,
+    macd, macdSignal: macdSig, macdHistogram: macdHist,
+    macdTrend: macd !== null && macdSig !== null ? (macd > macdSig ? "bullish" : "bearish") : "neutral",
+    bbUpper, bbMiddle, bbLower,
+    bbPosition: bbLower !== null && bbUpper !== null ? (lastClose < bbLower ? "below" : lastClose > bbUpper ? "above" : "inside") : "inside",
+    atr,
+    stochK, stochD,
+    overallBias,
+    buyScore,
+    sellScore,
+  };
+}
