@@ -21,7 +21,15 @@ export async function GET() {
 
     const credits = await checkCredits(user.id);
 
-    return NextResponse.json({ profile, credits });
+    return NextResponse.json({
+      profile,
+      credits: {
+        ...credits,
+        // backwards compat for dashboard
+        dailyRemaining: credits.monthlyRemaining,
+        creditsBalance: credits.topupBalance,
+      },
+    });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }

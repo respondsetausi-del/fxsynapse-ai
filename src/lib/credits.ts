@@ -2,10 +2,27 @@ import { createServiceSupabase } from "@/lib/supabase/server";
 
 export interface CreditCheck {
   canScan: boolean;
-  source: "daily" | "credits" | "unlimited";
+  source: "monthly" | "topup" | "unlimited";
+  monthlyUsed: number;
+  monthlyLimit: number;
+  monthlyRemaining: number;
+  topupBalance: number;
+  reason?: string;
+  planId: string;
+  planName: string;
+}
+
+// Backwards compat for dashboard display
+export interface LegacyCreditDisplay {
   dailyRemaining: number;
   creditsBalance: number;
-  reason?: string;
+}
+
+export function toLegacyDisplay(c: CreditCheck): LegacyCreditDisplay {
+  return {
+    dailyRemaining: c.monthlyRemaining,
+    creditsBalance: c.topupBalance,
+  };
 }
 
 export async function checkCredits(userId: string): Promise<CreditCheck> {
@@ -18,78 +35,121 @@ export async function checkCredits(userId: string): Promise<CreditCheck> {
     .single();
 
   if (!profile) {
-    return { canScan: false, source: "daily", dailyRemaining: 0, creditsBalance: 0, reason: "Profile not found" };
+    return {
+      canScan: false, source: "monthly", monthlyUsed: 0, monthlyLimit: 0,
+      monthlyRemaining: 0, topupBalance: 0, reason: "Profile not found",
+      planId: "none", planName: "None",
+    };
   }
 
   const plan = profile.plans;
   const now = new Date();
-  const resetAt = new Date(profile.daily_scans_reset_at);
 
-  // Check if daily counter needs reset (new day)
-  if (now.toDateString() !== resetAt.toDateString()) {
-    await supabase
-      .from("profiles")
-      .update({ daily_scans_used: 0, daily_scans_reset_at: now.toISOString() })
-      .eq("id", userId);
-    profile.daily_scans_used = 0;
+  // Check if monthly cycle needs reset
+  const cycleStart = profile.billing_cycle_start ? new Date(profile.billing_cycle_start) : null;
+  if (cycleStart) {
+    const nextReset = new Date(cycleStart);
+    nextReset.setMonth(now.getMonth());
+    nextReset.setFullYear(now.getFullYear());
+    if (nextReset > now) {
+      nextReset.setMonth(nextReset.getMonth() - 1);
+    }
+    const lastReset = profile.monthly_scans_reset_at ? new Date(profile.monthly_scans_reset_at) : null;
+    if (!lastReset || lastReset < nextReset) {
+      await supabase
+        .from("profiles")
+        .update({ monthly_scans_used: 0, monthly_scans_reset_at: now.toISOString() })
+        .eq("id", userId);
+      profile.monthly_scans_used = 0;
+    }
   }
+
+  // No active subscription
+  if (!profile.subscription_status || profile.subscription_status !== "active") {
+    if (profile.credits_balance > 0) {
+      return {
+        canScan: true, source: "topup",
+        monthlyUsed: 0, monthlyLimit: 0, monthlyRemaining: 0,
+        topupBalance: profile.credits_balance,
+        planId: profile.plan_id || "none", planName: plan?.name || "None",
+      };
+    }
+    return {
+      canScan: false, source: "monthly",
+      monthlyUsed: 0, monthlyLimit: 0, monthlyRemaining: 0,
+      topupBalance: 0, reason: "No active plan. Choose a plan to start scanning.",
+      planId: profile.plan_id || "none", planName: plan?.name || "None",
+    };
+  }
+
+  // Check expiry
+  if (profile.subscription_expires_at && new Date(profile.subscription_expires_at) < now) {
+    await supabase.from("profiles").update({ subscription_status: "expired" }).eq("id", userId);
+    return {
+      canScan: false, source: "monthly",
+      monthlyUsed: 0, monthlyLimit: 0, monthlyRemaining: 0,
+      topupBalance: profile.credits_balance || 0,
+      reason: "Your subscription has expired. Renew to continue scanning.",
+      planId: profile.plan_id || "none", planName: plan?.name || "None",
+    };
+  }
+
+  // Use monthly_scans from plan (new field), fall back to daily_scans for backwards compat
+  const monthlyLimit = plan?.monthly_scans ?? plan?.daily_scans ?? 0;
 
   // Premium unlimited
-  if (plan.daily_scans === -1 && profile.subscription_status === "active") {
+  if (monthlyLimit === -1) {
     return {
-      canScan: true,
-      source: "unlimited",
-      dailyRemaining: -1,
-      creditsBalance: profile.credits_balance,
+      canScan: true, source: "unlimited",
+      monthlyUsed: profile.monthly_scans_used || 0, monthlyLimit: -1,
+      monthlyRemaining: -1, topupBalance: profile.credits_balance || 0,
+      planId: profile.plan_id, planName: plan?.name || "Premium",
     };
   }
 
-  // Check daily scans
-  const dailyLimit = plan.daily_scans;
-  const dailyUsed = profile.daily_scans_used;
-  const dailyRemaining = Math.max(0, dailyLimit - dailyUsed);
+  const used = profile.monthly_scans_used || 0;
+  const remaining = Math.max(0, monthlyLimit - used);
 
-  if (dailyRemaining > 0) {
+  if (remaining > 0) {
     return {
-      canScan: true,
-      source: "daily",
-      dailyRemaining,
-      creditsBalance: profile.credits_balance,
+      canScan: true, source: "monthly",
+      monthlyUsed: used, monthlyLimit, monthlyRemaining: remaining,
+      topupBalance: profile.credits_balance || 0,
+      planId: profile.plan_id, planName: plan?.name || "Starter",
     };
   }
 
-  // Check purchased credits
+  // Monthly exhausted — check top-up
   if (profile.credits_balance > 0) {
     return {
-      canScan: true,
-      source: "credits",
-      dailyRemaining: 0,
-      creditsBalance: profile.credits_balance,
+      canScan: true, source: "topup",
+      monthlyUsed: used, monthlyLimit, monthlyRemaining: 0,
+      topupBalance: profile.credits_balance,
+      planId: profile.plan_id, planName: plan?.name || "Starter",
     };
   }
 
   return {
-    canScan: false,
-    source: "daily",
-    dailyRemaining: 0,
-    creditsBalance: 0,
-    reason: "No scans remaining. Upgrade your plan or purchase credits.",
+    canScan: false, source: "monthly",
+    monthlyUsed: used, monthlyLimit, monthlyRemaining: 0,
+    topupBalance: 0,
+    reason: "Monthly scans used up. Buy top-up credits or upgrade your plan.",
+    planId: profile.plan_id, planName: plan?.name || "Starter",
   };
 }
 
 export async function deductCredit(
   userId: string,
-  source: "daily" | "credits" | "unlimited"
+  source: "monthly" | "topup" | "unlimited"
 ): Promise<boolean> {
   const supabase = createServiceSupabase();
 
   if (source === "unlimited") return true;
 
-  if (source === "daily") {
-    // Get current count and increment
+  if (source === "monthly") {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("daily_scans_used")
+      .select("monthly_scans_used")
       .eq("id", userId)
       .single();
 
@@ -97,17 +157,13 @@ export async function deductCredit(
 
     const { error } = await supabase
       .from("profiles")
-      .update({ daily_scans_used: profile.daily_scans_used + 1 })
+      .update({ monthly_scans_used: (profile.monthly_scans_used || 0) + 1 })
       .eq("id", userId);
 
-    if (error) {
-      console.error("Deduct daily scan error:", error);
-      return false;
-    }
-    return true;
+    return !error;
   }
 
-  if (source === "credits") {
+  if (source === "topup") {
     const { data: profile } = await supabase
       .from("profiles")
       .select("credits_balance")
@@ -121,16 +177,13 @@ export async function deductCredit(
       .update({ credits_balance: profile.credits_balance - 1 })
       .eq("id", userId);
 
-    if (error) {
-      console.error("Deduct credit error:", error);
-      return false;
-    }
+    if (error) return false;
 
     await supabase.from("credit_transactions").insert({
       user_id: userId,
       amount: -1,
       type: "scan_debit",
-      description: "Chart analysis scan",
+      description: "Chart scan (top-up credit)",
     });
 
     return true;
@@ -141,7 +194,7 @@ export async function deductCredit(
 
 export async function recordScan(
   userId: string,
-  source: "daily" | "credits" | "unlimited",
+  source: "monthly" | "topup" | "unlimited",
   analysis: Record<string, unknown>
 ) {
   const supabase = createServiceSupabase();

@@ -269,9 +269,13 @@ export default function Dashboard() {
                 <p className="text-sm max-w-[400px] mx-auto" style={{ color: "rgba(255,255,255,.55)" }}>
                   Upload a forex chart screenshot — FXSynapse AI annotates your chart with key levels, zones, and trade setups.
                 </p>
-                {user?.plan_id === "free" && credits && (
-                  <p className="text-[10px] font-mono mt-2" style={{ color: credits.dailyRemaining > 0 ? "rgba(0,229,160,.6)" : "rgba(255,77,106,.6)" }}>
-                    {credits.dailyRemaining > 0 ? `${credits.dailyRemaining} free scan remaining today` : "No scans remaining — resets at midnight"}
+                {credits && (
+                  <p className="text-[10px] font-mono mt-2" style={{ color: (credits.monthlyRemaining ?? 0) > 0 || credits.monthlyRemaining === -1 ? "rgba(0,229,160,.6)" : "rgba(255,77,106,.6)" }}>
+                    {credits.monthlyRemaining === -1 ? "Unlimited scans" :
+                     (credits.monthlyRemaining ?? 0) > 0 ? `${credits.monthlyRemaining}/${credits.monthlyLimit} scans remaining this month` :
+                     (credits.topupBalance ?? 0) > 0 ? `${credits.topupBalance} top-up scans remaining` :
+                     "No scans remaining"}
+                    {(credits.topupBalance ?? 0) > 0 && (credits.monthlyRemaining ?? 0) > 0 ? ` + ${credits.topupBalance} top-up` : ""}
                   </p>
                 )}
               </div>
@@ -548,21 +552,14 @@ export default function Dashboard() {
             <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(255,77,106,.1)", border: "2px solid rgba(255,77,106,.2)" }}>
               <span className="text-2xl">🔒</span>
             </div>
-            <h3 className="text-lg font-bold text-white mb-1">Scan Limit Reached</h3>
-            <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,.45)" }}>
-              You&apos;ve used your free scan for today.
+            <h3 className="text-lg font-bold text-white mb-1">Scans Used Up</h3>
+            <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,.45)" }}>
+              You&apos;ve used all your monthly scans. Top up or upgrade to keep scanning.
             </p>
-            <div className="rounded-lg px-3 py-2 mb-4 inline-block" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
-              <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Next free scan resets at midnight</span>
-            </div>
-            <div className="rounded-xl p-3 mb-4" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.12)" }}>
-              <div className="text-[10px] font-mono font-bold mb-1" style={{ color: "#00e5a0" }}>🔥 LAUNCH SPECIAL</div>
-              <div className="text-sm font-bold text-white mb-0.5">50% off your first month</div>
-              <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Pro at R49 • Premium at R124</div>
-            </div>
             <div className="flex flex-col gap-2">
-              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>Upgrade to Pro — R99/mo</Link>
-              <button onClick={() => setShowPaywall(false)} className="w-full py-3 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.4)" }}>Wait for Tomorrow</button>
+              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>Upgrade Plan</Link>
+              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up Scans</Link>
+              <button onClick={() => setShowPaywall(false)} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>
             </div>
           </div>
         </div>

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     if (admin?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const search = req.nextUrl.searchParams.get("search") || "";
-    const filter = req.nextUrl.searchParams.get("filter") || "all"; // all, free, pro, premium, blocked
+    const filter = req.nextUrl.searchParams.get("filter") || "all"; // all, starter, pro, premium, unpaid, blocked
     const page = parseInt(req.nextUrl.searchParams.get("page") || "1");
     const limit = 20;
     const offset = (page - 1) * limit;
@@ -29,8 +29,10 @@ export async function GET(req: NextRequest) {
 
     if (filter === "blocked") {
       query = query.eq("is_blocked", true);
-    } else if (["free", "pro", "premium"].includes(filter)) {
+    } else if (["starter", "pro", "premium"].includes(filter)) {
       query = query.eq("plan_id", filter);
+    } else if (filter === "unpaid") {
+      query = query.in("plan_id", ["none", "free"]);
     }
 
     const { data: users, count, error } = await query;

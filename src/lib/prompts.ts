@@ -26,10 +26,11 @@ CRITICAL: ALL annotation coordinates MUST be between 0.0 and 1.0. Never place an
 
 STEP 2 -- READ THE CHART:
 1. Identify the pair, timeframe, and current market structure
-2. Find ALL visible support and resistance levels on the chart (typically 3-6 levels)
-3. Look for EVERY significant price level where price has bounced, consolidated, or reversed
-4. Determine trend direction and bias
-5. Read any visible indicators (RSI, EMA, Volume)
+2. Find the 3-4 MOST SIGNIFICANT support and resistance levels on the chart
+3. Only include levels where price has CLEARLY bounced, reversed, or consolidated multiple times
+4. Do NOT mark minor or weak levels — only the strongest, most obvious ones
+5. Determine trend direction and bias
+6. Read any visible indicators (RSI, EMA, Volume)
 
 STEP 3 -- BUILD THE TRADE SETUP:
 This is critical. The Entry, TP, SL, and arrow MUST follow proper trading logic:
@@ -86,14 +87,12 @@ Return this exact JSON structure:
   "risk_reward": "<R:R ratio like '1:2.5'>",
   "chart_bounds": { "x": <>, "y": <>, "w": <>, "h": <> },
   "annotations": [
-    // -- ALL SUPPORT & RESISTANCE LEVELS (find EVERY visible level, typically 3-6) --
-    // Look at the ENTIRE chart. Find every price where candles have bounced, stalled, or reversed.
-    // Include major levels AND minor levels. More levels = better analysis.
-    {"type": "line", "y": <y for resistance level 1>, "label": "R -- <price>", "color": "#ff4d6a"},
-    {"type": "line", "y": <y for resistance level 2>, "label": "R -- <price>", "color": "#ff4d6a"},
-    {"type": "line", "y": <y for support level 1>, "label": "S -- <price>", "color": "#00e5a0"},
-    {"type": "line", "y": <y for support level 2>, "label": "S -- <price>", "color": "#00e5a0"},
-    // Add MORE lines for every visible level -- do not stop at 2!
+    // -- KEY SUPPORT & RESISTANCE LEVELS (3-4 strongest levels only) --
+    // Only mark levels with CLEAR price reactions. Quality over quantity.
+    // Typically: 1-2 resistance levels above price, 1-2 support levels below price
+    {"type": "line", "y": <y for strongest resistance>, "label": "R -- <price>", "color": "#ff4d6a"},
+    {"type": "line", "y": <y for strongest support>, "label": "S -- <price>", "color": "#00e5a0"},
+    // Add 1-2 more ONLY if clearly visible and significant
     
     // -- ZONES (at least one supply near resistance, demand near support) --
     {"type": "zone", "y1": <top edge>, "y2": <bottom edge>, "label": "Supply Zone", "color": "rgba(255,77,106,0.10)", "bc": "#ff4d6a"},
@@ -128,18 +127,17 @@ CRITICAL RULES:
 9. Resistance line y should match where you place Entry (short) or TP (long)
 10. S/R lines and zone edges should be at the SAME y-levels as the corresponding trade points
 11. Return ONLY the JSON object, nothing else
-12. Find ALL visible S/R levels (3-6 minimum), not just 2
+12. Mark only the 3-4 STRONGEST S/R levels — quality over quantity
 13. NEVER place annotations outside the 0.0-1.0 coordinate range`;
 
 export const USER_PROMPT = `Analyze this forex chart screenshot.
 
 First detect chart_bounds (candlestick area only, excluding price axis, time axis, title bars, indicators).
 
-Then identify ALL visible support and resistance levels on the chart:
-- Look at the ENTIRE visible price history
-- Find every significant level where price bounced, stalled, reversed, or consolidated
-- Include both major and minor levels (typically 3-6 levels visible on any chart)
-- Do NOT stop at just 2 levels -- find ALL of them
+Then identify the 3-4 STRONGEST support and resistance levels:
+- Only mark levels with clear, multiple price reactions
+- Quality over quantity — skip weak or minor levels
+- Typically 1-2 resistance above current price, 1-2 support below
 
 Then build a proper trade setup:
 - Determine bias (Long/Short/Neutral)  

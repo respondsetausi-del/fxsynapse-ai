@@ -203,9 +203,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       analysis,
       credits: {
-        dailyRemaining: updatedCredits.dailyRemaining,
-        creditsBalance: updatedCredits.creditsBalance,
+        monthlyUsed: updatedCredits.monthlyUsed,
+        monthlyLimit: updatedCredits.monthlyLimit,
+        monthlyRemaining: updatedCredits.monthlyRemaining,
+        topupBalance: updatedCredits.topupBalance,
         source: creditCheck.source,
+        planName: updatedCredits.planName,
+        // backwards compat
+        dailyRemaining: updatedCredits.monthlyRemaining,
+        creditsBalance: updatedCredits.topupBalance,
       },
     });
   } catch (error) {

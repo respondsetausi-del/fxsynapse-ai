@@ -32,7 +32,7 @@ interface EmailLog {
 
 type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel";
 type ModalType = "credits" | "plan" | "role" | "trial" | "block" | "email";
-type UserFilter = "all" | "free" | "pro" | "premium" | "blocked";
+type UserFilter = "all" | "starter" | "pro" | "premium" | "blocked" | "unpaid";
 
 /* ─── Helpers ─── */
 const fmt = (c: number) => `R${(c / 100).toFixed(2)}`;
@@ -381,7 +381,7 @@ export default function AdminDashboard() {
                 <div className="flex-1 space-y-2">
                   <div className="text-[10px] font-mono tracking-widest mb-3" style={{ color: "rgba(255,255,255,.3)" }}>PLAN MIX</div>
                   {[
-                    { id: "free", name: "Free", color: "rgba(255,255,255,.4)" },
+                    { id: "starter", name: "Starter", color: "#4da0ff" },
                     { id: "pro", name: "Pro", color: "#4da0ff" },
                     { id: "premium", name: "Premium", color: "#f0b90b" },
                   ].map((p) => (
@@ -427,7 +427,7 @@ export default function AdminDashboard() {
               {/* Toolbar */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {(["all", "free", "pro", "premium", "blocked"] as UserFilter[]).map((f) => (
+                  {(["all", "starter", "pro", "premium", "unpaid", "blocked"] as UserFilter[]).map((f) => (
                     <button key={f} onClick={() => { setUserFilter(f); setPage(1); }}
                       className="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold cursor-pointer capitalize transition-all"
                       style={{
@@ -490,7 +490,7 @@ export default function AdminDashboard() {
                             <Btn color="#f0b90b" label="Role" onClick={() => { setModal({ user: u, type: "role" }); setModalValue(u.role); }} />
                             <Btn color={u.is_blocked ? "#00e5a0" : "#ff4d6a"} label={u.is_blocked ? "Unblock" : "Block"} onClick={() => { setModal({ user: u, type: "block" }); setModalDesc(""); }} />
                             <Btn color="#a855f7" label="Email" onClick={() => { setModal({ user: u, type: "email" }); setEmailSubject(""); setEmailBody(""); }} />
-                            {u.plan_id === "free" && <Btn color="#a855f7" label="🎁 Trial" onClick={() => { setModal({ user: u, type: "trial" }); setModalValue("7"); }} />}
+                            {(u.plan_id === "none" || u.plan_id === "free") && <Btn color="#a855f7" label="🎁 Trial" onClick={() => { setModal({ user: u, type: "trial" }); setModalValue("7"); }} />}
                           </div>
                         </td>
                       </tr>
@@ -674,7 +674,7 @@ export default function AdminDashboard() {
                     <div className="flex gap-2 flex-wrap">
                       {[
                         { id: "all", label: "All Users" },
-                        { id: "free", label: "Free Only" },
+                        { id: "starter", label: "Starter Only" },
                         { id: "pro", label: "Pro Only" },
                         { id: "premium", label: "Premium Only" },
                         { id: "active", label: "Active Subscribers" },

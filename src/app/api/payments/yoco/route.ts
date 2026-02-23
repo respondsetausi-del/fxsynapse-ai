@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-const CREDIT_PACKS = [
-  { id: "pack_10", credits: 10, price_cents: 1500, label: "10 Credits" },
-  { id: "pack_50", credits: 50, price_cents: 4900, label: "50 Credits" },
-  { id: "pack_100", credits: 100, price_cents: 7900, label: "100 Credits" },
-  { id: "pack_500", credits: 500, price_cents: 29900, label: "500 Credits" },
+const TOPUP_PACKS = [
+  { id: "topup_5", credits: 5, price_cents: 2500, label: "5 Scans" },
+  { id: "topup_10", credits: 10, price_cents: 4500, label: "10 Scans" },
+  { id: "topup_20", credits: 20, price_cents: 8000, label: "20 Scans" },
 ];
 
-const PLANS = {
-  pro: { price_cents: 9900, name: "Pro Plan" },
-  premium: { price_cents: 24900, name: "Premium Plan" },
+const PLANS: Record<string, { price_cents: number; name: string; monthly_scans: number }> = {
+  starter: { price_cents: 4900, name: "Starter Plan", monthly_scans: 15 },
+  pro: { price_cents: 9900, name: "Pro Plan", monthly_scans: 50 },
+  premium: { price_cents: 19900, name: "Premium Plan", monthly_scans: -1 },
 };
 
 export async function POST(req: NextRequest) {
@@ -39,16 +39,16 @@ export async function POST(req: NextRequest) {
     let metadata: Record<string, string>;
 
     if (type === "subscription" && planId && planId in PLANS) {
-      const plan = PLANS[planId as keyof typeof PLANS];
+      const plan = PLANS[planId];
       amountCents = plan.price_cents;
       description = `FXSynapse AI — ${plan.name} Monthly`;
-      metadata = { type: "subscription", planId, userId: user.id };
-    } else if (type === "credits" && packId) {
-      const pack = CREDIT_PACKS.find((p) => p.id === packId);
-      if (!pack) return NextResponse.json({ error: "Invalid credit pack" }, { status: 400 });
+      metadata = { type: "subscription", planId, userId: user.id, monthlyScans: String(plan.monthly_scans) };
+    } else if (type === "topup" && packId) {
+      const pack = TOPUP_PACKS.find((p) => p.id === packId);
+      if (!pack) return NextResponse.json({ error: "Invalid top-up pack" }, { status: 400 });
       amountCents = pack.price_cents;
-      description = `FXSynapse AI — ${pack.label}`;
-      metadata = { type: "credits", packId: pack.id, credits: String(pack.credits), userId: user.id };
+      description = `FXSynapse AI — ${pack.label} Top-up`;
+      metadata = { type: "topup", packId: pack.id, credits: String(pack.credits), userId: user.id };
     } else {
       return NextResponse.json({ error: "Invalid payment type" }, { status: 400 });
     }
@@ -58,7 +58,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Payment system not configured" }, { status: 500 });
     }
 
-    // Create Yoco checkout
     const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
     const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {
@@ -92,7 +91,7 @@ export async function POST(req: NextRequest) {
       currency: "ZAR",
       type,
       plan_id: planId || null,
-      credits_amount: type === "credits" ? CREDIT_PACKS.find((p) => p.id === packId)?.credits : null,
+      credits_amount: type === "topup" ? TOPUP_PACKS.find((p) => p.id === packId)?.credits : null,
       status: "pending",
       metadata,
     });

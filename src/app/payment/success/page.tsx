@@ -19,10 +19,10 @@ function SuccessContent() {
         <h1 className="text-2xl font-bold text-white mb-2">Payment Successful!</h1>
         <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.5)" }}>
           {type === "subscription"
-            ? "Your plan has been upgraded. Enjoy your new scan limits!"
-            : "Credits have been added to your account. They never expire."}
+            ? "Your plan is now active. Head to the dashboard to start scanning!"
+            : "Top-up credits have been added to your account. They never expire."}
         </p>
-        <Link href="/" className="inline-block px-6 py-3 rounded-xl text-sm font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+        <Link href="/dashboard?scanner=true" className="inline-block px-6 py-3 rounded-xl text-sm font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
           Start Scanning →
         </Link>
       </div>

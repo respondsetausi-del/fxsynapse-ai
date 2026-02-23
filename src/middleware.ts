@@ -1,9 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-const PUBLIC_ROUTES = ["/", "/login", "/signup", "/pricing", "/auth/callback"];
+const PUBLIC_ROUTES = ["/", "/login", "/signup", "/pricing", "/auth/callback", "/payment/success"];
 
-// Admin emails - add yours here
 const ADMIN_EMAILS = ["respondsetausi@gmail.com"];
 
 export async function middleware(request: NextRequest) {
@@ -54,17 +54,50 @@ export async function middleware(request: NextRequest) {
 
   const isAdmin = ADMIN_EMAILS.includes(user.email || "");
 
-  // Admin auto-redirect: dashboard → admin
-  if (pathname === "/dashboard" && !request.nextUrl.searchParams.has("scanner")) {
-    if (isAdmin) {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
-  }
-
-  // Admin route protection
+  // Admin routes
   if (pathname.startsWith("/admin")) {
     if (!isAdmin) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return supabaseResponse;
+  }
+
+  // PAYWALL CHECK — for /dashboard, verify user has active paid plan
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) {
+    if (!isAdmin) {
+      try {
+        const service = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+        const { data: profile } = await service
+          .from("profiles")
+          .select("plan_id, subscription_status")
+          .eq("id", user.id)
+          .single();
+
+        const hasPaidPlan = profile &&
+          profile.plan_id &&
+          profile.plan_id !== "free" &&
+          profile.plan_id !== "none" &&
+          profile.subscription_status === "active";
+
+        if (!hasPaidPlan) {
+          const url = new URL("/pricing", request.url);
+          url.searchParams.set("gate", "1");
+          return NextResponse.redirect(url);
+        }
+      } catch (err) {
+        console.error("Paywall check error:", err);
+        // Allow through on error to avoid blocking users
+      }
+    }
+  }
+
+  // Admin auto-redirect
+  if (pathname === "/dashboard" && !request.nextUrl.searchParams.has("scanner")) {
+    if (isAdmin) {
+      return NextResponse.redirect(new URL("/admin", request.url));
     }
   }
 
@@ -73,6 +106,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|apk|json|js|css|ico)$).*)",
   ],
 };

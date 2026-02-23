@@ -12,13 +12,14 @@ export async function POST(req: NextRequest) {
     if (admin?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { subject, body, target } = await req.json();
-    // target: "all" | "free" | "pro" | "premium" | "active" | "inactive"
+    // target: "all" | "starter" | "pro" | "premium" | "active" | "inactive" | "unpaid"
     if (!subject || !body || !target) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     let query = service.from("profiles").select("id, email").eq("is_blocked", false);
     
+    if (target === "starter") query = query.eq("plan_id", "starter");
     if (target === "free") query = query.eq("plan_id", "free");
     else if (target === "pro") query = query.eq("plan_id", "pro");
     else if (target === "premium") query = query.eq("plan_id", "premium");

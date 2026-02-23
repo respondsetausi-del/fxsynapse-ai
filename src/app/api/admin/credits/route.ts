@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       const { userId, planId } = body;
       const { error } = await service
         .from("profiles")
-        .update({ plan_id: planId, subscription_status: planId === "free" ? "none" : "active" })
+        .update({ plan_id: planId, subscription_status: planId === "none" ? "none" : "active" })
         .eq("id", userId);
       if (error) throw error;
       return NextResponse.json({ success: true });

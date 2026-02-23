@@ -56,9 +56,12 @@ export async function POST(req: NextRequest) {
         plan_id: planId,
         subscription_status: "active",
         subscription_expires_at: expiry.toISOString(),
+        billing_cycle_start: new Date().toISOString(),
+        monthly_scans_used: 0,
+        monthly_scans_reset_at: new Date().toISOString(),
       }).eq("id", userId);
 
-    } else if (paymentType === "credits") {
+    } else if (paymentType === "credits" || paymentType === "topup") {
       const creditsAmount = payment?.credits_amount || parseInt(metadata.credits || "0");
 
       // Get current balance

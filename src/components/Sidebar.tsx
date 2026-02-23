@@ -20,8 +20,13 @@ interface SidebarProps {
     plans: { name: string };
   } | null;
   credits: {
-    dailyRemaining: number;
-    creditsBalance: number;
+    monthlyUsed?: number;
+    monthlyLimit?: number;
+    monthlyRemaining?: number;
+    topupBalance?: number;
+    planName?: string;
+    dailyRemaining?: number;
+    creditsBalance?: number;
   } | null;
   isOpen: boolean;
   onClose: () => void;
@@ -110,19 +115,19 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
               <div className="flex-1 rounded-lg p-2 text-center" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.05)" }}>
                 <div className="text-[9px] font-mono uppercase mb-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Plan</div>
                 <div className="text-xs font-bold" style={{
-                  color: user.plan_id === "premium" ? "#f0b90b" : user.plan_id === "pro" ? "#00e5a0" : "rgba(255,255,255,.5)"
-                }}>{user.plans?.name || "Free"}</div>
+                  color: user.plan_id === "premium" ? "#f0b90b" : user.plan_id === "pro" ? "#00e5a0" : user.plan_id === "starter" ? "#4da0ff" : "rgba(255,255,255,.5)"
+                }}>{user.plans?.name || "None"}</div>
               </div>
               <div className="flex-1 rounded-lg p-2 text-center" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.05)" }}>
-                <div className="text-[9px] font-mono uppercase mb-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Scans Left</div>
+                <div className="text-[9px] font-mono uppercase mb-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Monthly</div>
                 <div className="text-xs font-bold" style={{ color: "#4da0ff" }}>
-                  {credits ? (credits.dailyRemaining === -1 ? "∞" : credits.dailyRemaining) : "—"}
+                  {credits ? (credits.monthlyRemaining === -1 ? "∞" : `${credits.monthlyRemaining}/${credits.monthlyLimit}`) : "—"}
                 </div>
               </div>
               <div className="flex-1 rounded-lg p-2 text-center" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.05)" }}>
-                <div className="text-[9px] font-mono uppercase mb-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Credits</div>
+                <div className="text-[9px] font-mono uppercase mb-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Top-up</div>
                 <div className="text-xs font-bold" style={{ color: "#f0b90b" }}>
-                  {credits ? credits.creditsBalance : "—"}
+                  {credits ? credits.topupBalance : "—"}
                 </div>
               </div>
             </div>

@@ -16,8 +16,8 @@ export async function GET() {
       .eq("id", user.id)
       .single();
 
-    // Free users: only last 3 scans. Paid: full history
-    const historyLimit = profile?.plan_id === "free" ? 3 : 50;
+    // All paid users get full history (starter gets 30, pro/premium get 50)
+    const historyLimit = profile?.plan_id === "starter" ? 30 : 50;
 
     const { data: scans } = await service
       .from("scans")
@@ -26,20 +26,11 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(historyLimit);
 
-    let totalCount = scans?.length || 0;
-    if (profile?.plan_id === "free") {
-      const { count } = await service
-        .from("scans")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
-      totalCount = count || 0;
-    }
-
     return NextResponse.json({
       scans: scans || [],
-      totalCount,
-      isLimited: profile?.plan_id === "free" && totalCount > 3,
-      hiddenCount: profile?.plan_id === "free" ? Math.max(0, totalCount - 3) : 0,
+      totalCount: scans?.length || 0,
+      isLimited: false,
+      hiddenCount: 0,
     });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

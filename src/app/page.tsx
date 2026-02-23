@@ -17,9 +17,9 @@ const FEATURES = [
 ];
 
 const PLANS = [
-  { name: "Free", price: "R0", period: "forever", scans: "1 / day", features: ["1 scan per day", "Basic trend & S/R", "Last 3 scans in history"], cta: "Get Started" },
-  { name: "Pro", price: "R99", period: "/month", scans: "15 / day", features: ["15 scans per day", "Full annotations", "Trade setups (Entry/TP/SL)", "AI Fundamentals & News", "Confluence grading", "Full scan history"], cta: "Upgrade to Pro", popular: true },
-  { name: "Premium", price: "R249", period: "/month", scans: "Unlimited", features: ["Unlimited scans", "All Pro features", "AI Fundamentals & News", "Priority processing", "Chart download", "Priority support"], cta: "Go Premium" },
+  { name: "Starter", price: "R49", period: "/month", scans: "15/month", features: ["15 scans per month", "Full annotations", "Trade setups (Entry/TP/SL)", "S/R levels & zones", "Scan history"], cta: "Get Starter" },
+  { name: "Pro", price: "R99", period: "/month", scans: "50/month", features: ["50 scans per month", "Full annotations", "Trade setups (Entry/TP/SL)", "AI Fundamentals & News", "Confluence grading", "Full scan history"], cta: "Get Pro", popular: true },
+  { name: "Premium", price: "R199", period: "/month", scans: "Unlimited", features: ["Unlimited scans", "All Pro features", "AI Fundamentals & News", "Priority processing", "Priority support"], cta: "Go Premium" },
 ];
 
 const STEPS = [
@@ -108,8 +108,8 @@ export default function LandingPage() {
             <Link href="/login" className="text-xs font-semibold no-underline px-4 py-2 rounded-lg" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
               Sign In
             </Link>
-            <Link href="/signup" onClick={() => handleSignupClick("nav")} className="text-xs font-bold no-underline px-4 py-2 rounded-lg" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
-              Start Free
+            <Link href="/pricing" onClick={() => handleSignupClick("nav")} className="text-xs font-bold no-underline px-4 py-2 rounded-lg" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+              Get Started
             </Link>
           </div>
         </nav>
@@ -133,14 +133,14 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center gap-3 mb-4">
-            <Link href="/signup" onClick={() => handleSignupClick("hero")} className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
-              Start Free — 1 Scan/Day
+            <Link href="/pricing" onClick={() => handleSignupClick("hero")} className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
+              Get Started — From R49/mo
             </Link>
             <Link href="/login" className="no-underline px-7 py-3.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
               Sign In
             </Link>
           </div>
-          <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>No credit card required • Free scan daily</p>
+          <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>Plans from R49/month • 15 to unlimited scans</p>
 
           {/* Platform badges */}
           <div className="flex gap-2 mt-8 flex-wrap justify-center">
@@ -248,7 +248,7 @@ export default function LandingPage() {
         <section style={{ padding: "60px 24px" }}>
           <div className="text-center mb-12">
             <h2 className="text-2xl font-extrabold text-white mb-2" style={{ letterSpacing: "-1px" }}>Simple pricing</h2>
-            <p className="text-sm" style={{ color: "rgba(255,255,255,.4)" }}>Start free. Upgrade when you need more power.</p>
+            <p className="text-sm" style={{ color: "rgba(255,255,255,.4)" }}>Professional AI chart analysis from R49/month</p>
           </div>
           <div className="max-w-3xl mx-auto grid md:grid-cols-3 gap-4">
             {PLANS.map((plan) => (
@@ -272,7 +272,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/signup" className="block w-full py-2.5 rounded-lg text-xs font-bold no-underline text-center" style={{
+                <Link href="/pricing" className="block w-full py-2.5 rounded-lg text-xs font-bold no-underline text-center" style={{
                   background: plan.popular ? "linear-gradient(135deg,#00e5a0,#00b87d)" : "rgba(255,255,255,.06)",
                   color: plan.popular ? "#0a0b0f" : "#fff",
                 }}>
@@ -309,8 +309,8 @@ export default function LandingPage() {
             <div className="text-[10px] font-mono font-bold mb-2" style={{ color: "#f0b90b" }}>🔥 LAUNCH SPECIAL — 50% OFF FIRST MONTH</div>
             <h2 className="text-2xl font-extrabold text-white mb-3" style={{ letterSpacing: "-1px" }}>Ready to level up your trading?</h2>
             <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.4)" }}>Join 40+ traders using AI to analyze charts in seconds.</p>
-            <Link href="/signup" onClick={() => handleSignupClick("cta")} className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
-              Start Free Today →
+            <Link href="/pricing" onClick={() => handleSignupClick("cta")} className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
+              View Plans — From R49/mo →
             </Link>
             <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.25)" }}>Use code LAUNCH50 for 50% off Pro or Premium</p>
           </div>
