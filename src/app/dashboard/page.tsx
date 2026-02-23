@@ -156,7 +156,7 @@ export default function Dashboard() {
 
       <div className="relative z-[1] min-h-screen flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between" style={{ padding: "14px 22px", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+        <header className="flex items-center justify-between" style={{ padding: "14px 22px", paddingTop: "calc(14px + env(safe-area-inset-top, 0px))", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
           <div className="flex items-center gap-3">
             {/* Hamburger */}
             <button onClick={() => setSidebarOpen(true)} className="flex flex-col gap-1 cursor-pointer p-1.5 rounded-lg" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)" }}>

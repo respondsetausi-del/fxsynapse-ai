@@ -91,7 +91,7 @@ export default function LandingPage() {
 
       <div className="relative z-[1]">
         {/* NAV */}
-        <nav className="flex items-center justify-between" style={{ padding: "16px 28px", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+        <nav className="flex items-center justify-between" style={{ padding: "16px 28px", paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg,#00e5a0,#00b87d)", boxShadow: "0 4px 18px rgba(0,229,160,.25)" }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>

@@ -26,10 +26,13 @@ body {
   font-family: "Outfit", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+}
+
+/* PWA standalone mode - prevent content under status bar */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top, 20px);
+  }
 }
 
 /* Animations */
