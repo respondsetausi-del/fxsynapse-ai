@@ -81,7 +81,7 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
       }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+        <div className="flex items-center justify-between p-4" style={{ paddingTop: 48, borderBottom: "1px solid rgba(255,255,255,.06)" }}>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>

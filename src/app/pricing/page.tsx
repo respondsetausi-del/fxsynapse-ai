@@ -120,7 +120,7 @@ export default function PricingPage() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 flex items-center justify-between px-6 py-4" style={{ paddingTop: 32, borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+      <header className="relative z-10 flex items-center justify-between px-6 py-4" style={{ paddingTop: 48, borderBottom: "1px solid rgba(255,255,255,.04)" }}>
         <Link href="/" className="flex items-center gap-2.5 no-underline">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
