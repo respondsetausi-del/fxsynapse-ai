@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
       broker_clicks: events.filter(e => e.event_type === "broker_click").length,
       broker_popup_shown: events.filter(e => e.event_type === "broker_popup_shown").length,
       broker_popup_dismissed: events.filter(e => e.event_type === "broker_popup_dismissed").length,
+      apk_downloads: events.filter(e => e.event_type === "apk_download").length,
       // Unique visitors
       unique_visitors: new Set(events.filter(e => e.visitor_id).map(e => e.visitor_id)).size,
       // Conversion: signup clicks / landing visits
@@ -85,13 +86,14 @@ export async function GET(req: NextRequest) {
     });
 
     // Daily breakdown
-    const dailyMap: Record<string, { visits: number; signups: number; broker: number }> = {};
+    const dailyMap: Record<string, { visits: number; signups: number; broker: number; downloads: number }> = {};
     events.forEach(e => {
       const day = e.created_at.split("T")[0];
-      if (!dailyMap[day]) dailyMap[day] = { visits: 0, signups: 0, broker: 0 };
+      if (!dailyMap[day]) dailyMap[day] = { visits: 0, signups: 0, broker: 0, downloads: 0 };
       if (e.event_type === "landing_visit") dailyMap[day].visits++;
       if (e.event_type === "signup_click") dailyMap[day].signups++;
       if (e.event_type === "broker_click") dailyMap[day].broker++;
+      if (e.event_type === "apk_download") dailyMap[day].downloads++;
     });
     stats.daily = Object.entries(dailyMap)
       .map(([date, d]) => ({ date, ...d }))

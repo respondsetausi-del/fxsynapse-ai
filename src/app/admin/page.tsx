@@ -145,6 +145,8 @@ export default function AdminDashboard() {
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [funnelData, setFunnelData] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [ratingsData, setRatingsData] = useState<any>(null);
   const [emailLogsTotal, setEmailLogsTotal] = useState(0);
   const [emailLogsPage, setEmailLogsPage] = useState(1);
   const [modal, setModal] = useState<{ user: UserRow; type: ModalType } | null>(null);
@@ -195,6 +197,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (tab === "funnel") {
       fetch("/api/tracking?days=30").then(r => r.json()).then(d => setFunnelData(d)).catch(() => {});
+      fetch("/api/ratings").then(r => r.json()).then(d => setRatingsData(d)).catch(() => {});
     }
   }, [tab]);
 
@@ -280,7 +283,6 @@ export default function AdminDashboard() {
     { id: "retention", label: "Retention", icon: "◇" },
     { id: "payments", label: "Payments", icon: "◆" },
     { id: "email", label: "Email", icon: "◁" },
-    { id: "funnel", label: "Funnel", icon: "◐" },
     { id: "funnel", label: "Funnel", icon: "◐" },
   ];
 
@@ -757,12 +759,13 @@ export default function AdminDashboard() {
             ) : (
               <>
                 {/* Funnel Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {[
                     { label: "Landing Visits", value: funnelData.stats?.landing_visits || 0, color: "#4da0ff" },
                     { label: "Signup Clicks", value: funnelData.stats?.signup_clicks || 0, color: "#00e5a0" },
                     { label: "Signup Rate", value: `${funnelData.stats?.signup_rate || 0}%`, color: "#f0b90b" },
                     { label: "Unique Visitors", value: funnelData.stats?.unique_visitors || 0, color: "#fff" },
+                    { label: "APK Downloads", value: funnelData.stats?.apk_downloads || 0, color: "#3ddc84" },
                   ].map((s, i) => (
                     <div key={i} className="rounded-xl p-4" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
                       <div className="text-[9px] font-mono uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,.3)" }}>{s.label}</div>
@@ -847,16 +850,64 @@ export default function AdminDashboard() {
                       { label: "Landed on Site", value: funnelData.stats?.landing_visits || 0, color: "#4da0ff", width: "100%" },
                       { label: "Saw Broker Popup", value: funnelData.stats?.broker_popup_shown || 0, color: "#f0b90b", width: "75%" },
                       { label: "Clicked Signup", value: funnelData.stats?.signup_clicks || 0, color: "#00e5a0", width: "50%" },
-                      { label: "Clicked Broker Link", value: funnelData.stats?.broker_clicks || 0, color: "#f0b90b", width: "30%" },
+                      { label: "Clicked Broker Link", value: funnelData.stats?.broker_clicks || 0, color: "#f0b90b", width: "35%" },
+                      { label: "Downloaded APK", value: funnelData.stats?.apk_downloads || 0, color: "#3ddc84", width: "20%" },
                     ].map((step, i) => (
                       <div key={i} className="text-center" style={{ width: step.width, transition: "all 0.3s" }}>
                         <div className="rounded-xl py-3 px-4 flex items-center justify-between" style={{ background: step.color + "12", border: `1px solid ${step.color}25` }}>
                           <span className="text-[11px] font-semibold" style={{ color: step.color }}>{step.label}</span>
                           <span className="text-lg font-bold font-mono" style={{ color: step.color }}>{step.value}</span>
                         </div>
-                        {i < 3 && <div className="text-[16px] my-1" style={{ color: "rgba(255,255,255,.15)" }}>▼</div>}
+                        {i < 4 && <div className="text-[16px] my-1" style={{ color: "rgba(255,255,255,.15)" }}>▼</div>}
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* User Ratings */}
+                <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+                  <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                    <h2 className="text-sm font-bold text-white">⭐ User Ratings</h2>
+                    <p className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Scan quality feedback from users</p>
+                  </div>
+                  <div className="p-4">
+                    {!ratingsData || ratingsData.total === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="text-2xl mb-2">⭐</div>
+                        <div className="text-sm" style={{ color: "rgba(255,255,255,.3)" }}>No ratings yet</div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col md:flex-row gap-6">
+                        {/* Average Score */}
+                        <div className="flex flex-col items-center justify-center px-6">
+                          <div className="text-4xl font-bold font-mono" style={{ color: "#f0b90b" }}>{ratingsData.average}</div>
+                          <div className="flex gap-0.5 mt-1">
+                            {[1,2,3,4,5].map(s => (
+                              <span key={s} className="text-sm" style={{ color: s <= Math.round(ratingsData.average) ? "#f0b90b" : "rgba(255,255,255,.15)" }}>★</span>
+                            ))}
+                          </div>
+                          <div className="text-[10px] font-mono mt-1" style={{ color: "rgba(255,255,255,.3)" }}>{ratingsData.total} total ratings</div>
+                        </div>
+                        {/* Distribution Bars */}
+                        <div className="flex-1 space-y-1.5">
+                          {[5,4,3,2,1].map(star => {
+                            const count = ratingsData.distribution?.find((d: { stars: number; count: number }) => d.stars === star)?.count || 0;
+                            const pct = ratingsData.total > 0 ? Math.round((count / ratingsData.total) * 100) : 0;
+                            return (
+                              <div key={star} className="flex items-center gap-2">
+                                <span className="text-[11px] font-mono w-4 text-right" style={{ color: "rgba(255,255,255,.4)" }}>{star}</span>
+                                <span className="text-[10px]" style={{ color: "#f0b90b" }}>★</span>
+                                <div className="flex-1 rounded-full overflow-hidden" style={{ height: 8, background: "rgba(255,255,255,.04)" }}>
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: star >= 4 ? "#00e5a0" : star === 3 ? "#f0b90b" : "#ff4d6a" }} />
+                                </div>
+                                <span className="text-[10px] font-mono font-bold w-8 text-right" style={{ color: "rgba(255,255,255,.5)" }}>{count}</span>
+                                <span className="text-[9px] font-mono w-8" style={{ color: "rgba(255,255,255,.2)" }}>{pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -879,7 +930,7 @@ export default function AdminDashboard() {
                         {(funnelData.recent || []).length === 0 ? (
                           <tr><td colSpan={4} className="px-4 py-12 text-center"><div className="text-2xl mb-2">📊</div><div className="text-sm" style={{ color: "rgba(255,255,255,.3)" }}>No events tracked yet</div></td></tr>
                         ) : (funnelData.recent || []).map((e: { id: string; created_at: string; event_type: string; source: string; visitor_id: string }) => {
-                          const evColor = e.event_type === "signup_click" ? "#00e5a0" : e.event_type === "broker_click" ? "#f0b90b" : e.event_type === "broker_popup_dismissed" ? "#ff4d6a" : "#4da0ff";
+                          const evColor = e.event_type === "signup_click" ? "#00e5a0" : e.event_type === "broker_click" ? "#f0b90b" : e.event_type === "broker_popup_dismissed" ? "#ff4d6a" : e.event_type === "apk_download" ? "#3ddc84" : "#4da0ff";
                           return (
                             <tr key={e.id} className="hover:bg-white/[.02]" style={{ borderBottom: "1px solid rgba(255,255,255,.03)" }}>
                               <td className="px-4 py-2.5 font-mono text-[10px]" style={{ color: "rgba(255,255,255,.35)" }}>{fmtDate(e.created_at)}</td>

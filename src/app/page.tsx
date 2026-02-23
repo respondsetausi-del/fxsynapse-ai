@@ -148,9 +148,16 @@ export default function LandingPage() {
               <span key={p} className="px-3 py-1 rounded-full text-[10px] font-mono" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", color: "rgba(255,255,255,.3)" }}>{p}</span>
             ))}
           </div>
-        </section>
 
-        {/* MOCK CHART PREVIEW */}
+          {/* Android Download */}
+          <a href="/FXSynapse-AI.apk" download onClick={() => trackEvent("apk_download", "landing")} className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl no-underline transition-all hover:opacity-90" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#3ddc84"><path d="M17.523 2.248a.75.75 0 0 0-1.046.224l-1.3 2.044A7.96 7.96 0 0 0 12 3.75a7.96 7.96 0 0 0-3.177.766l-1.3-2.044a.75.75 0 1 0-1.27.808l1.2 1.886A8.004 8.004 0 0 0 4 12v.75h16V12a8.004 8.004 0 0 0-3.453-6.584l1.2-1.886a.75.75 0 0 0-.224-1.046V2.248zM9.5 9.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zm5 0a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM4 14.25h16v4A3.75 3.75 0 0 1 16.25 22h-8.5A3.75 3.75 0 0 1 4 18.25v-4z"/></svg>
+            <div className="text-left">
+              <div className="text-[11px] font-bold text-white">Download Android App</div>
+              <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>FXSynapse-AI.apk • 6.7 MB</div>
+            </div>
+          </a>
+        </section>
         <section className="flex justify-center" style={{ padding: "0 24px 80px" }}>
           <div className="w-full max-w-3xl rounded-2xl overflow-hidden relative" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)", boxShadow: "0 20px 80px rgba(0,0,0,.4)" }}>
             <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
