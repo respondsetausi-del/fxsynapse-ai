@@ -32,6 +32,7 @@ export interface AnalysisResult {
   confidence: number;
   support: string;
   resistance: string;
+  all_levels?: { price: string; type: "support" | "resistance" }[];
   notes: string;
   rsi: number | null;
   ema_status: string;

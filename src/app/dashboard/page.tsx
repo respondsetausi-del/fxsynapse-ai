@@ -403,7 +403,12 @@ export default function Dashboard() {
                 {viewMode !== "chart" && (
                   <div className="result-analysis flex flex-col gap-2.5 animate-slideInRight" style={{ width: viewMode === "analysis" ? "100%" : "42%" }}>
                     <div className="grid grid-cols-2 gap-1.5">
-                      {[{ l: "Trend", v: A.trend, c: "#00e5a0" }, { l: "Structure", v: A.structure?.length > 20 ? (A.structure.split("/")[0]?.trim() + " / " + (A.structure.split("/")[1]?.trim() || "")) : A.structure, c: "#4da0ff" }, { l: "Support", v: A.support, c: "#00e5a0" }, { l: "Resistance", v: A.resistance, c: "#ff4d6a" }].map((s, i) => (
+                      {[{ l: "Trend", v: A.trend, c: "#00e5a0" }, { l: "Structure", v: A.structure?.length > 20 ? (A.structure.split("/")[0]?.trim() + " / " + (A.structure.split("/")[1]?.trim() || "")) : A.structure, c: "#4da0ff" },
+                        ...(A.all_levels && A.all_levels.length > 0
+                          ? A.all_levels.map((lv: any, idx: number) => ({ l: lv.type === "support" ? `Support ${idx + 1}` : `Resistance ${idx + 1}`, v: lv.price, c: lv.type === "support" ? "#00e5a0" : "#ff4d6a" }))
+                          : [{ l: "Support", v: A.support, c: "#00e5a0" }, { l: "Resistance", v: A.resistance, c: "#ff4d6a" }]
+                        )
+                      ].map((s, i) => (
                         <div key={i} className="stat-card">
                           <div className="text-[9px] font-mono uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,.3)" }}>{s.l}</div>
                           <div className="text-sm font-bold" style={{ color: s.c }}>{s.v}</div>

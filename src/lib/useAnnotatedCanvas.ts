@@ -56,9 +56,13 @@ export function useAnnotatedCanvas(
     const bw = b.w * w; // chart area width in pixels
     const bh = b.h * h; // chart area height in pixels
 
+    // Helper: clamp value between 0 and 1
+    const clamp = (v: number) => Math.max(0.01, Math.min(0.99, v));
+
     // Helper: convert annotation coords (0-1 within bounds) to pixel coords
-    const toPixelX = (ax: number) => bx + ax * bw;
-    const toPixelY = (ay: number) => by + ay * bh;
+    // All coordinates are clamped to stay within chart bounds
+    const toPixelX = (ax: number) => bx + clamp(ax) * bw;
+    const toPixelY = (ay: number) => by + clamp(ay) * bh;
 
     const fontSize = w > 700 ? 12 : w > 400 ? 11 : 10;
 
