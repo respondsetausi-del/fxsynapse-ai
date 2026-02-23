@@ -28,13 +28,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* PWA standalone mode - prevent content under status bar */
-@media all and (display-mode: standalone) {
-  body {
-    padding-top: env(safe-area-inset-top, 20px);
-  }
-}
-
 /* Animations */
 @keyframes float {
   0%, 100% { transform: translateY(0); opacity: 0.3; }

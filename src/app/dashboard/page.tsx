@@ -156,7 +156,7 @@ export default function Dashboard() {
 
       <div className="relative z-[1] min-h-screen flex flex-col">
         {/* Header */}
-        <header className="flex items-center justify-between" style={{ padding: "14px 22px", paddingTop: "calc(14px + env(safe-area-inset-top, 0px))", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+        <header className="flex items-center justify-between" style={{ padding: "14px 22px", paddingTop: 32, borderBottom: "1px solid rgba(255,255,255,.04)" }}>
           <div className="flex items-center gap-3">
             {/* Hamburger */}
             <button onClick={() => setSidebarOpen(true)} className="flex flex-col gap-1 cursor-pointer p-1.5 rounded-lg" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)" }}>
@@ -176,17 +176,6 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Credit badge */}
-            {user && credits && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.15)" }}>
-                <span className="text-[10px] font-mono font-medium" style={{ color: "#4da0ff" }}>
-                  {credits.dailyRemaining === -1 ? "∞" : credits.dailyRemaining} scans
-                </span>
-                {credits.creditsBalance > 0 && (
-                  <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>+ {credits.creditsBalance} cr</span>
-                )}
-              </div>
-            )}
             {/* Recommended Broker */}
             <a href={BROKER_LINK} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("broker_click", "header")} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full no-underline transition-all hover:opacity-90" style={{ background: "rgba(240,185,11,.1)", border: "1px solid rgba(240,185,11,.15)" }}>
               <span className="text-[10px]">📈</span>
@@ -198,16 +187,6 @@ export default function Dashboard() {
                 background: "rgba(255,77,106,.12)", border: "1px solid rgba(255,77,106,.2)", color: "#ff4d6a",
               }}>
                 👑 Admin
-              </Link>
-            )}
-            {/* Plan badge */}
-            {user && (
-              <Link href="/pricing" className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold no-underline" style={{
-                background: user.plan_id === "premium" ? "rgba(240,185,11,.12)" : user.plan_id === "pro" ? "rgba(0,229,160,.12)" : "rgba(255,255,255,.04)",
-                border: `1px solid ${user.plan_id === "premium" ? "rgba(240,185,11,.2)" : user.plan_id === "pro" ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.06)"}`,
-                color: user.plan_id === "premium" ? "#f0b90b" : user.plan_id === "pro" ? "#00e5a0" : "rgba(255,255,255,.4)",
-              }}>
-                {user.plans?.name || "Free"}
               </Link>
             )}
             {/* User avatar */}
