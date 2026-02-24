@@ -30,7 +30,7 @@ interface EmailLog {
   body: string; status: string; created_at: string;
 }
 
-type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel";
+type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel" | "chat";
 type ModalType = "credits" | "plan" | "role" | "trial" | "block" | "email";
 type UserFilter = "all" | "starter" | "pro" | "premium" | "blocked" | "unpaid";
 
@@ -161,6 +161,11 @@ export default function AdminDashboard() {
   const [bulkSubject, setBulkSubject] = useState("");
   const [bulkBody, setBulkBody] = useState("");
   const [bulkSending, setBulkSending] = useState(false);
+  const [chatThreads, setChatThreads] = useState<any[]>([]);
+  const [chatActive, setChatActive] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatReply, setChatReply] = useState("");
+  const [chatSending, setChatSending] = useState(false);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const supabase = createClient();
@@ -200,6 +205,44 @@ export default function AdminDashboard() {
       fetch("/api/ratings").then(r => r.json()).then(d => setRatingsData(d)).catch(() => {});
     }
   }, [tab]);
+
+  // Chat: fetch threads
+  useEffect(() => {
+    if (tab === "chat") {
+      const fetchThreads = () => fetch("/api/chat?admin=1").then(r => r.json()).then(d => setChatThreads(d.threads || [])).catch(() => {});
+      fetchThreads();
+      const iv = setInterval(fetchThreads, 5000);
+      return () => clearInterval(iv);
+    }
+  }, [tab]);
+
+  // Chat: fetch messages when thread selected
+  useEffect(() => {
+    if (chatActive) {
+      const fetchMsgs = () => fetch(`/api/chat?visitor_id=${chatActive}`).then(r => r.json()).then(d => setChatMessages(d.messages || [])).catch(() => {});
+      fetchMsgs();
+      const iv = setInterval(fetchMsgs, 3000);
+      return () => clearInterval(iv);
+    }
+  }, [chatActive]);
+
+  const sendChatReply = async () => {
+    if (!chatReply.trim() || !chatActive) return;
+    setChatSending(true);
+    try {
+      await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitor_id: chatActive, message: chatReply, sender: "admin", name: "FXSynapse Support" }),
+      });
+      setChatReply("");
+      // Refresh messages
+      const res = await fetch(`/api/chat?visitor_id=${chatActive}`);
+      const data = await res.json();
+      setChatMessages(data.messages || []);
+    } catch {}
+    setChatSending(false);
+  };
 
   const handleSearchChange = (val: string) => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -284,6 +327,7 @@ export default function AdminDashboard() {
     { id: "payments", label: "Payments", icon: "◆" },
     { id: "email", label: "Email", icon: "◁" },
     { id: "funnel", label: "Funnel", icon: "◐" },
+    { id: "chat", label: "Chat", icon: "◌" },
   ];
 
   if (loading) return (
@@ -946,6 +990,81 @@ export default function AdminDashboard() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* ── CHAT TAB ── */}
+        {tab === "chat" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Thread list */}
+            <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+              <div className="text-sm font-bold text-white mb-3">Conversations</div>
+              {chatThreads.length === 0 && <div className="text-xs" style={{ color: "rgba(255,255,255,.3)" }}>No chats yet</div>}
+              <div className="flex flex-col gap-1.5 max-h-[500px] overflow-y-auto">
+                {chatThreads.map((t: any) => (
+                  <button key={t.visitor_id} onClick={() => setChatActive(t.visitor_id)}
+                    className="text-left px-3 py-2.5 rounded-xl cursor-pointer transition-all"
+                    style={{
+                      background: chatActive === t.visitor_id ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.02)",
+                      border: `1px solid ${chatActive === t.visitor_id ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.04)"}`,
+                    }}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs font-bold text-white">{t.name || "Visitor"}</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{
+                        background: t.status === "waiting" ? "rgba(255,77,106,.1)" : "rgba(0,229,160,.1)",
+                        color: t.status === "waiting" ? "#ff4d6a" : "#00e5a0",
+                      }}>{t.status}</span>
+                    </div>
+                    <div className="text-[10px] truncate" style={{ color: "rgba(255,255,255,.35)" }}>{t.email || "No email"}</div>
+                    <div className="text-[10px] truncate mt-0.5" style={{ color: "rgba(255,255,255,.25)" }}>{t.last_message}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Chat messages */}
+            <div className="md:col-span-2 rounded-2xl flex flex-col" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)", minHeight: 400 }}>
+              {!chatActive ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-xs" style={{ color: "rgba(255,255,255,.2)" }}>Select a conversation</div>
+                </div>
+              ) : (
+                <>
+                  <div className="px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                    <div className="text-sm font-bold text-white">{chatThreads.find((t: any) => t.visitor_id === chatActive)?.name || "Visitor"}</div>
+                    <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{chatThreads.find((t: any) => t.visitor_id === chatActive)?.email || "No email"}</div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2" style={{ maxHeight: 350 }}>
+                    {chatMessages.map((m: any, i: number) => (
+                      <div key={i} className={`flex ${m.sender === "admin" ? "justify-end" : "justify-start"}`}>
+                        <div className="max-w-[75%] px-3 py-2 rounded-xl text-xs" style={{
+                          background: m.sender === "admin" ? "rgba(0,229,160,.1)" : "rgba(255,255,255,.04)",
+                          color: m.sender === "admin" ? "#00e5a0" : "rgba(255,255,255,.6)",
+                          borderBottomRightRadius: m.sender === "admin" ? 4 : 12,
+                          borderBottomLeftRadius: m.sender === "visitor" ? 4 : 12,
+                        }}>
+                          {m.message}
+                          <div className="text-[8px] mt-1" style={{ color: "rgba(255,255,255,.2)" }}>
+                            {m.created_at ? new Date(m.created_at).toLocaleTimeString() : ""}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-4 py-3 flex gap-2" style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+                    <input value={chatReply} onChange={(e) => setChatReply(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && sendChatReply()}
+                      placeholder="Type reply..." className="flex-1 px-3 py-2.5 rounded-xl text-xs outline-none"
+                      style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff" }} />
+                    <button onClick={sendChatReply} disabled={chatSending || !chatReply.trim()}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                      style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none", opacity: chatSending ? 0.5 : 1 }}>
+                      Send
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

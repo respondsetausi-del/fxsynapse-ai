@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import ChatWidget from "@/components/ChatWidget";
 
 const PLANS = [
   {
@@ -299,6 +300,7 @@ function PricingContent() {
           Payments securely processed by Yoco. All prices in ZAR. Top-up credits never expire.
         </p>
       </div>
+      <ChatWidget />
     </div>
   );
 }

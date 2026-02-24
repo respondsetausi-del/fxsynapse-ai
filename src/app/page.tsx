@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ChatWidget from "@/components/ChatWidget";
 
 const PX = Array.from({ length: 30 }, (_, i) => ({
   id: i, x: Math.random() * 100, y: Math.random() * 100,
@@ -449,6 +450,9 @@ export default function LandingPage() {
           </div>
         </div>
       )}
+
+      {/* Chat Widget */}
+      <ChatWidget />
     </div>
   );
 }

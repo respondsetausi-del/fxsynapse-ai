@@ -26,27 +26,36 @@ CRITICAL: ALL annotation coordinates MUST be between 0.0 and 1.0. Never place an
 
 STEP 2 -- READ THE CHART:
 1. Identify the pair, timeframe, and current market structure
-2. Find the 3-4 MOST SIGNIFICANT support and resistance levels on the chart
-3. Only include levels where price has CLEARLY bounced, reversed, or consolidated multiple times
-4. Do NOT mark minor or weak levels — only the strongest, most obvious ones
-5. Determine trend direction and bias
-6. Read any visible indicators (RSI, EMA, Volume)
+2. LOCATE THE CURRENT PRICE — find the RIGHTMOST candle on the chart. This is where price is NOW.
+   - Note the x position of the last candle (typically x = 0.85-0.95 of the chart area)
+   - Note the y position of the last candle's close (this is the current price level)
+3. Find the 3-4 MOST SIGNIFICANT support and resistance levels on the chart
+4. Only include levels where price has CLEARLY bounced, reversed, or consolidated multiple times
+5. Do NOT mark minor or weak levels — only the strongest, most obvious ones
+6. Determine trend direction and bias
+7. Read any visible indicators (RSI, EMA, Volume)
 
 STEP 3 -- BUILD THE TRADE SETUP:
 This is critical. The Entry, TP, SL, and arrow MUST follow proper trading logic:
 
+CURRENT PRICE ANCHORING:
+- Find where the LAST/RIGHTMOST candle is on the chart — that is the current price
+- Entry should be placed AT or VERY NEAR the current price level (the y position of the last candle's close)
+- The x position of Entry/TP/SL/Arrow should all be at the RIGHTMOST candles (where the chart ends on the right side, typically x = 0.88-0.95)
+- Do NOT place Entry/TP/SL in the middle of the chart — they must be at the RIGHT EDGE where price currently is
+
 FOR A LONG/BULLISH SETUP:
-- Entry: at or near SUPPORT level (where price bounces up or current pullback zone)
-- Stop Loss: BELOW support (lower y value = higher on chart, so SL y > Entry y)
-- Take Profit: at or near RESISTANCE (TP y < Entry y because TP is higher price)
+- Entry: at or near CURRENT PRICE (where the last candle is — this is where you'd enter NOW)
+- Stop Loss: BELOW the nearest support (SL y > Entry y because lower price = higher y)
+- Take Profit: at or near RESISTANCE above current price (TP y < Entry y because higher price = lower y)
 - Arrow: points UP (y1 > y2, meaning arrow goes from lower to higher on chart)
 - Entry y > TP y (entry is at lower price, TP is at higher price)
 - SL y > Entry y (stop loss is at even lower price)
 
 FOR A SHORT/BEARISH SETUP:
-- Entry: at or near RESISTANCE level (where price rejects down or current rally zone)
-- Stop Loss: ABOVE resistance (SL y < Entry y because SL is higher price)
-- Take Profit: at or near SUPPORT (TP y > Entry y because TP is lower price)
+- Entry: at or near CURRENT PRICE (where the last candle is — this is where you'd enter NOW)
+- Stop Loss: ABOVE the nearest resistance (SL y < Entry y because higher price = lower y)
+- Take Profit: at or near SUPPORT below current price (TP y > Entry y because lower price = higher y)
 - Arrow: points DOWN (y1 < y2, meaning arrow goes from higher to lower on chart)
 - Entry y < TP y (entry is at higher price, TP is at lower price)
 - SL y < Entry y (stop loss is at even higher price)
@@ -58,9 +67,10 @@ FOR RANGING/NEUTRAL:
 COORDINATE LOGIC (y-axis is INVERTED -- y=0 is TOP of chart = highest price):
 - Higher price = LOWER y value (closer to 0)
 - Lower price = HIGHER y value (closer to 1)
-- So if support is at y=0.75 and resistance is at y=0.20:
-  - Long Entry: y~0.70 (near support), TP: y~0.25 (near resistance), SL: y~0.82 (below support)
-  - Short Entry: y~0.25 (near resistance), TP: y~0.70 (near support), SL: y~0.12 (above resistance)
+- So if support is at y=0.75 and resistance is at y=0.20 and current price is at y=0.55:
+  - Long Entry: y~0.55 (current price), TP: y~0.25 (near resistance), SL: y~0.82 (below support)
+  - Short Entry: y~0.55 (current price), TP: y~0.70 (near support), SL: y~0.12 (above resistance)
+  - All at x = 0.90 (right edge where last candle is)
 
 Return this exact JSON structure:
 
@@ -101,17 +111,18 @@ Return this exact JSON structure:
     // -- TRENDLINE (if visible trend) --
     {"type": "trend", "x1": <start x>, "y1": <start y>, "x2": <end x>, "y2": <end y>, "color": "#4da0ff", "label": "Uptrend | Downtrend"},
     
-    // -- TRADE SETUP (Entry, TP, SL -- MUST follow the rules above) --
-    // All three points should share the SAME x value (aligned vertically on recent candles)
-    // x should be 0.75-0.88 (on recent price action, rightmost candles)
-    {"type": "point", "x": <same x for all 3>, "y": <entry level y>, "label": "Entry", "color": "#00e5a0"},
+    // -- TRADE SETUP (Entry, TP, SL -- anchored to current price at right edge) --
+    // Find the x position of the LAST candle on the chart (rightmost candle, typically x = 0.88-0.95)
+    // Entry y = the y level of the current/last candle's close price
+    // All three points share the SAME x value (at the right edge where candles end)
+    {"type": "point", "x": <rightmost candle x, 0.88-0.95>, "y": <current price y>, "label": "Entry", "color": "#00e5a0"},
     {"type": "point", "x": <same x>, "y": <TP level y>, "label": "TP", "color": "#4da0ff"},
     {"type": "point", "x": <same x>, "y": <SL level y>, "label": "SL", "color": "#ff4d6a"},
     
     // -- ARROW (from Entry toward TP direction) --
-    // x: 0.70-0.82, y1: Entry y, y2: TP y
+    // x: same as Entry/TP/SL x position (right edge)
     // Bullish: y1 > y2 (arrow points up). Bearish: y1 < y2 (arrow points down)
-    {"type": "arrow", "x": <0.70-0.82>, "y1": <entry y>, "y2": <TP y>, "color": "#00e5a0 for bullish | #ff4d6a for bearish"}
+    {"type": "arrow", "x": <same x as Entry>, "y1": <entry y>, "y2": <TP y>, "color": "#00e5a0 for bullish | #ff4d6a for bearish"}
   ]
 }
 
@@ -119,16 +130,16 @@ CRITICAL RULES:
 1. chart_bounds MUST accurately frame only the candlestick area
 2. ALL coords are 0.0-1.0 WITHIN chart_bounds -- CLAMP to 0.01-0.99 range
 3. y=0 is TOP (highest price), y=1 is BOTTOM (lowest price) -- this is critical for trade setup logic
-4. Entry, TP, SL MUST be vertically aligned (same x around 0.80) and at the CORRECT price levels
-5. For LONG: TP.y < Entry.y < SL.y (TP higher on chart, SL lower on chart)
-6. For SHORT: SL.y < Entry.y < TP.y (SL higher on chart, TP lower on chart)  
-7. Arrow y1=Entry.y, y2=TP.y -- showing the expected price movement direction
-8. Support line y should match where you place TP (long) or Entry (short)
-9. Resistance line y should match where you place Entry (short) or TP (long)
-10. S/R lines and zone edges should be at the SAME y-levels as the corresponding trade points
-11. Return ONLY the JSON object, nothing else
-12. Mark only the 3-4 STRONGEST S/R levels — quality over quantity
-13. NEVER place annotations outside the 0.0-1.0 coordinate range`;
+4. Entry MUST be at the CURRENT PRICE level (y of the last/rightmost candle's close)
+5. Entry, TP, SL, Arrow MUST share the SAME x position at the RIGHT EDGE of the chart (x = 0.88-0.95, where the last candles are)
+6. For LONG: TP.y < Entry.y < SL.y (TP higher on chart, SL lower on chart)
+7. For SHORT: SL.y < Entry.y < TP.y (SL higher on chart, TP lower on chart)  
+8. Arrow y1=Entry.y, y2=TP.y -- showing the expected price movement direction
+9. S/R lines and zone edges should be at the SAME y-levels as the corresponding trade points
+10. Return ONLY the JSON object, nothing else
+11. Mark only the 3-4 STRONGEST S/R levels — quality over quantity
+12. NEVER place annotations outside the 0.0-1.0 coordinate range
+13. Entry/TP/SL should NEVER be in the middle of the chart — always at the right edge where price currently is`;
 
 export const USER_PROMPT = `Analyze this forex chart screenshot.
 
@@ -140,11 +151,13 @@ Then identify the 3-4 STRONGEST support and resistance levels:
 - Typically 1-2 resistance above current price, 1-2 support below
 
 Then build a proper trade setup:
-- Determine bias (Long/Short/Neutral)  
-- Place Entry at the logical level for the bias (near support for long, near resistance for short)
-- Place TP at the opposite level (resistance for long, support for short)
-- Place SL beyond the entry level (below support for long, above resistance for short)
-- Align Entry/TP/SL vertically on the same x coordinate near recent candles
+- FIND THE CURRENT PRICE — look at the LAST/RIGHTMOST candle on the chart. That is where price is NOW.
+- Determine bias (Long/Short/Neutral)
+- Place Entry at the CURRENT PRICE level (the y position of the last candle's close)
+- Place TP at the target level (resistance for long, support for short)
+- Place SL beyond the protective level (below support for long, above resistance for short)
+- Entry/TP/SL/Arrow x position MUST be at the RIGHT EDGE where the last candles end (x = 0.88-0.95)
+- Do NOT place Entry/TP/SL in the middle of the chart
 - Arrow from Entry toward TP
 
 IMPORTANT: All annotation coordinates MUST be within 0.01-0.99 range. Do NOT draw outside the chart area.
