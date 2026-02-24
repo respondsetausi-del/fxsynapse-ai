@@ -32,7 +32,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please sign in to analyze charts." }, { status: 401 });
     }
 
-    // 2. Credit check
+    // 2. HARD SUBSCRIPTION GATE — must have active paid plan
+    const { createClient } = await import("@supabase/supabase-js");
+    const service = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: profile } = await service
+      .from("profiles")
+      .select("plan_id, subscription_status")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || 
+        !profile.plan_id || 
+        profile.plan_id === "free" || 
+        profile.plan_id === "none" || 
+        profile.subscription_status !== "active") {
+      return NextResponse.json({ 
+        error: "Active subscription required. Choose a plan to start scanning.",
+      }, { status: 403 });
+    }
+
+    // 3. Credit check (monthly limit / top-up)
     const creditCheck = await checkCredits(user.id);
     if (!creditCheck.canScan) {
       return NextResponse.json({
@@ -41,7 +63,7 @@ export async function POST(req: NextRequest) {
       }, { status: 402 });
     }
 
-    // 3. Validate file
+    // 4. Validate file
     const formData = await req.formData();
     const file = formData.get("image") as File | null;
     if (!file) {

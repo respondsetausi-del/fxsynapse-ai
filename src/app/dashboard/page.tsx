@@ -49,6 +49,7 @@ export default function Dashboard() {
   const [ratingHover, setRatingHover] = useState(0);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [showBrokerPopup, setShowBrokerPopup] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileObjRef = useRef<File | null>(null);
   const supabase = createClient();
@@ -57,7 +58,7 @@ export default function Dashboard() {
   useEffect(() => {
     (async () => {
       const { data: { user: u } } = await supabase.auth.getUser();
-      if (!u) return;
+      if (!u) { router.push("/login"); return; }
       const res = await fetch("/api/user");
       if (res.ok) {
         const data = await res.json();
@@ -70,7 +71,12 @@ export default function Dashboard() {
         const isAdmin = data.profile?.role === "admin";
         if (!isAdmin && (!plan || plan === "free" || plan === "none" || subStatus !== "active")) {
           router.push("/pricing?gate=1");
+          return;
         }
+        // Only unlock dashboard after verified
+        setAuthLoading(false);
+      } else {
+        router.push("/login");
       }
     })();
   }, [supabase, router]);
@@ -126,6 +132,7 @@ export default function Dashboard() {
       formData.append("image", fileObjRef.current);
       const res = await fetch("/api/analyze", { method: "POST", body: formData });
       const data = await res.json();
+      if (res.status === 403) { clearInterval(iv); router.push("/pricing?gate=1"); return; }
       if (res.status === 402) { clearInterval(iv); setShowPaywall(true); setStage("preview"); return; }
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       clearInterval(iv); setProgress(100);
@@ -151,6 +158,19 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "#0a0b0f" }}>
+      {/* LOADING WALL — blocks everything until auth + plan verified */}
+      {authLoading && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center" style={{ background: "#0a0b0f" }}>
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-lg mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <div className="text-sm font-bold text-white mb-1">FXSynapse AI</div>
+            <div className="text-[10px] font-mono animate-pulse" style={{ color: "rgba(255,255,255,.35)" }}>Loading...</div>
+          </div>
+        </div>
+      )}
+
       {/* BG */}
       <div className="fixed inset-0 z-0 overflow-hidden">
         <div className="absolute rounded-full" style={{ top: "-20%", left: "-10%", width: 550, height: 550, background: "radial-gradient(circle,rgba(0,229,160,.07) 0%,transparent 70%)", filter: "blur(80px)" }} />
