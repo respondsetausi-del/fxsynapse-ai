@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 
 export async function POST() {
   try {
-    // Get authenticated user
     const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,7 +36,7 @@ export async function POST() {
       .single();
 
     if (!payment) {
-      // No pending payment — check if already active
+      // Check if already activated (webhook may have beaten us)
       const { data: profile } = await service
         .from("profiles")
         .select("plan_id, subscription_status")
@@ -47,11 +46,41 @@ export async function POST() {
       if (profile?.subscription_status === "active") {
         return NextResponse.json({ status: "already_active", plan: profile.plan_id });
       }
+
+      // Also check if there's a recently completed payment (webhook processed it)
+      const { data: recentPayment } = await service
+        .from("payments")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (recentPayment) {
+        const completedAt = new Date(recentPayment.updated_at || recentPayment.created_at);
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        if (completedAt > fiveMinAgo) {
+          // Webhook already processed this very recently
+          return NextResponse.json({
+            status: "activated",
+            plan: recentPayment.plan_id,
+            type: recentPayment.type,
+            method: "webhook_already_processed",
+          });
+        }
+      }
+
       return NextResponse.json({ status: "no_pending_payment" });
     }
 
-    // Activate the payment (assume Yoco redirected to success = payment went through)
-    await service.from("payments").update({ status: "completed" }).eq("id", payment.id);
+    // Activate: Yoco redirected to success = payment went through
+    console.log(`[ACTIVATE] Processing payment ${payment.id} for user ${user.id}`);
+
+    await service.from("payments").update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+    }).eq("id", payment.id);
 
     if (payment.type === "subscription") {
       const expiry = new Date();
@@ -66,6 +95,7 @@ export async function POST() {
         monthly_scans_reset_at: new Date().toISOString(),
       }).eq("id", user.id);
 
+      console.log(`[ACTIVATE] ✅ Subscription activated: user=${user.id}, plan=${payment.plan_id}`);
       return NextResponse.json({ status: "activated", plan: payment.plan_id, type: "subscription" });
 
     } else if (payment.type === "topup" || payment.type === "credits") {
@@ -90,12 +120,13 @@ export async function POST() {
         });
       }
 
+      console.log(`[ACTIVATE] ✅ Credits added: user=${user.id}, credits=${creditsAmount}`);
       return NextResponse.json({ status: "activated", credits: creditsAmount, type: "topup" });
     }
 
     return NextResponse.json({ status: "unknown_type" });
   } catch (error) {
-    console.error("Activate payment error:", error);
+    console.error("[ACTIVATE] Error:", error);
     return NextResponse.json({ error: "Failed to activate" }, { status: 500 });
   }
 }

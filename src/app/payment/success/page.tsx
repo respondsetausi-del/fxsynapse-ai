@@ -10,25 +10,41 @@ function SuccessContent() {
   const [planInfo, setPlanInfo] = useState("");
 
   useEffect(() => {
-    // Auto-activate: fallback in case webhook didn't fire
-    (async () => {
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    async function activate() {
       try {
         const res = await fetch("/api/payments/activate", { method: "POST" });
         const data = await res.json();
-        if (data.status === "activated") {
+
+        if (data.status === "activated" || data.status === "already_active") {
           setPlanInfo(data.plan || `${data.credits} credits`);
           setStatus("done");
-        } else if (data.status === "already_active") {
-          setPlanInfo(data.plan);
-          setStatus("done");
-        } else {
-          // Might already be processed by webhook
-          setStatus("done");
+          return;
         }
+
+        if (data.status === "no_pending_payment" && attempts < maxAttempts) {
+          // Webhook might have already processed it, or payment not yet confirmed
+          // Wait and retry
+          attempts++;
+          setTimeout(activate, 2000);
+          return;
+        }
+
+        // After retries, just show success (don't block user)
+        setStatus("done");
       } catch {
-        setStatus("done"); // Don't block user even on error
+        if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(activate, 2000);
+        } else {
+          setStatus("done"); // Don't block user even on error
+        }
       }
-    })();
+    }
+
+    activate();
   }, []);
 
   return (
