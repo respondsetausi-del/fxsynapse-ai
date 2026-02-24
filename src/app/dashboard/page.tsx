@@ -9,6 +9,7 @@ import Sidebar from "@/components/Sidebar";
 import AIFundamentals from "@/components/AIFundamentals";
 import LiveMarketEngine from "@/components/LiveMarketEngine";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const PX = Array.from({ length: 25 }, (_, i) => ({
   id: i, x: Math.random() * 100, y: Math.random() * 100,
@@ -51,6 +52,7 @@ export default function Dashboard() {
   const fileRef = useRef<HTMLInputElement>(null);
   const fileObjRef = useRef<File | null>(null);
   const supabase = createClient();
+  const router = useRouter();
 
   useEffect(() => {
     (async () => {
@@ -61,9 +63,17 @@ export default function Dashboard() {
         const data = await res.json();
         setUser(data.profile);
         setCredits(data.credits);
+
+        // Paywall: redirect unpaid users to pricing (skip admin)
+        const plan = data.profile?.plan_id;
+        const subStatus = data.profile?.subscription_status;
+        const isAdmin = data.profile?.role === "admin";
+        if (!isAdmin && (!plan || plan === "free" || plan === "none" || subStatus !== "active")) {
+          router.push("/pricing?gate=1");
+        }
       }
     })();
-  }, [supabase]);
+  }, [supabase, router]);
 
   // Smart broker popup — show once per session after 8 seconds
   useEffect(() => {
