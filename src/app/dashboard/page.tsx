@@ -17,9 +17,9 @@ const PX = Array.from({ length: 25 }, (_, i) => ({
 }));
 
 const STEPS = [
-  { l: "Extracting chart data", t: 0 }, { l: "Detecting key levels", t: 18 },
-  { l: "Mapping S/R zones", t: 36 }, { l: "Annotating chart", t: 56 },
-  { l: "Generating intelligence", t: 78 },
+  { l: "Reading price axis", t: 0 }, { l: "Mapping market structure", t: 14 },
+  { l: "Detecting S/R & order blocks", t: 28 }, { l: "Scanning liquidity & FVGs", t: 42 },
+  { l: "Annotating chart", t: 58 }, { l: "Generating trade setup", t: 76 },
 ];
 
 interface UserProfile {
@@ -355,7 +355,7 @@ export default function Dashboard() {
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
                 </div>
                 <h2 className="text-lg font-bold text-white mb-1">Synapse Processing</h2>
-                <p className="text-xs mb-5" style={{ color: "rgba(255,255,255,.55)" }}>Annotating chart & decoding structure...</p>
+                <p className="text-xs mb-5" style={{ color: "rgba(255,255,255,.55)" }}>Decoding structure, order flow & liquidity...</p>
                 <div className="w-full rounded-full overflow-hidden mb-4" style={{ height: 5, background: "rgba(255,255,255,.05)" }}>
                   <div className="h-full rounded-full transition-[width] duration-300" style={{ background: "linear-gradient(90deg,#00e5a0,#4da0ff)", width: `${Math.min(progress, 100)}%`, animation: "progressPulse 2s infinite" }} />
                 </div>
@@ -453,7 +453,7 @@ export default function Dashboard() {
                             <div className="rounded-lg relative" style={{ padding: "11px 13px", background: "rgba(77,160,255,.04)", border: "1px solid rgba(77,160,255,.1)" }}>
                               <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#4da0ff" }}>🎯 TRADE SETUP</div>
                               <div className="flex flex-col gap-1">
-                                {[{ l: "Entry Zone", v: A.entry_zone || "—", c: "#00e5a0" }, { l: "Take Profit", v: A.take_profit || "—", c: "#4da0ff" }, { l: "Stop Loss", v: A.stop_loss || "—", c: "#ff4d6a" }, { l: "Risk:Reward", v: A.risk_reward || "—", c: "#f0b90b" }].map((r, i) => (
+                                {[{ l: "Entry", v: A.entry_price || A.entry_zone || "—", c: "#00e5a0" }, { l: "Take Profit", v: A.take_profit || "—", c: "#4da0ff" }, { l: "Stop Loss", v: A.stop_loss || "—", c: "#ff4d6a" }, { l: "Risk:Reward", v: A.risk_reward || "—", c: "#f0b90b" }].map((r, i) => (
                                   <div key={i} className="flex justify-between">
                                     <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{r.l}</span>
                                     <span className="text-[11px] font-semibold font-mono" style={{ color: r.c }}>{r.v}</span>
@@ -488,12 +488,58 @@ export default function Dashboard() {
                                     <div key={pi} className="flex items-center justify-between">
                                       <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,.6)" }}>{pt.name}</span>
                                       <div className="flex items-center gap-1.5">
-                                        <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{pt.location}</span>
+                                        <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{pt.location || pt.price}</span>
                                         <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{
                                           background: pt.significance === "high" ? "rgba(0,229,160,.1)" : pt.significance === "medium" ? "rgba(240,185,11,.1)" : "rgba(255,255,255,.05)",
                                           color: pt.significance === "high" ? "#00e5a0" : pt.significance === "medium" ? "#f0b90b" : "rgba(255,255,255,.4)",
                                         }}>{pt.significance}</span>
                                       </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* Smart Money Concepts */}
+                            {A.order_blocks && A.order_blocks.length > 0 && (
+                              <div className="rounded-lg" style={{ padding: "11px 13px", background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)" }}>
+                                <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#f0b90b" }}>📦 ORDER BLOCKS</div>
+                                <div className="flex flex-col gap-1">
+                                  {(A.order_blocks as any[]).map((ob: any, oi: number) => (
+                                    <div key={oi} className="flex items-center justify-between">
+                                      <span className="text-[10px] font-semibold" style={{ color: ob.type === "bullish_ob" ? "#00e5a0" : "#ff4d6a" }}>
+                                        {ob.type === "bullish_ob" ? "▲ Bullish OB" : "▼ Bearish OB"}
+                                      </span>
+                                      <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{ob.high} — {ob.low}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {A.fvgs && A.fvgs.length > 0 && (
+                              <div className="rounded-lg" style={{ padding: "11px 13px", background: "rgba(77,160,255,.04)", border: "1px solid rgba(77,160,255,.1)" }}>
+                                <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#4da0ff" }}>⚡ FAIR VALUE GAPS</div>
+                                <div className="flex flex-col gap-1">
+                                  {(A.fvgs as any[]).map((fvg: any, fi: number) => (
+                                    <div key={fi} className="flex items-center justify-between">
+                                      <span className="text-[10px] font-semibold" style={{ color: fvg.type === "bullish" ? "#00e5a0" : "#ff4d6a" }}>
+                                        {fvg.type === "bullish" ? "▲ Bullish FVG" : "▼ Bearish FVG"}
+                                      </span>
+                                      <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{fvg.high} — {fvg.low}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {A.liquidity_levels && A.liquidity_levels.length > 0 && (
+                              <div className="rounded-lg" style={{ padding: "11px 13px", background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.08)" }}>
+                                <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#f0b90b" }}>💧 LIQUIDITY POOLS</div>
+                                <div className="flex flex-col gap-1">
+                                  {(A.liquidity_levels as any[]).map((liq: any, li: number) => (
+                                    <div key={li} className="flex items-center justify-between">
+                                      <span className="text-[10px] font-semibold" style={{ color: liq.type === "buy_side" ? "#ff4d6a" : "#00e5a0" }}>
+                                        {liq.type === "buy_side" ? "🔺 Buy-side" : "🔻 Sell-side"} @ {liq.price}
+                                      </span>
+                                      {liq.description && <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{liq.description}</span>}
                                     </div>
                                   ))}
                                 </div>

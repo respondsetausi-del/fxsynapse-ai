@@ -101,39 +101,80 @@ export function useAnnotatedCanvas(
       ctx.fillText(text, lx + p, ly + bh2 / 2);
     };
 
+    // ── Small badge helper (for BOS/CHoCH/patterns) ──
+    const badge = (
+      text: string, x: number, y: number,
+      bg: string, fg: string
+    ) => {
+      ctx.font = `bold ${smallFont}px monospace`;
+      const m = ctx.measureText(text);
+      const p = 4;
+      const bw2 = m.width + p * 2;
+      const bh2 = smallFont + 5;
+      const lx = x - bw2 / 2;
+      const ly = y - bh2 - 4;
+
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      if ((ctx as any).roundRect) {
+        (ctx as any).roundRect(lx, ly, bw2, bh2, 3);
+      } else {
+        ctx.rect(lx, ly, bw2, bh2);
+      }
+      ctx.fill();
+
+      // Small arrow pointing down
+      ctx.beginPath();
+      ctx.moveTo(x - 4, ly + bh2);
+      ctx.lineTo(x, ly + bh2 + 4);
+      ctx.lineTo(x + 4, ly + bh2);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = fg;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, ly + bh2 / 2);
+    };
+
     const lw = w > 700 ? 2 : 1.5;
 
     annotations.forEach((a) => {
       ctx.globalAlpha = prog * 0.9;
 
-      // ── ZONE ──
-      if (a.type === "zone" && a.y1 !== undefined && a.y2 !== undefined) {
+      // ── ZONE / FVG ──
+      if ((a.type === "zone" || a.type === "fvg") && a.y1 !== undefined && a.y2 !== undefined) {
         const zy1 = toPixelY(a.y1);
         const zy2 = toPixelY(a.y2);
-        const zh = zy2 - zy1;
+        const zh = Math.abs(zy2 - zy1);
+        const ztop = Math.min(zy1, zy2);
         const zoneDrawW = bw * prog;
 
         ctx.fillStyle = a.color;
-        ctx.fillRect(bx, zy1, zoneDrawW, zh);
+        ctx.fillRect(bx, ztop, zoneDrawW, zh);
         ctx.strokeStyle = (a.bc || a.color) + "50";
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        ctx.strokeRect(bx, zy1, zoneDrawW, zh);
+        ctx.strokeRect(bx, ztop, zoneDrawW, zh);
         ctx.setLineDash([]);
         if (prog > 0.5 && a.label) {
-          lbl(a.label, bx + 8, zy1 + zh / 2, (a.bc || a.color) + "25", a.bc || a.color, "left");
+          lbl(a.label, bx + 8, ztop + zh / 2, (a.bc || a.color) + "25", a.bc || a.color, "left");
         }
       }
 
-      // ── LINE ──
-      if (a.type === "line" && a.y !== undefined) {
+      // ── LINE / LIQUIDITY ──
+      if ((a.type === "line" || a.type === "liquidity") && a.y !== undefined) {
         const ly2 = toPixelY(a.y);
         const lineEndX = bx + bw * prog;
 
         ctx.beginPath();
-        ctx.setLineDash([8, 5]);
+        if (a.type === "liquidity" || a.style === "dotted") {
+          ctx.setLineDash([2, 3]);
+        } else {
+          ctx.setLineDash([8, 5]);
+        }
         ctx.strokeStyle = a.color + "bb";
-        ctx.lineWidth = lw;
+        ctx.lineWidth = a.type === "liquidity" ? lw * 0.8 : lw;
         ctx.moveTo(bx, ly2);
         ctx.lineTo(lineEndX, ly2);
         ctx.stroke();
@@ -166,8 +207,8 @@ export function useAnnotatedCanvas(
 
       // ── FIBONACCI RETRACEMENT ──
       if (a.type === "fib" && a.y_0 !== undefined && a.y_100 !== undefined && prog > 0.3) {
-        const y0px = toPixelY(a.y_0);   // 0% = swing high
-        const y100px = toPixelY(a.y_100); // 100% = swing low
+        const y0px = toPixelY(a.y_0);
+        const y100px = toPixelY(a.y_100);
         const range = y100px - y0px;
         const fibDrawW = bw * Math.min(prog * 1.2, 1);
         const ap = Math.min((prog - 0.3) / 0.4, 1);
@@ -188,7 +229,6 @@ export function useAnnotatedCanvas(
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Fib level label
           ctx.font = `bold ${smallFont}px monospace`;
           ctx.fillStyle = color + "aa";
           ctx.textAlign = "left";
@@ -196,7 +236,7 @@ export function useAnnotatedCanvas(
           ctx.fillText(`${(level * 100).toFixed(1)}%`, bx + 4, fibY - 7);
         });
 
-        // Shaded zone between 0.5 and 0.618 (golden pocket)
+        // Golden pocket shading
         const gp1 = y0px + range * 0.5;
         const gp2 = y0px + range * 0.618;
         ctx.fillStyle = "rgba(77,160,255,0.06)";
@@ -225,25 +265,41 @@ export function useAnnotatedCanvas(
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Pattern label
         if (a.label) {
-          ctx.font = `bold ${smallFont}px monospace`;
-          const tm = ctx.measureText(a.label);
-          const lbx = px - tm.width / 2 - 4;
-          const lby = py - sz - fontSize - 4;
+          badge(a.label, px, py - sz, a.color + "30", a.color);
+        }
+        ctx.globalAlpha = prog * 0.9;
+      }
 
-          ctx.fillStyle = a.color + "20";
-          ctx.beginPath();
-          if ((ctx as any).roundRect) {
-            (ctx as any).roundRect(lbx, lby, tm.width + 8, fontSize + 4, 3);
-          } else {
-            ctx.rect(lbx, lby, tm.width + 8, fontSize + 4);
-          }
-          ctx.fill();
-          ctx.fillStyle = a.color;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(a.label, px, lby + (fontSize + 4) / 2);
+      // ── BOS / CHoCH MARKERS ──
+      if ((a.type === "bos" || a.type === "choch") && a.x !== undefined && a.y !== undefined && prog > 0.4) {
+        const px = toPixelX(a.x);
+        const py = toPixelY(a.y);
+        const ap = Math.min((prog - 0.4) / 0.3, 1);
+        ctx.globalAlpha = ap * 0.9;
+
+        // Horizontal dashed line at the break level
+        const lineLen = bw * 0.25;
+        ctx.beginPath();
+        ctx.setLineDash(a.type === "bos" ? [6, 3] : [3, 3]);
+        ctx.strokeStyle = a.color + "88";
+        ctx.lineWidth = lw * 0.8;
+        ctx.moveTo(px - lineLen / 2, py);
+        ctx.lineTo(px + lineLen / 2, py);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Circle at the break point
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.fillStyle = a.color + "44";
+        ctx.fill();
+        ctx.strokeStyle = a.color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        if (a.label) {
+          badge(a.label, px, py, a.color + "35", a.color);
         }
         ctx.globalAlpha = prog * 0.9;
       }
@@ -296,7 +352,7 @@ export function useAnnotatedCanvas(
           py = Math.max(by + 8, Math.min(by + bh - 8, py));
           pointYs.push({ py, color: a.color, label: a.label || "" });
 
-          // Horizontal dashed line
+          // Horizontal dashed line from left edge to tag
           ctx.globalAlpha = ap * 0.35;
           ctx.beginPath();
           ctx.setLineDash([3, 4]);
@@ -307,7 +363,7 @@ export function useAnnotatedCanvas(
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Price tag badge
+          // Price tag badge (arrow shape)
           ctx.globalAlpha = ap * 0.95;
           const tagY = py - tagH / 2;
 
@@ -328,7 +384,7 @@ export function useAnnotatedCanvas(
           ctx.fillText(a.label || "", tagX + tagW / 2 + 2, py);
         });
 
-        // ── Vertical connector ──
+        // ── Vertical connector line between points ──
         if (pointYs.length >= 2) {
           const sortedYs = [...pointYs].sort((a, b) => a.py - b.py);
           const topY = sortedYs[0].py;
@@ -351,7 +407,7 @@ export function useAnnotatedCanvas(
             ctx.fill();
           });
 
-          // R:R labels
+          // R:R labels on connector
           if (entry && tp && sl && prog > 0.8) {
             const entryY = toPixelY(entry.y!);
             const tpY = toPixelY(tp.y!);
@@ -363,11 +419,9 @@ export function useAnnotatedCanvas(
             ctx.textAlign = "right";
             ctx.textBaseline = "middle";
 
-            // Reward label
             ctx.fillStyle = "#00e5a0";
             ctx.fillText("R", bracketX, (entryY + tpY) / 2);
 
-            // Risk label
             ctx.fillStyle = "#ff4d6a";
             ctx.fillText("R", bracketX, (entryY + slY) / 2);
           }
@@ -379,7 +433,7 @@ export function useAnnotatedCanvas(
 
     // ── ARROW ──
     annotations.forEach((a) => {
-      if (a.type === "arrow" && a.x !== undefined && a.y1 !== undefined && a.y2 !== undefined && prog > 0.6) {
+      if (a.type === "arrow" && a.y1 !== undefined && a.y2 !== undefined && prog > 0.6) {
         const tagW = w > 700 ? 58 : w > 400 ? 50 : 44;
         const arrowX = bx + bw - tagW - 18;
         const sy = toPixelY(a.y1);
@@ -390,7 +444,7 @@ export function useAnnotatedCanvas(
 
         ctx.globalAlpha = ap * 0.8;
 
-        // Glow effect
+        // Glow
         ctx.beginPath();
         ctx.strokeStyle = a.color + "30";
         ctx.lineWidth = 6;
@@ -398,7 +452,7 @@ export function useAnnotatedCanvas(
         ctx.lineTo(arrowX, cy);
         ctx.stroke();
 
-        // Arrow shaft
+        // Shaft
         ctx.beginPath();
         ctx.strokeStyle = a.color;
         ctx.lineWidth = 2;
@@ -407,7 +461,7 @@ export function useAnnotatedCanvas(
         ctx.lineTo(arrowX, cy);
         ctx.stroke();
 
-        // Arrow head
+        // Head
         const headSize = w > 700 ? 7 : 5;
         ctx.beginPath();
         ctx.fillStyle = a.color;

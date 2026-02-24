@@ -15,7 +15,7 @@ const LEGEND = [
   { c: "#00e5a0", l: "Support / Entry" },
   { c: "#ff4d6a", l: "Resistance / SL" },
   { c: "#4da0ff", l: "Trend / TP" },
-  { c: "#f0b90b", l: "Fib / Zone" },
+  { c: "#f0b90b", l: "Liquidity / OB" },
 ];
 
 export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVisible, onClick }: Props) {
