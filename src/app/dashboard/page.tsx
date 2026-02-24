@@ -65,11 +65,12 @@ export default function Dashboard() {
         setUser(data.profile);
         setCredits(data.credits);
 
-        // Paywall: redirect unpaid users to pricing (skip admin)
+        // Paywall: redirect users with no subscription AND no credits
         const plan = data.profile?.plan_id;
         const subStatus = data.profile?.subscription_status;
         const isAdmin = data.profile?.role === "admin";
-        if (!isAdmin && (!plan || plan === "free" || plan === "none" || subStatus !== "active")) {
+        const hasCredits = data.credits?.canScan || (data.credits?.topupBalance > 0);
+        if (!isAdmin && !hasCredits && (!plan || plan === "free" || plan === "none" || subStatus !== "active")) {
           router.push("/pricing?gate=1");
           return;
         }
