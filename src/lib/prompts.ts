@@ -141,6 +141,8 @@ Types:
 
 CRITICAL:
 1. price_high, price_low, current_price MUST be actual numbers read from the chart axis
+2. ALL price values must be PLAIN NUMBERS with NO COMMAS — write "5250.00" NOT "5,250.00"
+3. price_high and price_low are REQUIRED — the system cannot draw annotations without them
 2. Entry price MUST equal current_price
 3. All annotation prices within visible price range
 4. Include 3-6 S/R levels, zones, patterns, BOS/CHoCH if applicable

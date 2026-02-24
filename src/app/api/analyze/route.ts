@@ -134,33 +134,64 @@ export async function POST(req: NextRequest) {
 
     // ═══ PRICE-TO-COORDINATE CONVERSION ═══
     // The AI returns actual prices — we convert to 0-1 y-coordinates
-    const priceHigh = parseFloat(analysis.price_high);
-    const priceLow = parseFloat(analysis.price_low);
+    // CRITICAL: strip commas from prices — parseFloat("5,250") returns 5!
+    const parsePrice = (v: string | number | undefined | null): number => {
+      if (v === undefined || v === null) return NaN;
+      if (typeof v === "number") return v;
+      return parseFloat(String(v).replace(/,/g, ""));
+    };
+
+    let priceHigh = parsePrice(analysis.price_high);
+    let priceLow = parsePrice(analysis.price_low);
+
+    // If price_high/price_low are missing, compute from annotation prices
+    if (isNaN(priceHigh) || isNaN(priceLow) || priceHigh <= priceLow) {
+      const allPrices: number[] = [];
+      for (const a of analysis.annotations) {
+        for (const key of ["price", "price_high", "price_low", "entry_price", "tp_price", "swing_high_price", "swing_low_price", "y1_price", "y2_price"]) {
+          const p = parsePrice(a[key]);
+          if (!isNaN(p) && p > 0) allPrices.push(p);
+        }
+      }
+      // Also try top-level fields
+      for (const key of ["current_price", "support", "resistance"]) {
+        const p = parsePrice(analysis[key]);
+        if (!isNaN(p) && p > 0) allPrices.push(p);
+      }
+      if (allPrices.length >= 2) {
+        const computedHigh = Math.max(...allPrices);
+        const computedLow = Math.min(...allPrices);
+        // Add 5% padding so annotations don't sit at exact edges
+        const padding = (computedHigh - computedLow) * 0.05;
+        priceHigh = computedHigh + padding;
+        priceLow = computedLow - padding;
+        console.log("[ANALYZE] Computed price range from annotations:", priceLow.toFixed(2), "-", priceHigh.toFixed(2));
+      }
+    }
+
     const priceRange = priceHigh - priceLow;
 
-    // Convert a price string to a y-coordinate (0=top/high, 1=bottom/low)
+    // Convert a price to y-coordinate (0=top/high, 1=bottom/low)
     const priceToY = (priceStr: string | number | undefined): number => {
       if (priceStr === undefined || priceStr === null) return 0.5;
-      const price = typeof priceStr === "string" ? parseFloat(priceStr) : priceStr;
+      const price = parsePrice(priceStr);
       if (isNaN(price) || priceRange <= 0) return 0.5;
-      // Higher price = lower y (top of chart), lower price = higher y (bottom)
       const y = (priceHigh - price) / priceRange;
       return Math.max(0.01, Math.min(0.99, y));
     };
 
-    // Only use price conversion if we have valid price range
     const hasPriceData = !isNaN(priceHigh) && !isNaN(priceLow) && priceRange > 0;
+    console.log("[ANALYZE] Price data:", { priceHigh, priceLow, priceRange, hasPriceData, annotationCount: analysis.annotations.length });
 
     if (hasPriceData) {
-      // Store current_price_y for reference
       analysis.current_price_y = priceToY(analysis.current_price);
 
       // Convert all annotations from prices to y-coordinates
       analysis.annotations = analysis.annotations.map((a: Record<string, unknown>) => {
         const converted = { ...a };
 
-        // Line: price → y
-        if (a.type === "line" && a.price) {
+        // Line / Liquidity: price → y
+        if ((a.type === "line" || a.type === "liquidity") && a.price) {
           converted.y = priceToY(a.price as string);
         }
 
@@ -173,14 +204,16 @@ export async function POST(req: NextRequest) {
         // Point (Entry/TP/SL): price → y, x at right edge
         if (a.type === "point" && a.price) {
           converted.y = priceToY(a.price as string);
-          converted.x = 0.92;
+          if (!converted.x) converted.x = 0.92;
         }
 
         // Arrow: entry_price/tp_price → y1/y2
-        if (a.type === "arrow" && a.entry_price && a.tp_price) {
-          converted.x = 0.92;
-          converted.y1 = priceToY(a.entry_price as string);
-          converted.y2 = priceToY(a.tp_price as string);
+        if (a.type === "arrow") {
+          if (a.entry_price && a.tp_price) {
+            converted.y1 = priceToY(a.entry_price as string);
+            converted.y2 = priceToY(a.tp_price as string);
+          }
+          if (!converted.x) converted.x = 0.92;
         }
 
         // Trendline: y1_price/y2_price → y1/y2
@@ -200,12 +233,7 @@ export async function POST(req: NextRequest) {
           converted.y = priceToY(a.price as string);
         }
 
-        // Liquidity: price → y
-        if (a.type === "liquidity" && a.price) {
-          converted.y = priceToY(a.price as string);
-        }
-
-        // Clamp all computed y values
+        // Clamp all coordinate values
         const clamp = (v: unknown) => typeof v === "number" ? Math.max(0.01, Math.min(0.99, v)) : v;
         for (const key of ["x", "y", "y1", "y2", "x1", "x2", "y_0", "y_100"]) {
           if (key in converted) converted[key] = clamp(converted[key]);
@@ -213,15 +241,32 @@ export async function POST(req: NextRequest) {
 
         return converted;
       });
+
+      // Log for debugging
+      const convertedTypes = analysis.annotations.map((a: Record<string, unknown>) => 
+        `${a.type}(y=${a.y ?? a.y1 ?? "?"})`
+      ).join(", ");
+      console.log("[ANALYZE] Converted annotations:", convertedTypes);
+
     } else {
-      // Fallback: clamp any raw y values the AI may have returned
+      // Fallback: if annotations already have y-coordinates (0-1 range), clamp them
+      // If they have price fields but no price range, try to detect and handle
+      console.warn("[ANALYZE] No valid price range! Checking for raw y-coordinates...");
+      
       analysis.annotations = analysis.annotations.map((a: Record<string, unknown>) => {
-        const clamped = { ...a };
+        const fixed = { ...a };
         const clamp = (v: unknown) => typeof v === "number" ? Math.max(0.01, Math.min(0.99, v)) : v;
+        
+        // Check if y values exist and are in 0-1 range (AI returned coords not prices)
         for (const key of ["x", "y", "y1", "y2", "x1", "x2", "y_0", "y_100"]) {
-          if (key in clamped) clamped[key] = clamp(clamped[key]);
+          if (key in fixed) {
+            const val = fixed[key];
+            if (typeof val === "number" && val >= 0 && val <= 1) {
+              fixed[key] = clamp(val);
+            }
+          }
         }
-        return clamped;
+        return fixed;
       });
     }
 
