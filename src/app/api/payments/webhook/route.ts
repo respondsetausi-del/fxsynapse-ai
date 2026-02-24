@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac } from "crypto";
+import { sendPaymentSuccessToUser, sendPaymentNotificationToAdmin } from "@/lib/email";
 
 function getAdminSupabase() {
   return createClient(
@@ -127,6 +128,16 @@ export async function POST(req: NextRequest) {
         console.error("[WEBHOOK] Failed to update profile:", error);
       } else {
         console.log(`[WEBHOOK] ✅ Subscription activated: user=${effectiveUserId}, plan=${planId}`);
+        // Send emails
+        const { data: userProfile } = await supabase.from("profiles").select("email").eq("id", effectiveUserId).single();
+        if (userProfile?.email) {
+          const planNames: Record<string, string> = { starter: "Starter", pro: "Pro", premium: "Premium" };
+          const planPrices: Record<string, string> = { starter: "R49", pro: "R99", premium: "R199" };
+          const pName = planNames[planId] || planId;
+          const pPrice = planPrices[planId] || `R${(payment.amount || 0) / 100}`;
+          sendPaymentSuccessToUser(userProfile.email, pName, pPrice).catch(console.error);
+          sendPaymentNotificationToAdmin(userProfile.email, pName, pPrice).catch(console.error);
+        }
       }
 
     } else if (effectiveType === "credits" || effectiveType === "topup") {

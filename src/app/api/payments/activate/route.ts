@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { sendPaymentSuccessToUser, sendPaymentNotificationToAdmin } from "@/lib/email";
 
 export async function POST() {
   try {
@@ -96,6 +97,13 @@ export async function POST() {
       }).eq("id", user.id);
 
       console.log(`[ACTIVATE] ✅ Subscription activated: user=${user.id}, plan=${payment.plan_id}`);
+      // Send emails
+      const planNames: Record<string, string> = { starter: "Starter", pro: "Pro", premium: "Premium" };
+      const planPrices: Record<string, string> = { starter: "R49", pro: "R99", premium: "R199" };
+      const pName = planNames[payment.plan_id] || payment.plan_id;
+      const pPrice = planPrices[payment.plan_id] || `R${(payment.amount || 0) / 100}`;
+      sendPaymentSuccessToUser(user.email!, pName, pPrice).catch(console.error);
+      sendPaymentNotificationToAdmin(user.email!, pName, pPrice).catch(console.error);
       return NextResponse.json({ status: "activated", plan: payment.plan_id, type: "subscription" });
 
     } else if (payment.type === "topup" || payment.type === "credits") {

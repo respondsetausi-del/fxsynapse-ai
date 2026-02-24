@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendChatNotificationToAdmin } from "@/lib/email";
 
 function getService() {
   return createClient(
@@ -42,6 +43,11 @@ export async function POST(req: NextRequest) {
       message,
       name: name || null,
     });
+
+    // Email admin when a visitor sends a message
+    if (sender !== "admin") {
+      sendChatNotificationToAdmin(email || name || visitor_id, message).catch(console.error);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

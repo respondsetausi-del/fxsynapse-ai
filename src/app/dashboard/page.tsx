@@ -25,6 +25,7 @@ const STEPS = [
 interface UserProfile {
   id: string; email: string; full_name: string; role: string;
   plan_id: string; credits_balance: number; avatar_url: string;
+  subscription_status: string;
   plans: { name: string };
 }
 
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const fileObjRef = useRef<File | null>(null);
   const supabase = createClient();
   const router = useRouter();
+  const isPaidUser = user?.subscription_status === "active" && user?.plan_id && user.plan_id !== "free" && user.plan_id !== "none";
 
   useEffect(() => {
     (async () => {
@@ -65,16 +67,8 @@ export default function Dashboard() {
         setUser(data.profile);
         setCredits(data.credits);
 
-        // Paywall: redirect users with no subscription AND no credits
-        const plan = data.profile?.plan_id;
-        const subStatus = data.profile?.subscription_status;
-        const isAdmin = data.profile?.role === "admin";
-        const hasCredits = data.credits?.canScan || (data.credits?.topupBalance > 0);
-        if (!isAdmin && !hasCredits && (!plan || plan === "free" || plan === "none" || subStatus !== "active")) {
-          router.push("/pricing?gate=1");
-          return;
-        }
-        // Only unlock dashboard after verified
+        // No hard paywall redirect — all users can access dashboard
+        // Paywall shows when they try to scan without credits or view results
         setAuthLoading(false);
       } else {
         router.push("/login");
@@ -403,8 +397,22 @@ export default function Dashboard() {
 
               <div className="result-layout flex gap-3" style={{ flexDirection: viewMode === "analysis" ? "column" : "row" }}>
                 {viewMode !== "analysis" && (
-                  <div className="result-chart glass overflow-hidden animate-fadeUp" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
-                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => setFullscreen(true)} />
+                  <div className="result-chart glass overflow-hidden animate-fadeUp relative" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
+                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => isPaidUser ? setFullscreen(true) : null} />
+                    {/* Blur overlay for free users */}
+                    {!isPaidUser && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center z-20" style={{ backdropFilter: "blur(12px)", background: "rgba(10,11,15,.6)" }}>
+                        <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
+                          <span className="text-2xl">🔒</span>
+                        </div>
+                        <h3 className="text-base font-bold text-white mb-1">Annotated Chart Locked</h3>
+                        <p className="text-[11px] mb-4 text-center px-6" style={{ color: "rgba(255,255,255,.45)" }}>Upgrade to see AI annotations, entry/exit points, and zones on your chart.</p>
+                        <div className="flex gap-2">
+                          <Link href="/pricing" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>Upgrade — From R49/mo</Link>
+                          <Link href="/pricing?topup=1" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up</Link>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between" style={{ padding: "9px 13px", borderTop: "1px solid rgba(255,255,255,.04)" }}>
                       <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>ANNOTATED BY FXSYNAPSE AI</span>
                       <div className="flex gap-1">
