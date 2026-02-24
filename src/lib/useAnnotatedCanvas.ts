@@ -2,13 +2,22 @@
 import { useEffect, useRef } from "react";
 import { Annotation, ChartBounds } from "@/lib/types";
 
-// Default bounds fallback if Claude doesn't return them
-// Conservative estimate that works for most chart screenshots
 const DEFAULT_BOUNDS: ChartBounds = {
   x: 0.02,
   y: 0.18,
   w: 0.78,
   h: 0.65,
+};
+
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+const FIB_COLORS: Record<number, string> = {
+  0: "#ff4d6a",
+  0.236: "#ff8c42",
+  0.382: "#f0b90b",
+  0.5: "#a0a0a0",
+  0.618: "#4da0ff",
+  0.786: "#9b59b6",
+  1.0: "#00e5a0",
 };
 
 export function useAnnotatedCanvas(
@@ -25,9 +34,7 @@ export function useAnnotatedCanvas(
   useEffect(() => {
     if (!dataUrl) return;
     const img = new Image();
-    img.onload = () => {
-      imgRef.current = img;
-    };
+    img.onload = () => { imgRef.current = img; };
     img.src = dataUrl;
   }, [dataUrl]);
 
@@ -51,29 +58,22 @@ export function useAnnotatedCanvas(
 
     // ── Chart bounds (pixel coords) ──
     const b = chartBounds && chartBounds.w > 0 ? chartBounds : DEFAULT_BOUNDS;
-    const bx = b.x * w; // chart area left edge in pixels
-    const by = b.y * h; // chart area top edge in pixels
-    const bw = b.w * w; // chart area width in pixels
-    const bh = b.h * h; // chart area height in pixels
+    const bx = b.x * w;
+    const by = b.y * h;
+    const bw = b.w * w;
+    const bh = b.h * h;
 
-    // Helper: clamp value between 0 and 1
     const clamp = (v: number) => Math.max(0.01, Math.min(0.99, v));
-
-    // Helper: convert annotation coords (0-1 within bounds) to pixel coords
-    // All coordinates are clamped to stay within chart bounds
     const toPixelX = (ax: number) => bx + clamp(ax) * bw;
     const toPixelY = (ay: number) => by + clamp(ay) * bh;
 
     const fontSize = w > 700 ? 12 : w > 400 ? 11 : 10;
+    const smallFont = w > 700 ? 10 : w > 400 ? 9 : 8;
 
     // ── Label drawing helper ──
     const lbl = (
-      text: string,
-      x: number,
-      y: number,
-      bg: string,
-      fg: string,
-      align: "left" | "right"
+      text: string, x: number, y: number,
+      bg: string, fg: string, align: "left" | "right"
     ) => {
       ctx.font = `bold ${fontSize}px monospace`;
       const m = ctx.measureText(text);
@@ -81,8 +81,6 @@ export function useAnnotatedCanvas(
       const bw2 = m.width + p * 2;
       const bh2 = fontSize + 6;
       let lx = align === "right" ? x - bw2 : x;
-
-      // Clamp label within chart bounds
       if (lx < bx) lx = bx + 2;
       if (lx + bw2 > bx + bw) lx = bx + bw - bw2 - 2;
       let ly = y - bh2 / 2;
@@ -91,7 +89,11 @@ export function useAnnotatedCanvas(
 
       ctx.fillStyle = bg;
       ctx.beginPath();
-      (ctx as any).roundRect ? (ctx as any).roundRect(lx, ly, bw2, bh2, 3) : ctx.rect(lx, ly, bw2, bh2);
+      if ((ctx as any).roundRect) {
+        (ctx as any).roundRect(lx, ly, bw2, bh2, 3);
+      } else {
+        ctx.rect(lx, ly, bw2, bh2);
+      }
       ctx.fill();
       ctx.fillStyle = fg;
       ctx.textBaseline = "middle";
@@ -104,7 +106,7 @@ export function useAnnotatedCanvas(
     annotations.forEach((a) => {
       ctx.globalAlpha = prog * 0.9;
 
-      // ── ZONE ── (spans chart area width only)
+      // ── ZONE ──
       if (a.type === "zone" && a.y1 !== undefined && a.y2 !== undefined) {
         const zy1 = toPixelY(a.y1);
         const zy2 = toPixelY(a.y2);
@@ -119,18 +121,11 @@ export function useAnnotatedCanvas(
         ctx.strokeRect(bx, zy1, zoneDrawW, zh);
         ctx.setLineDash([]);
         if (prog > 0.5 && a.label) {
-          lbl(
-            a.label,
-            bx + 8,
-            zy1 + zh / 2,
-            (a.bc || a.color) + "25",
-            a.bc || a.color,
-            "left"
-          );
+          lbl(a.label, bx + 8, zy1 + zh / 2, (a.bc || a.color) + "25", a.bc || a.color, "left");
         }
       }
 
-      // ── LINE ── (horizontal, spans chart area width only)
+      // ── LINE ──
       if (a.type === "line" && a.y !== undefined) {
         const ly2 = toPixelY(a.y);
         const lineEndX = bx + bw * prog;
@@ -148,14 +143,8 @@ export function useAnnotatedCanvas(
         }
       }
 
-      // ── TRENDLINE ── (within chart bounds)
-      if (
-        a.type === "trend" &&
-        a.x1 !== undefined &&
-        a.y1 !== undefined &&
-        a.x2 !== undefined &&
-        a.y2 !== undefined
-      ) {
+      // ── TRENDLINE ──
+      if (a.type === "trend" && a.x1 !== undefined && a.y1 !== undefined && a.x2 !== undefined && a.y2 !== undefined) {
         const tx1 = toPixelX(a.x1);
         const ty1 = toPixelY(a.y1);
         const tx2 = toPixelX(a.x2);
@@ -171,19 +160,96 @@ export function useAnnotatedCanvas(
         ctx.lineTo(tx1 + dx, ty1 + dy);
         ctx.stroke();
         if (prog > 0.7 && a.label) {
-          lbl(
-            a.label,
-            tx1 + dx / 2,
-            ty1 + dy / 2 - 12,
-            a.color + "28",
-            a.color,
-            "left"
-          );
+          lbl(a.label, tx1 + dx / 2, ty1 + dy / 2 - 12, a.color + "28", a.color, "left");
         }
+      }
+
+      // ── FIBONACCI RETRACEMENT ──
+      if (a.type === "fib" && a.y_0 !== undefined && a.y_100 !== undefined && prog > 0.3) {
+        const y0px = toPixelY(a.y_0);   // 0% = swing high
+        const y100px = toPixelY(a.y_100); // 100% = swing low
+        const range = y100px - y0px;
+        const fibDrawW = bw * Math.min(prog * 1.2, 1);
+        const ap = Math.min((prog - 0.3) / 0.4, 1);
+
+        ctx.globalAlpha = ap * 0.6;
+
+        FIB_LEVELS.forEach((level) => {
+          const fibY = y0px + range * level;
+          if (fibY < by || fibY > by + bh) return;
+
+          const color = FIB_COLORS[level] || "#888";
+          ctx.beginPath();
+          ctx.setLineDash([3, 5]);
+          ctx.strokeStyle = color + "66";
+          ctx.lineWidth = 1;
+          ctx.moveTo(bx, fibY);
+          ctx.lineTo(bx + fibDrawW, fibY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Fib level label
+          ctx.font = `bold ${smallFont}px monospace`;
+          ctx.fillStyle = color + "aa";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${(level * 100).toFixed(1)}%`, bx + 4, fibY - 7);
+        });
+
+        // Shaded zone between 0.5 and 0.618 (golden pocket)
+        const gp1 = y0px + range * 0.5;
+        const gp2 = y0px + range * 0.618;
+        ctx.fillStyle = "rgba(77,160,255,0.06)";
+        ctx.fillRect(bx, gp1, fibDrawW, gp2 - gp1);
+        ctx.globalAlpha = prog * 0.9;
+      }
+
+      // ── PATTERN MARKER ──
+      if (a.type === "pattern" && a.x !== undefined && a.y !== undefined && prog > 0.5) {
+        const px = toPixelX(a.x);
+        const py = toPixelY(a.y);
+        const ap = Math.min((prog - 0.5) / 0.3, 1);
+        ctx.globalAlpha = ap * 0.9;
+
+        // Diamond marker
+        const sz = w > 700 ? 6 : 5;
+        ctx.beginPath();
+        ctx.moveTo(px, py - sz);
+        ctx.lineTo(px + sz, py);
+        ctx.lineTo(px, py + sz);
+        ctx.lineTo(px - sz, py);
+        ctx.closePath();
+        ctx.fillStyle = a.color + "cc";
+        ctx.fill();
+        ctx.strokeStyle = a.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Pattern label
+        if (a.label) {
+          ctx.font = `bold ${smallFont}px monospace`;
+          const tm = ctx.measureText(a.label);
+          const lbx = px - tm.width / 2 - 4;
+          const lby = py - sz - fontSize - 4;
+
+          ctx.fillStyle = a.color + "20";
+          ctx.beginPath();
+          if ((ctx as any).roundRect) {
+            (ctx as any).roundRect(lbx, lby, tm.width + 8, fontSize + 4, 3);
+          } else {
+            ctx.rect(lbx, lby, tm.width + 8, fontSize + 4);
+          }
+          ctx.fill();
+          ctx.fillStyle = a.color;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(a.label, px, lby + (fontSize + 4) / 2);
+        }
+        ctx.globalAlpha = prog * 0.9;
       }
     });
 
-    // ── TRADE SETUP (Entry/TP/SL as right-edge price tags + connector) ──
+    // ── TRADE SETUP (Entry/TP/SL as right-edge price tags + connector + R:R shading) ──
     if (prog > 0.5) {
       const points = annotations.filter(a => a.type === "point" && a.y !== undefined);
       const entry = points.find(a => a.label === "Entry");
@@ -193,47 +259,68 @@ export function useAnnotatedCanvas(
       if (points.length > 0) {
         const tagW = w > 700 ? 58 : w > 400 ? 50 : 44;
         const tagH = w > 700 ? 20 : w > 400 ? 18 : 16;
-        const tagX = bx + bw - tagW - 2; // Right edge of chart area
+        const tagX = bx + bw - tagW - 2;
         const tagFontSize = w > 700 ? 10 : w > 400 ? 9 : 8;
-        const ap = Math.min((prog - 0.5) / 0.5, 1); // animation progress
+        const ap = Math.min((prog - 0.5) / 0.5, 1);
 
-        // Collect y positions for connector
+        // ── Risk/Reward shaded zones ──
+        if (entry && tp && sl && prog > 0.6) {
+          const entryPx = toPixelY(entry.y!);
+          const tpPx = toPixelY(tp.y!);
+          const slPx = toPixelY(sl.y!);
+          const zoneLeft = bx + bw * 0.6;
+          const zoneRight = tagX - 14;
+          const zoneW = zoneRight - zoneLeft;
+          const zap = Math.min((prog - 0.6) / 0.3, 1);
+
+          ctx.globalAlpha = zap * 0.12;
+          // TP zone (green)
+          ctx.fillStyle = "#00e5a0";
+          const tpTop = Math.min(entryPx, tpPx);
+          const tpBot = Math.max(entryPx, tpPx);
+          ctx.fillRect(zoneLeft, tpTop, zoneW, tpBot - tpTop);
+
+          // SL zone (red)
+          ctx.fillStyle = "#ff4d6a";
+          const slTop = Math.min(entryPx, slPx);
+          const slBot = Math.max(entryPx, slPx);
+          ctx.fillRect(zoneLeft, slTop, zoneW, slBot - slTop);
+          ctx.globalAlpha = ap;
+        }
+
         const pointYs: { py: number; color: string; label: string }[] = [];
 
         points.forEach((a) => {
           if (a.y === undefined) return;
           let py = toPixelY(a.y);
           py = Math.max(by + 8, Math.min(by + bh - 8, py));
-          const color = a.color;
-          pointYs.push({ py, color, label: a.label || "" });
+          pointYs.push({ py, color: a.color, label: a.label || "" });
 
-          // Horizontal dashed line from left edge to tag
-          ctx.globalAlpha = ap * 0.4;
+          // Horizontal dashed line
+          ctx.globalAlpha = ap * 0.35;
           ctx.beginPath();
           ctx.setLineDash([3, 4]);
-          ctx.strokeStyle = color + "55";
+          ctx.strokeStyle = a.color + "55";
           ctx.lineWidth = 1;
           ctx.moveTo(bx, py);
           ctx.lineTo(tagX, py);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Price tag badge on right edge
+          // Price tag badge
           ctx.globalAlpha = ap * 0.95;
           const tagY = py - tagH / 2;
 
-          // Tag background with left arrow notch
           ctx.beginPath();
           ctx.moveTo(tagX + 4, tagY);
           ctx.lineTo(tagX + tagW, tagY);
           ctx.lineTo(tagX + tagW, tagY + tagH);
           ctx.lineTo(tagX + 4, tagY + tagH);
-          ctx.lineTo(tagX - 3, py); // Arrow notch pointing left
+          ctx.lineTo(tagX - 3, py);
           ctx.closePath();
-          ctx.fillStyle = color + "dd";
+          ctx.fillStyle = a.color + "dd";
           ctx.fill();
 
-          // Label text
           ctx.font = `bold ${tagFontSize}px monospace`;
           ctx.fillStyle = "#0a0b0f";
           ctx.textAlign = "center";
@@ -241,7 +328,7 @@ export function useAnnotatedCanvas(
           ctx.fillText(a.label || "", tagX + tagW / 2 + 2, py);
         });
 
-        // ── Vertical connector line between SL → Entry → TP ──
+        // ── Vertical connector ──
         if (pointYs.length >= 2) {
           const sortedYs = [...pointYs].sort((a, b) => a.py - b.py);
           const topY = sortedYs[0].py;
@@ -257,7 +344,6 @@ export function useAnnotatedCanvas(
           ctx.lineTo(connX, botY);
           ctx.stroke();
 
-          // Small dots at each level on the connector
           pointYs.forEach(({ py, color }) => {
             ctx.beginPath();
             ctx.arc(connX, py, 3, 0, Math.PI * 2);
@@ -265,26 +351,25 @@ export function useAnnotatedCanvas(
             ctx.fill();
           });
 
-          // Risk/Reward bracket labels
+          // R:R labels
           if (entry && tp && sl && prog > 0.8) {
             const entryY = toPixelY(entry.y!);
             const tpY = toPixelY(tp.y!);
             const slY = toPixelY(sl.y!);
-            const bracketX = connX - 12;
+            const bracketX = connX - 14;
 
-            // TP zone (green) — between Entry and TP
-            const tpMidY = (entryY + tpY) / 2;
-            ctx.globalAlpha = ap * 0.5;
+            ctx.globalAlpha = ap * 0.6;
             ctx.font = `bold ${tagFontSize - 1}px monospace`;
-            ctx.fillStyle = "#00e5a0";
             ctx.textAlign = "right";
             ctx.textBaseline = "middle";
-            ctx.fillText("TP", bracketX, tpMidY);
 
-            // SL zone (red) — between Entry and SL
-            const slMidY = (entryY + slY) / 2;
+            // Reward label
+            ctx.fillStyle = "#00e5a0";
+            ctx.fillText("R", bracketX, (entryY + tpY) / 2);
+
+            // Risk label
             ctx.fillStyle = "#ff4d6a";
-            ctx.fillText("SL", bracketX, slMidY);
+            ctx.fillText("R", bracketX, (entryY + slY) / 2);
           }
         }
 
@@ -292,17 +377,11 @@ export function useAnnotatedCanvas(
       }
     }
 
-    // ── ARROW ── (directional, within chart bounds)
+    // ── ARROW ──
     annotations.forEach((a) => {
-      if (
-        a.type === "arrow" &&
-        a.x !== undefined &&
-        a.y1 !== undefined &&
-        a.y2 !== undefined &&
-        prog > 0.6
-      ) {
+      if (a.type === "arrow" && a.x !== undefined && a.y1 !== undefined && a.y2 !== undefined && prog > 0.6) {
         const tagW = w > 700 ? 58 : w > 400 ? 50 : 44;
-        const arrowX = bx + bw - tagW - 18; // Just left of the trade tags
+        const arrowX = bx + bw - tagW - 18;
         const sy = toPixelY(a.y1);
         const ey = toPixelY(a.y2);
 
@@ -310,6 +389,14 @@ export function useAnnotatedCanvas(
         const cy = sy + (ey - sy) * ap;
 
         ctx.globalAlpha = ap * 0.8;
+
+        // Glow effect
+        ctx.beginPath();
+        ctx.strokeStyle = a.color + "30";
+        ctx.lineWidth = 6;
+        ctx.moveTo(arrowX, sy);
+        ctx.lineTo(arrowX, cy);
+        ctx.stroke();
 
         // Arrow shaft
         ctx.beginPath();
@@ -334,7 +421,7 @@ export function useAnnotatedCanvas(
 
     ctx.globalAlpha = 1;
 
-    // Watermark — bottom-right of chart area
+    // ── Watermark ──
     if (prog > 0.8) {
       ctx.globalAlpha = 0.45;
       ctx.font = `bold ${w > 700 ? 13 : 11}px monospace`;

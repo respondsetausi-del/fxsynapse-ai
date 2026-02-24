@@ -452,16 +452,6 @@ export default function Dashboard() {
                             </div>
                             <div className="rounded-lg relative" style={{ padding: "11px 13px", background: "rgba(77,160,255,.04)", border: "1px solid rgba(77,160,255,.1)" }}>
                               <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#4da0ff" }}>🎯 TRADE SETUP</div>
-                              {user?.plan_id === "free" ? (
-                                <div className="text-center py-3">
-                                  <div className="text-lg mb-1">🔒</div>
-                                  <div className="text-[11px] font-semibold text-white mb-1">Upgrade to unlock trade setups</div>
-                                  <div className="text-[10px] mb-2" style={{ color: "rgba(255,255,255,.35)" }}>Entry, TP, SL & Risk:Reward</div>
-                                  <Link href="/pricing" className="inline-block px-4 py-1.5 rounded-lg text-[10px] font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
-                                    Unlock Pro — R99/mo
-                                  </Link>
-                                </div>
-                              ) : (
                               <div className="flex flex-col gap-1">
                                 {[{ l: "Entry Zone", v: A.entry_zone || "—", c: "#00e5a0" }, { l: "Take Profit", v: A.take_profit || "—", c: "#4da0ff" }, { l: "Stop Loss", v: A.stop_loss || "—", c: "#ff4d6a" }, { l: "Risk:Reward", v: A.risk_reward || "—", c: "#f0b90b" }].map((r, i) => (
                                   <div key={i} className="flex justify-between">
@@ -469,9 +459,46 @@ export default function Dashboard() {
                                     <span className="text-[11px] font-semibold font-mono" style={{ color: r.c }}>{r.v}</span>
                                   </div>
                                 ))}
+                                {A.setup_grade && (
+                                  <div className="flex justify-between mt-1 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,.05)" }}>
+                                    <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Setup Grade</span>
+                                    <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded" style={{
+                                      background: A.setup_grade === "A" ? "rgba(0,229,160,.15)" : A.setup_grade === "B" ? "rgba(77,160,255,.15)" : A.setup_grade === "C" ? "rgba(240,185,11,.15)" : "rgba(255,77,106,.15)",
+                                      color: A.setup_grade === "A" ? "#00e5a0" : A.setup_grade === "B" ? "#4da0ff" : A.setup_grade === "C" ? "#f0b90b" : "#ff4d6a",
+                                    }}>Grade {A.setup_grade}</span>
+                                  </div>
+                                )}
                               </div>
-                              )}
                             </div>
+                            {A.confluences && A.confluences.length > 0 && (
+                              <div className="rounded-lg" style={{ padding: "11px 13px", background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)" }}>
+                                <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#f0b90b" }}>⚡ CONFLUENCES ({A.confluences.length}/5)</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {A.confluences.map((cf: string, ci: number) => (
+                                    <span key={ci} className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: "rgba(240,185,11,.08)", color: "#f0b90b", border: "1px solid rgba(240,185,11,.12)" }}>✓ {cf}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {A.patterns && A.patterns.length > 0 && (
+                              <div className="rounded-lg" style={{ padding: "11px 13px", background: "rgba(156,106,222,.04)", border: "1px solid rgba(156,106,222,.1)" }}>
+                                <div className="text-[9px] font-mono uppercase tracking-[1.5px] mb-1.5" style={{ color: "#9b6ade" }}>🔍 PATTERNS DETECTED</div>
+                                <div className="flex flex-col gap-1">
+                                  {(A.patterns as any[]).map((pt: any, pi: number) => (
+                                    <div key={pi} className="flex items-center justify-between">
+                                      <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,.6)" }}>{pt.name}</span>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{pt.location}</span>
+                                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{
+                                          background: pt.significance === "high" ? "rgba(0,229,160,.1)" : pt.significance === "medium" ? "rgba(240,185,11,.1)" : "rgba(255,255,255,.05)",
+                                          color: pt.significance === "high" ? "#00e5a0" : pt.significance === "medium" ? "#f0b90b" : "rgba(255,255,255,.4)",
+                                        }}>{pt.significance}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                         {activeTab === "indicators" && (
@@ -488,6 +515,12 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex justify-between mt-1">
                                   <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Oversold</span>
+                                  {A.rsi_signal && A.rsi_signal !== "neutral" && (
+                                    <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded" style={{
+                                      background: A.rsi_signal.includes("bullish") ? "rgba(0,229,160,.1)" : A.rsi_signal.includes("bearish") ? "rgba(255,77,106,.1)" : A.rsi_signal === "overbought" ? "rgba(255,77,106,.1)" : "rgba(0,229,160,.1)",
+                                      color: A.rsi_signal.includes("bullish") || A.rsi_signal === "oversold" ? "#00e5a0" : "#ff4d6a",
+                                    }}>{A.rsi_signal.replace(/_/g, " ").toUpperCase()}</span>
+                                  )}
                                   <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Overbought</span>
                                 </div>
                               </div>

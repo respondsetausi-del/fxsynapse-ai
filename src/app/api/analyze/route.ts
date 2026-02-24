@@ -32,29 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please sign in to analyze charts." }, { status: 401 });
     }
 
-    // 2. HARD SUBSCRIPTION GATE — must have active paid plan
-    const { createClient } = await import("@supabase/supabase-js");
-    const service = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    const { data: profile } = await service
-      .from("profiles")
-      .select("plan_id, subscription_status")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile || 
-        !profile.plan_id || 
-        profile.plan_id === "free" || 
-        profile.plan_id === "none" || 
-        profile.subscription_status !== "active") {
-      return NextResponse.json({ 
-        error: "Active subscription required. Choose a plan to start scanning.",
-      }, { status: 403 });
-    }
-
-    // 3. Credit check (monthly limit / top-up)
+    // 2. Credit check — handles both subscriptions and free trial credits
     const creditCheck = await checkCredits(user.id);
     if (!creditCheck.canScan) {
       return NextResponse.json({
@@ -63,7 +41,7 @@ export async function POST(req: NextRequest) {
       }, { status: 402 });
     }
 
-    // 4. Validate file
+    // 3. Validate file
     const formData = await req.formData();
     const file = formData.get("image") as File | null;
     if (!file) {
@@ -98,7 +76,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 3000,
+        max_tokens: 4000,
         system: SYSTEM_PROMPT,
         messages: [{
           role: "user",
@@ -141,9 +119,8 @@ export async function POST(req: NextRequest) {
     analysis.confidence = Math.max(0, Math.min(100, Number(analysis.confidence) || 50));
     if (!Array.isArray(analysis.annotations)) analysis.annotations = [];
 
-    // Validate chart_bounds — ensure it exists and has reasonable values
+    // ── Validate chart_bounds ──
     if (!analysis.chart_bounds || typeof analysis.chart_bounds !== "object") {
-      // Default bounds for typical mobile chart screenshot
       analysis.chart_bounds = { x: 0.02, y: 0.18, w: 0.78, h: 0.65 };
     } else {
       const cb = analysis.chart_bounds;
@@ -151,65 +128,142 @@ export async function POST(req: NextRequest) {
       cb.y = Math.max(0, Math.min(0.4, Number(cb.y) || 0.18));
       cb.w = Math.max(0.4, Math.min(1.0, Number(cb.w) || 0.78));
       cb.h = Math.max(0.3, Math.min(1.0, Number(cb.h) || 0.65));
-      // Ensure bounds don't exceed image
       if (cb.x + cb.w > 1.0) cb.w = 1.0 - cb.x;
       if (cb.y + cb.h > 1.0) cb.h = 1.0 - cb.y;
     }
 
-    // Clamp annotation coordinates to valid 0-1 range within chart bounds
-    analysis.annotations = analysis.annotations.map((a: Record<string, unknown>) => {
-      const clamped = { ...a };
-      if (typeof clamped.x === "number") clamped.x = Math.max(0, Math.min(1, clamped.x as number));
-      if (typeof clamped.y === "number") clamped.y = Math.max(0, Math.min(1, clamped.y as number));
-      if (typeof clamped.y1 === "number") clamped.y1 = Math.max(0, Math.min(1, clamped.y1 as number));
-      if (typeof clamped.y2 === "number") clamped.y2 = Math.max(0, Math.min(1, clamped.y2 as number));
-      if (typeof clamped.x1 === "number") clamped.x1 = Math.max(0, Math.min(1, clamped.x1 as number));
-      if (typeof clamped.x2 === "number") clamped.x2 = Math.max(0, Math.min(1, clamped.x2 as number));
-      return clamped;
-    });
+    // ═══ PRICE-TO-COORDINATE CONVERSION ═══
+    // The AI returns actual prices — we convert to 0-1 y-coordinates
+    const priceHigh = parseFloat(analysis.price_high);
+    const priceLow = parseFloat(analysis.price_low);
+    const priceRange = priceHigh - priceLow;
 
-    // ── TRADE SETUP VALIDATION ──
-    // Ensure Entry/TP/SL follow correct logic for the bias
+    // Convert a price string to a y-coordinate (0=top/high, 1=bottom/low)
+    const priceToY = (priceStr: string | number | undefined): number => {
+      if (priceStr === undefined || priceStr === null) return 0.5;
+      const price = typeof priceStr === "string" ? parseFloat(priceStr) : priceStr;
+      if (isNaN(price) || priceRange <= 0) return 0.5;
+      // Higher price = lower y (top of chart), lower price = higher y (bottom)
+      const y = (priceHigh - price) / priceRange;
+      return Math.max(0.01, Math.min(0.99, y));
+    };
+
+    // Only use price conversion if we have valid price range
+    const hasPriceData = !isNaN(priceHigh) && !isNaN(priceLow) && priceRange > 0;
+
+    if (hasPriceData) {
+      // Store current_price_y for reference
+      analysis.current_price_y = priceToY(analysis.current_price);
+
+      // Convert all annotations from prices to y-coordinates
+      analysis.annotations = analysis.annotations.map((a: Record<string, unknown>) => {
+        const converted = { ...a };
+
+        // Line: price → y
+        if (a.type === "line" && a.price) {
+          converted.y = priceToY(a.price as string);
+        }
+
+        // Zone / FVG: price_high/price_low → y1/y2
+        if ((a.type === "zone" || a.type === "fvg") && a.price_high && a.price_low) {
+          converted.y1 = priceToY(a.price_high as string);
+          converted.y2 = priceToY(a.price_low as string);
+        }
+
+        // Point (Entry/TP/SL): price → y, x at right edge
+        if (a.type === "point" && a.price) {
+          converted.y = priceToY(a.price as string);
+          converted.x = 0.92;
+        }
+
+        // Arrow: entry_price/tp_price → y1/y2
+        if (a.type === "arrow" && a.entry_price && a.tp_price) {
+          converted.x = 0.92;
+          converted.y1 = priceToY(a.entry_price as string);
+          converted.y2 = priceToY(a.tp_price as string);
+        }
+
+        // Trendline: y1_price/y2_price → y1/y2
+        if (a.type === "trend" && a.y1_price && a.y2_price) {
+          converted.y1 = priceToY(a.y1_price as string);
+          converted.y2 = priceToY(a.y2_price as string);
+        }
+
+        // Fib: swing_high_price/swing_low_price → y_0/y_100
+        if (a.type === "fib" && a.swing_high_price && a.swing_low_price) {
+          converted.y_0 = priceToY(a.swing_high_price as string);
+          converted.y_100 = priceToY(a.swing_low_price as string);
+        }
+
+        // Pattern / BOS / CHoCH: price → y
+        if ((a.type === "pattern" || a.type === "bos" || a.type === "choch") && a.price) {
+          converted.y = priceToY(a.price as string);
+        }
+
+        // Liquidity: price → y
+        if (a.type === "liquidity" && a.price) {
+          converted.y = priceToY(a.price as string);
+        }
+
+        // Clamp all computed y values
+        const clamp = (v: unknown) => typeof v === "number" ? Math.max(0.01, Math.min(0.99, v)) : v;
+        for (const key of ["x", "y", "y1", "y2", "x1", "x2", "y_0", "y_100"]) {
+          if (key in converted) converted[key] = clamp(converted[key]);
+        }
+
+        return converted;
+      });
+    } else {
+      // Fallback: clamp any raw y values the AI may have returned
+      analysis.annotations = analysis.annotations.map((a: Record<string, unknown>) => {
+        const clamped = { ...a };
+        const clamp = (v: unknown) => typeof v === "number" ? Math.max(0.01, Math.min(0.99, v)) : v;
+        for (const key of ["x", "y", "y1", "y2", "x1", "x2", "y_0", "y_100"]) {
+          if (key in clamped) clamped[key] = clamp(clamped[key]);
+        }
+        return clamped;
+      });
+    }
+
+    // ── Trade setup validation ──
     const bias = (analysis.bias || "Neutral").toLowerCase();
     const points = analysis.annotations.filter((a: Record<string, unknown>) => a.type === "point");
     const entry = points.find((a: Record<string, unknown>) => a.label === "Entry");
     const tp = points.find((a: Record<string, unknown>) => a.label === "TP");
     const sl = points.find((a: Record<string, unknown>) => a.label === "SL");
-    const sLine = analysis.annotations.find((a: Record<string, unknown>) => a.type === "line" && typeof a.label === "string" && (a.label as string).startsWith("S"));
-    const rLine = analysis.annotations.find((a: Record<string, unknown>) => a.type === "line" && typeof a.label === "string" && (a.label as string).startsWith("R"));
 
-    if (entry && tp && sl && sLine && rLine) {
-      const sY = sLine.y as number;
-      const rY = rLine.y as number;
-      const alignX = 0.80; // Align all trade points vertically
+    if (entry && tp && sl) {
+      // Ensure all share same x (right edge)
+      const sharedX = 0.92;
+      entry.x = sharedX;
+      tp.x = sharedX;
+      sl.x = sharedX;
 
+      const eY = entry.y as number;
+      const tY = tp.y as number;
+      const sY = sl.y as number;
+
+      // Validate direction logic
       if (bias === "long" || bias === "neutral") {
-        // Long: Entry near support, TP near resistance, SL below support
-        // y=0 is top (high price), y=1 is bottom (low price)
-        // So: TP.y < Entry.y < SL.y
-        entry.y = sY;                           // Entry at support
-        entry.x = alignX;
-        tp.y = rY;                              // TP at resistance
-        tp.x = alignX;
-        sl.y = Math.min(1, sY + (sY - rY) * 0.3); // SL below support
-        sl.x = alignX;
+        // Long: TP above entry (lower y), SL below (higher y)
+        if (tY > eY) { tp.y = sY; sl.y = tY; } // Swap if wrong
+        if ((sl.y as number) < eY) {
+          sl.y = Math.min(0.99, eY + Math.abs(eY - (tp.y as number)) * 0.4);
+        }
       } else if (bias === "short") {
-        // Short: Entry near resistance, TP near support, SL above resistance
-        // So: SL.y < Entry.y < TP.y
-        entry.y = rY;                           // Entry at resistance
-        entry.x = alignX;
-        tp.y = sY;                              // TP at support
-        tp.x = alignX;
-        sl.y = Math.max(0, rY - (sY - rY) * 0.3); // SL above resistance
-        sl.x = alignX;
+        // Short: TP below entry (higher y), SL above (lower y)
+        if (tY < eY) { tp.y = sY; sl.y = tY; }
+        if ((sl.y as number) > eY) {
+          sl.y = Math.max(0.01, eY - Math.abs(eY - (tp.y as number)) * 0.4);
+        }
       }
 
-      // Fix arrow to match Entry → TP direction
+      // Fix arrow
       const arrow = analysis.annotations.find((a: Record<string, unknown>) => a.type === "arrow");
       if (arrow) {
-        arrow.x = alignX - 0.06;
-        arrow.y1 = entry.y as number;
-        arrow.y2 = tp.y as number;
+        arrow.x = sharedX;
+        arrow.y1 = entry.y;
+        arrow.y2 = tp.y;
         arrow.color = bias === "short" ? "#ff4d6a" : "#00e5a0";
       }
     }
@@ -231,7 +285,6 @@ export async function POST(req: NextRequest) {
         topupBalance: updatedCredits.topupBalance,
         source: creditCheck.source,
         planName: updatedCredits.planName,
-        // backwards compat
         dailyRemaining: updatedCredits.monthlyRemaining,
         creditsBalance: updatedCredits.topupBalance,
       },
