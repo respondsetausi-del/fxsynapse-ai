@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -59,7 +59,7 @@ const TOPUP_PACKS = [
   { id: "topup_20", credits: 20, price: 80, perScan: "R4.00" },
 ];
 
-export default function PricingPage() {
+function PricingContent() {
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [user, setUser] = useState<boolean>(false);
@@ -301,4 +301,8 @@ export default function PricingPage() {
       </div>
     </div>
   );
+}
+
+export default function PricingPage() {
+  return <Suspense><PricingContent /></Suspense>;
 }
