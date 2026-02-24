@@ -64,13 +64,22 @@ export async function checkCredits(userId: string): Promise<CreditCheck> {
     }
   }
 
-  // No active subscription = HARD BLOCK — must have paid plan
+  // No active subscription — allow if they have credits (free scan or top-ups)
   if (!profile.subscription_status || profile.subscription_status !== "active") {
+    if ((profile.credits_balance || 0) > 0) {
+      // Has free/topup credits — let them scan
+      return {
+        canScan: true, source: "topup",
+        monthlyUsed: 0, monthlyLimit: 0, monthlyRemaining: 0,
+        topupBalance: profile.credits_balance,
+        planId: profile.plan_id || "free", planName: "Free Trial",
+      };
+    }
     return {
       canScan: false, source: "monthly",
       monthlyUsed: 0, monthlyLimit: 0, monthlyRemaining: 0,
-      topupBalance: profile.credits_balance || 0,
-      reason: "No active plan. Choose a plan to start scanning.",
+      topupBalance: 0,
+      reason: "Your free scan has been used. Choose a plan to keep scanning.",
       planId: profile.plan_id || "none", planName: plan?.name || "None",
     };
   }

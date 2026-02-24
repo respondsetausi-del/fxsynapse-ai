@@ -579,15 +579,21 @@ export default function Dashboard() {
       {showPaywall && (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={{ background: "rgba(0,0,0,.85)", backdropFilter: "blur(15px)" }} onClick={() => setShowPaywall(false)}>
           <div className="max-w-sm w-full mx-4 rounded-2xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "#12131a", border: "1px solid rgba(255,255,255,.08)" }}>
-            <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(255,77,106,.1)", border: "2px solid rgba(255,77,106,.2)" }}>
-              <span className="text-2xl">🔒</span>
+            <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
+              <span className="text-2xl">{credits?.planId === "free" || credits?.planId === "none" ? "⚡" : "🔒"}</span>
             </div>
-            <h3 className="text-lg font-bold text-white mb-1">Scans Used Up</h3>
+            <h3 className="text-lg font-bold text-white mb-1">
+              {credits?.planId === "free" || credits?.planId === "none" ? "Liked what you saw?" : "Scans Used Up"}
+            </h3>
             <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,.45)" }}>
-              You&apos;ve used all your monthly scans. Top up or upgrade to keep scanning.
+              {credits?.planId === "free" || credits?.planId === "none"
+                ? "Your free scan has been used. Subscribe to unlock more AI chart analysis."
+                : "You\u0027ve used all your monthly scans. Top up or upgrade to keep scanning."}
             </p>
             <div className="flex flex-col gap-2">
-              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>Upgrade Plan</Link>
+              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+                {credits?.planId === "free" || credits?.planId === "none" ? "View Plans — From R49/mo" : "Upgrade Plan"}
+              </Link>
               <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up Scans</Link>
               <button onClick={() => setShowPaywall(false)} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>
             </div>

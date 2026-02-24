@@ -55,12 +55,7 @@ export default function LandingPage() {
     setVisible(true);
     // Track landing visit
     trackEvent("landing_visit");
-    // Show broker popup after 3 seconds
-    const t = setTimeout(() => {
-      setShowBrokerPopup(true);
-      trackEvent("broker_popup_shown", "landing");
-    }, 3000);
-    return () => clearTimeout(t);
+    // Broker popup removed from landing — show after first scan instead
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -109,8 +104,8 @@ export default function LandingPage() {
             <Link href="/login" className="text-xs font-semibold no-underline px-4 py-2 rounded-lg" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
               Sign In
             </Link>
-            <Link href="/pricing" onClick={() => handleSignupClick("nav")} className="text-xs font-bold no-underline px-4 py-2 rounded-lg" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
-              Get Started
+            <Link href="/login" onClick={() => handleSignupClick("nav")} className="text-xs font-bold no-underline px-4 py-2 rounded-lg" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+              Try Free
             </Link>
           </div>
         </nav>
@@ -134,14 +129,14 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center gap-3 mb-4">
-            <Link href="/pricing" onClick={() => handleSignupClick("hero")} className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
-              Get Started — From R49/mo
+            <Link href="/login" onClick={() => handleSignupClick("hero")} className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
+              Try Free — 1 Scan on Us
             </Link>
             <Link href="/login" className="no-underline px-7 py-3.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
               Sign In
             </Link>
           </div>
-          <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>Plans from R49/month • 15 to unlimited scans</p>
+          <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>1 free scan • No card required • Plans from R49/month</p>
 
           {/* Platform badges */}
           <div className="flex gap-2 mt-8 flex-wrap justify-center">
@@ -307,13 +302,13 @@ export default function LandingPage() {
         {/* CTA */}
         <section className="text-center" style={{ padding: "60px 24px 40px" }}>
           <div className="max-w-lg mx-auto rounded-2xl px-6 py-8" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.06), rgba(77,160,255,.04))", border: "1px solid rgba(0,229,160,.12)" }}>
-            <div className="text-[10px] font-mono font-bold mb-2" style={{ color: "#f0b90b" }}>🔥 LAUNCH SPECIAL — 50% OFF FIRST MONTH</div>
-            <h2 className="text-2xl font-extrabold text-white mb-3" style={{ letterSpacing: "-1px" }}>Ready to level up your trading?</h2>
-            <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.4)" }}>Join 40+ traders using AI to analyze charts in seconds.</p>
-            <Link href="/pricing" onClick={() => handleSignupClick("cta")} className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
-              View Plans — From R49/mo →
+            <div className="text-[10px] font-mono font-bold mb-2" style={{ color: "#00e5a0" }}>🎯 TRY BEFORE YOU BUY</div>
+            <h2 className="text-2xl font-extrabold text-white mb-3" style={{ letterSpacing: "-1px" }}>See what AI sees in your chart</h2>
+            <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.4)" }}>Upload any chart, get instant annotated analysis. 1 free scan — no card needed.</p>
+            <Link href="/login" onClick={() => handleSignupClick("cta")} className="inline-block no-underline px-8 py-4 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
+              Get Your Free Scan →
             </Link>
-            <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.25)" }}>Use code LAUNCH50 for 50% off Pro or Premium</p>
+            <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.25)" }}>No credit card required • Plans from R49/mo after</p>
           </div>
         </section>
 
