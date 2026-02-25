@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac } from "crypto";
 import { sendPaymentSuccessToUser, sendPaymentNotificationToAdmin } from "@/lib/email";
+import { processAffiliateCommission } from "@/lib/affiliate";
 
 function getAdminSupabase() {
   return createClient(
@@ -166,6 +167,14 @@ export async function POST(req: NextRequest) {
           console.error("[WEBHOOK] Failed to add credits:", error);
         }
       }
+    }
+
+    // ═══ AFFILIATE COMMISSION ═══
+    // If this user was referred, create commission for the affiliate
+    if (effectiveUserId && payment) {
+      processAffiliateCommission(effectiveUserId, payment.id, payment.amount_cents).catch(err => {
+        console.error("[WEBHOOK] Affiliate commission error (non-blocking):", err);
+      });
     }
 
     return NextResponse.json({ received: true, processed: true });

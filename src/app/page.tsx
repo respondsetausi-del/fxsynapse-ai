@@ -53,9 +53,23 @@ export default function LandingPage() {
 
   useEffect(() => {
     setVisible(true);
-    // Track landing visit
     trackEvent("landing_visit");
-    // Broker popup removed from landing — show after first scan instead
+
+    // ═══ AFFILIATE REF CODE CAPTURE ═══
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      // Store ref code in localStorage (30-day effective via check on signup)
+      localStorage.setItem("fxs_ref", ref);
+      localStorage.setItem("fxs_ref_at", Date.now().toString());
+      // Track the click
+      fetch("/api/affiliate/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refCode: ref }),
+      }).catch(() => {});
+      trackEvent("affiliate_click", ref);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

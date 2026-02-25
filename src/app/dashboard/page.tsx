@@ -67,6 +67,28 @@ export default function Dashboard() {
         setUser(data.profile);
         setCredits(data.credits);
 
+        // ═══ AFFILIATE: Process referral if user signed up via ref link ═══
+        if (!data.profile.referred_by) {
+          const refCode = localStorage.getItem("fxs_ref");
+          const refAt = localStorage.getItem("fxs_ref_at");
+          if (refCode && refAt) {
+            const daysSince = (Date.now() - parseInt(refAt)) / (1000 * 60 * 60 * 24);
+            if (daysSince <= 30) {
+              fetch("/api/affiliate/register-referral", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ refCode }),
+              }).then(() => {
+                localStorage.removeItem("fxs_ref");
+                localStorage.removeItem("fxs_ref_at");
+              }).catch(() => {});
+            } else {
+              localStorage.removeItem("fxs_ref");
+              localStorage.removeItem("fxs_ref_at");
+            }
+          }
+        }
+
         // No hard paywall redirect — all users can access dashboard
         // Paywall shows when they try to scan without credits or view results
         setAuthLoading(false);

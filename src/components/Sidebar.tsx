@@ -142,6 +142,9 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
           <Link href="/pricing" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg no-underline text-xs font-semibold" style={{ color: "rgba(255,255,255,.5)" }}>
             <span>💎</span> Upgrade Plan
           </Link>
+          <Link href="/affiliate" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg no-underline text-xs font-semibold" style={{ color: "rgba(255,255,255,.5)" }}>
+            <span>💰</span> Affiliate Program
+          </Link>
           {user?.role === "admin" && (
             <Link href="/admin" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg no-underline text-xs font-semibold" style={{ color: "#ff4d6a" }}>
               <span>👑</span> Admin Dashboard
