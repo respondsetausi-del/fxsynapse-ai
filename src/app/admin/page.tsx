@@ -166,6 +166,9 @@ export default function AdminDashboard() {
   const [quickSendSubject, setQuickSendSubject] = useState("");
   const [quickSendBody, setQuickSendBody] = useState("");
   const [quickSending, setQuickSending] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifyingPayments, setVerifyingPayments] = useState(false);
   const [chatThreads, setChatThreads] = useState<any[]>([]);
   const [chatActive, setChatActive] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -778,9 +781,54 @@ export default function AdminDashboard() {
         {tab === "payments" && (
           <div style={{ animation: "fadeUp 0.3s ease" }}>
             <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
-              <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+              <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                 <h2 className="text-sm font-bold text-white">Payment History</h2>
+                <div className="flex gap-2">
+                  <button onClick={async () => {
+                    try {
+                      const res = await fetch("/api/admin/register-webhook", { method: "POST" });
+                      const data = await res.json();
+                      if (data.success || data.message?.includes("already")) showToast(data.message || "Webhook registered! ✅");
+                      else showToast(`Webhook error: ${data.error || "Unknown"}`, "error");
+                    } catch { showToast("Failed to register webhook", "error"); }
+                  }}
+                    className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                    style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>
+                    🔗 Register Webhook
+                  </button>
+                  <button onClick={async () => {
+                    setVerifyingPayments(true); setVerifyResult(null);
+                    try {
+                      const res = await fetch("/api/admin/verify-payments", { method: "POST" });
+                      const data = await res.json();
+                      setVerifyResult(data);
+                      if (data.activated > 0) { fetchPayments(); fetchUsers(); fetchStats(); }
+                      showToast(`Verified: ${data.activated} activated, ${data.total - data.activated} not paid`);
+                    } catch { showToast("Verification failed", "error"); }
+                    setVerifyingPayments(false);
+                  }} disabled={verifyingPayments}
+                    className="px-4 py-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
+                    style={{ background: "linear-gradient(135deg,#f0b90b,#d4a00a)", color: "#0a0b0f", opacity: verifyingPayments ? 0.5 : 1 }}>
+                    {verifyingPayments ? "Verifying..." : "⚡ Verify Pending"}
+                  </button>
+                </div>
               </div>
+              {verifyResult && (
+                <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)", background: "rgba(240,185,11,.03)" }}>
+                  <div className="flex gap-4 flex-wrap text-[11px] font-mono">
+                    <span style={{ color: "#00e5a0" }}>✅ Activated: {verifyResult.activated}</span>
+                    <span style={{ color: "rgba(255,255,255,.4)" }}>Checked: {verifyResult.verified}/{verifyResult.total}</span>
+                    {verifyResult.failed > 0 && <span style={{ color: "#ff4d6a" }}>Errors: {verifyResult.failed}</span>}
+                  </div>
+                  {verifyResult.results?.filter((r: { status: string }) => r.status === "activated").length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {verifyResult.results.filter((r: { status: string }) => r.status === "activated").map((r: { email: string; plan: string }, i: number) => (
+                        <div key={i} className="text-[10px] font-mono" style={{ color: "#00e5a0" }}>✅ {r.email} → {r.plan}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
