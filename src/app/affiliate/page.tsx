@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -39,10 +39,62 @@ export default function AffiliatePage() {
   const [savingBank, setSavingBank] = useState(false);
   const [requestingPayout, setRequestingPayout] = useState(false);
   const [toast, setToast] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ id: string; sender_role: string; message: string; created_at: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
   const router = useRouter();
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const loadChat = async () => {
+    try {
+      const res = await fetch("/api/affiliate/chat");
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(data.messages || []);
+        if (!chatOpen) setChatUnread(data.unread || 0);
+        else setChatUnread(0);
+      }
+    } catch { /* silent */ }
+  };
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || chatSending) return;
+    setChatSending(true);
+    try {
+      const res = await fetch("/api/affiliate/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: chatInput.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(prev => [...prev, data.message]);
+        setChatInput("");
+      }
+    } catch { /* silent */ }
+    setChatSending(false);
+  };
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatOpen && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, chatOpen]);
+
+  // Load chat when affiliate dashboard loads, poll every 15s
+  useEffect(() => {
+    if (!isAffiliate) return;
+    loadChat();
+    const interval = setInterval(loadChat, 15000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAffiliate, chatOpen]);
 
   useEffect(() => {
     (async () => {
@@ -418,6 +470,91 @@ export default function AffiliatePage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Floating Chat Widget */}
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 100 }}>
+        {chatOpen && (
+          <div className="rounded-2xl overflow-hidden flex flex-col" style={{
+            width: 360, height: 480, background: "#12131a", border: "1px solid rgba(255,255,255,.08)",
+            boxShadow: "0 20px 60px rgba(0,0,0,.5)", marginBottom: 12,
+          }}>
+            {/* Chat Header */}
+            <div className="flex items-center justify-between px-4 py-3" style={{ background: "rgba(0,229,160,.06)", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+              <div>
+                <div className="text-sm font-bold text-white">💬 Chat with Admin</div>
+                <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>We typically reply within a few hours</div>
+              </div>
+              <button onClick={() => setChatOpen(false)} className="text-lg cursor-pointer"
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,.4)", lineHeight: 1 }}>✕</button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-3" style={{ scrollbarWidth: "thin" }}>
+              {chatMessages.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-2xl mb-2">👋</div>
+                  <div className="text-xs font-semibold text-white mb-1">Welcome to affiliate support!</div>
+                  <div className="text-[10px]" style={{ color: "rgba(255,255,255,.3)" }}>
+                    Have questions about payouts, commissions, or promotions? Send us a message.
+                  </div>
+                </div>
+              ) : (
+                chatMessages.map((m) => (
+                  <div key={m.id} className={`flex mb-3 ${m.sender_role === "affiliate" ? "justify-end" : "justify-start"}`}>
+                    <div className="max-w-[80%] rounded-xl px-3 py-2" style={{
+                      background: m.sender_role === "affiliate" ? "rgba(0,229,160,.12)" : "rgba(255,255,255,.06)",
+                      border: `1px solid ${m.sender_role === "affiliate" ? "rgba(0,229,160,.15)" : "rgba(255,255,255,.04)"}`,
+                    }}>
+                      <div className="text-[10px] font-mono mb-0.5" style={{
+                        color: m.sender_role === "affiliate" ? "#00e5a0" : "#4da0ff",
+                      }}>
+                        {m.sender_role === "affiliate" ? "You" : "Admin"}
+                      </div>
+                      <div className="text-xs" style={{ color: "rgba(255,255,255,.75)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {m.message}
+                      </div>
+                      <div className="text-[9px] font-mono mt-1" style={{ color: "rgba(255,255,255,.2)" }}>
+                        {new Date(m.created_at).toLocaleString("en-ZA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="px-3 py-3 flex gap-2" style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+              <input
+                type="text" value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendChat()}
+                placeholder="Type a message..."
+                className="flex-1 px-3 py-2.5 rounded-xl text-xs"
+                style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff", outline: "none" }}
+              />
+              <button onClick={sendChat} disabled={chatSending || !chatInput.trim()}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                style={{ background: chatInput.trim() ? "linear-gradient(135deg,#00e5a0,#00b87d)" : "rgba(255,255,255,.04)", color: chatInput.trim() ? "#0a0b0f" : "rgba(255,255,255,.2)", border: "none" }}>
+                {chatSending ? "..." : "Send"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Chat Toggle Button */}
+        <button onClick={() => { setChatOpen(!chatOpen); if (!chatOpen) { setChatUnread(0); loadChat(); } }}
+          className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer shadow-lg"
+          style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none", boxShadow: "0 4px 20px rgba(0,229,160,.3)", marginLeft: "auto", display: "block" }}>
+          <span className="text-2xl">{chatOpen ? "✕" : "💬"}</span>
+          {chatUnread > 0 && !chatOpen && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+              style={{ background: "#ff4d6a", color: "#fff" }}>
+              {chatUnread}
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );

@@ -168,6 +168,12 @@ export default function AdminDashboard() {
   const [chatSending, setChatSending] = useState(false);
   const [affData, setAffData] = useState<any>(null);
   const [affPayouts, setAffPayouts] = useState<any[]>([]);
+  const [affChatConvos, setAffChatConvos] = useState<any[]>([]);
+  const [affChatActive, setAffChatActive] = useState<string | null>(null);
+  const [affChatMessages, setAffChatMessages] = useState<any[]>([]);
+  const [affChatReply, setAffChatReply] = useState("");
+  const [affChatSending, setAffChatSending] = useState(false);
+  const affChatEndRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const supabase = createClient();
@@ -240,6 +246,66 @@ export default function AdminDashboard() {
       }).catch(() => {});
     }
   }, [tab]);
+
+  // Affiliate chat: load conversations
+  const loadAffChatConvos = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/affiliates/chat");
+      if (res.ok) {
+        const data = await res.json();
+        setAffChatConvos(data.conversations || []);
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  const loadAffChatMessages = useCallback(async (affiliateId: string) => {
+    try {
+      const res = await fetch(`/api/admin/affiliates/chat?affiliate_id=${affiliateId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAffChatMessages(data.messages || []);
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  const sendAffChatReply = async () => {
+    if (!affChatReply.trim() || !affChatActive || affChatSending) return;
+    setAffChatSending(true);
+    try {
+      const res = await fetch("/api/admin/affiliates/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ affiliate_id: affChatActive, message: affChatReply.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAffChatMessages(prev => [...prev, data.message]);
+        setAffChatReply("");
+        loadAffChatConvos();
+      }
+    } catch { /* silent */ }
+    setAffChatSending(false);
+  };
+
+  useEffect(() => {
+    if (tab === "affiliates") {
+      loadAffChatConvos();
+      const interval = setInterval(loadAffChatConvos, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [tab, loadAffChatConvos]);
+
+  useEffect(() => {
+    if (affChatActive) {
+      loadAffChatMessages(affChatActive);
+      const interval = setInterval(() => loadAffChatMessages(affChatActive), 10000);
+      return () => clearInterval(interval);
+    }
+  }, [affChatActive, loadAffChatMessages]);
+
+  useEffect(() => {
+    if (affChatEndRef.current) affChatEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [affChatMessages]);
 
   const sendChatReply = async () => {
     if (!chatReply.trim() || !chatActive) return;
