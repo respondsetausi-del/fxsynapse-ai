@@ -372,7 +372,7 @@ export default function AdminDashboard() {
           body: JSON.stringify({ userId: modal.user.id }),
         });
         if (res.ok) { showToast(`${modal.user.email} permanently deleted`); setModal(null); fetchUsers(); fetchStats(); }
-        else showToast("Failed to delete user", "error");
+        else { const err = await res.json().catch(() => ({})); showToast(`Delete failed: ${err.error || res.status}`, "error"); }
         setActionLoading(false);
         return;
       }

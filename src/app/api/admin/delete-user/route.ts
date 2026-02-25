@@ -6,6 +6,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Safe delete — won't throw if table doesn't exist
+async function safeDelete(table: string, column: string, value: string) {
+  try {
+    await supabase.from(table).delete().eq(column, value);
+  } catch (e) {
+    console.log(`Skip delete ${table}: ${e}`);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Verify admin
@@ -35,36 +44,46 @@ export async function POST(req: NextRequest) {
     // Prevent self-delete
     if (userId === user.id) return NextResponse.json({ error: "Cannot delete yourself" }, { status: 400 });
 
-    // Delete from related tables first (cascade should handle most, but be explicit)
-    // Affiliate earnings, payouts, referrals, messages
-    const { data: affiliate } = await supabase.from("affiliates").select("id").eq("user_id", userId).single();
+    // 1. Handle affiliate data (deepest foreign keys first)
+    const { data: affiliate } = await supabase.from("affiliates").select("id").eq("user_id", userId).maybeSingle();
     if (affiliate) {
-      await supabase.from("affiliate_messages").delete().eq("affiliate_id", affiliate.id);
-      await supabase.from("affiliate_payouts").delete().eq("affiliate_id", affiliate.id);
-      await supabase.from("affiliate_earnings").delete().eq("affiliate_id", affiliate.id);
-      await supabase.from("referrals").delete().eq("affiliate_id", affiliate.id);
-      await supabase.from("affiliates").delete().eq("id", affiliate.id);
+      await safeDelete("affiliate_messages", "affiliate_id", affiliate.id);
+      await safeDelete("affiliate_payouts", "affiliate_id", affiliate.id);
+      await safeDelete("affiliate_earnings", "affiliate_id", affiliate.id);
+      await safeDelete("referrals", "affiliate_id", affiliate.id);
+      await safeDelete("affiliates", "id", affiliate.id);
     }
 
-    // Delete referral where user was referred
-    await supabase.from("referrals").delete().eq("referred_user_id", userId);
+    // 2. Delete referral where this user was the referred person
+    await safeDelete("referrals", "referred_user_id", userId);
 
-    // Delete scans, payments, ratings, chat messages
-    await supabase.from("scans").delete().eq("user_id", userId);
-    await supabase.from("payments").delete().eq("user_id", userId);
-    await supabase.from("ratings").delete().eq("user_id", userId);
-    await supabase.from("chat_messages").delete().eq("user_id", userId);
+    // 3. Delete all user-related data
+    await safeDelete("scan_ratings", "user_id", userId);
+    await safeDelete("ratings", "user_id", userId);
+    await safeDelete("scans", "user_id", userId);
+    await safeDelete("credit_transactions", "user_id", userId);
+    await safeDelete("chat_messages", "user_id", userId);
+    await safeDelete("email_logs", "user_id", userId);
+    await safeDelete("visitor_events", "user_id", userId);
+    await safeDelete("payments", "user_id", userId);
 
-    // Delete profile
-    await supabase.from("profiles").delete().eq("id", userId);
+    // 4. Delete profile
+    const { error: profileError } = await supabase.from("profiles").delete().eq("id", userId);
+    if (profileError) {
+      console.error("Profile delete error:", profileError);
+      return NextResponse.json({ error: `Failed to delete profile: ${profileError.message}` }, { status: 500 });
+    }
 
-    // Delete auth user
+    // 5. Delete auth user
     const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-    if (authError) console.error("Auth delete error:", authError);
+    if (authError) {
+      console.error("Auth delete error:", authError);
+      // Profile already gone — auth delete fail is not critical
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     console.error("Delete user error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: `Server error: ${err instanceof Error ? err.message : "unknown"}` }, { status: 500 });
   }
 }
