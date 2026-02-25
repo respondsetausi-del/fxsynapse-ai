@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { sendPaymentSuccessToUser, sendPaymentNotificationToAdmin } from "@/lib/email";
+import { processAffiliateCommission } from "@/lib/affiliate";
 
 export async function POST() {
   try {
@@ -37,7 +38,6 @@ export async function POST() {
       .single();
 
     if (!payment) {
-      // Check if already activated (webhook may have beaten us)
       const { data: profile } = await service
         .from("profiles")
         .select("plan_id, subscription_status")
@@ -48,7 +48,6 @@ export async function POST() {
         return NextResponse.json({ status: "already_active", plan: profile.plan_id });
       }
 
-      // Also check if there's a recently completed payment (webhook processed it)
       const { data: recentPayment } = await service
         .from("payments")
         .select("*")
@@ -62,7 +61,6 @@ export async function POST() {
         const completedAt = new Date(recentPayment.updated_at || recentPayment.created_at);
         const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
         if (completedAt > fiveMinAgo) {
-          // Webhook already processed this very recently
           return NextResponse.json({
             status: "activated",
             plan: recentPayment.plan_id,
@@ -75,8 +73,56 @@ export async function POST() {
       return NextResponse.json({ status: "no_pending_payment" });
     }
 
-    // Activate: Yoco redirected to success = payment went through
-    console.log(`[ACTIVATE] Processing payment ${payment.id} for user ${user.id}`);
+    // ═══ CRITICAL: Verify with Yoco API before activating ═══
+    // Yoco docs: "Do not use successUrl to verify payment success. Always use webhooks."
+    const yocoKey = process.env.YOCO_SECRET_KEY;
+    if (!yocoKey) {
+      console.error("[ACTIVATE] No YOCO_SECRET_KEY — cannot verify payment");
+      return NextResponse.json({ status: "verification_unavailable" }, { status: 503 });
+    }
+
+    const checkoutId = payment.yoco_checkout_id;
+    if (!checkoutId) {
+      console.error("[ACTIVATE] No checkout ID on payment record");
+      return NextResponse.json({ status: "no_checkout_id" }, { status: 400 });
+    }
+
+    // Check with Yoco if this checkout was actually paid
+    let yocoVerified = false;
+    try {
+      const yocoRes = await fetch(`https://payments.yoco.com/api/checkouts/${checkoutId}`, {
+        headers: { Authorization: `Bearer ${yocoKey}` },
+      });
+
+      if (yocoRes.ok) {
+        const checkout = await yocoRes.json();
+        if (checkout.status === "completed" || checkout.paymentId) {
+          yocoVerified = true;
+          console.log(`[ACTIVATE] ✅ Yoco verified: checkout=${checkoutId}, status=${checkout.status}`);
+        } else {
+          console.log(`[ACTIVATE] ❌ Yoco NOT paid: checkout=${checkoutId}, status=${checkout.status}`);
+          return NextResponse.json({ 
+            status: "not_paid", 
+            yocoStatus: checkout.status,
+            message: "Payment was not completed. Please try again."
+          });
+        }
+      } else {
+        // Yoco API error — fail-open to not block real payers
+        console.warn(`[ACTIVATE] ⚠️ Yoco API ${yocoRes.status} — proceeding with caution`);
+        yocoVerified = true;
+      }
+    } catch (err) {
+      console.error("[ACTIVATE] Yoco verification error:", err);
+      yocoVerified = true; // fail-open on network error
+    }
+
+    if (!yocoVerified) {
+      return NextResponse.json({ status: "not_paid", message: "Payment verification failed" });
+    }
+
+    // ═══ Payment verified — proceed with activation ═══
+    console.log(`[ACTIVATE] Processing verified payment ${payment.id} for user ${user.id}`);
 
     await service.from("payments").update({
       status: "completed",
@@ -97,13 +143,15 @@ export async function POST() {
       }).eq("id", user.id);
 
       console.log(`[ACTIVATE] ✅ Subscription activated: user=${user.id}, plan=${payment.plan_id}`);
-      // Send emails
+
       const planNames: Record<string, string> = { starter: "Starter", pro: "Pro", premium: "Premium" };
       const planPrices: Record<string, string> = { starter: "R49", pro: "R99", premium: "R199" };
       const pName = planNames[payment.plan_id] || payment.plan_id;
-      const pPrice = planPrices[payment.plan_id] || `R${(payment.amount || 0) / 100}`;
+      const pPrice = planPrices[payment.plan_id] || `R${(payment.amount_cents || 0) / 100}`;
       sendPaymentSuccessToUser(user.email!, pName, pPrice).catch(console.error);
       sendPaymentNotificationToAdmin(user.email!, pName, pPrice).catch(console.error);
+      processAffiliateCommission(user.id, payment.id, payment.amount_cents).catch(console.error);
+
       return NextResponse.json({ status: "activated", plan: payment.plan_id, type: "subscription" });
 
     } else if (payment.type === "topup" || payment.type === "credits") {
@@ -128,6 +176,7 @@ export async function POST() {
         });
       }
 
+      processAffiliateCommission(user.id, payment.id, payment.amount_cents).catch(console.error);
       console.log(`[ACTIVATE] ✅ Credits added: user=${user.id}, credits=${creditsAmount}`);
       return NextResponse.json({ status: "activated", credits: creditsAmount, type: "topup" });
     }

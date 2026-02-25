@@ -6,12 +6,12 @@ import { Suspense, useEffect, useState } from "react";
 function SuccessContent() {
   const params = useSearchParams();
   const type = params.get("type");
-  const [status, setStatus] = useState<"activating" | "done" | "error">("activating");
+  const [status, setStatus] = useState<"activating" | "done" | "not_paid">("activating");
   const [planInfo, setPlanInfo] = useState("");
 
   useEffect(() => {
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 5;
 
     async function activate() {
       try {
@@ -24,22 +24,42 @@ function SuccessContent() {
           return;
         }
 
-        if (data.status === "no_pending_payment" && attempts < maxAttempts) {
-          // Webhook might have already processed it, or payment not yet confirmed
-          // Wait and retry
-          attempts++;
-          setTimeout(activate, 2000);
+        // Payment not completed on Yoco side
+        if (data.status === "not_paid") {
+          if (attempts < maxAttempts) {
+            // Yoco might still be processing — retry with delay
+            attempts++;
+            setTimeout(activate, 3000);
+            return;
+          }
+          setStatus("not_paid");
           return;
         }
 
-        // After retries, just show success (don't block user)
-        setStatus("done");
+        if (data.status === "no_pending_payment") {
+          if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(activate, 2000);
+            return;
+          }
+          // After retries, could be webhook already handled it
+          setStatus("done");
+          return;
+        }
+
+        // Unknown status — retry
+        if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(activate, 2000);
+        } else {
+          setStatus("done");
+        }
       } catch {
         if (attempts < maxAttempts) {
           attempts++;
           setTimeout(activate, 2000);
         } else {
-          setStatus("done"); // Don't block user even on error
+          setStatus("not_paid");
         }
       }
     }
@@ -58,8 +78,26 @@ function SuccessContent() {
             <div className="w-16 h-16 rounded-full mx-auto mb-5 flex items-center justify-center animate-pulse" style={{ background: "rgba(0,229,160,.15)", border: "2px solid rgba(0,229,160,.25)" }}>
               <span className="text-2xl">⏳</span>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Activating your plan...</h1>
-            <p className="text-sm" style={{ color: "rgba(255,255,255,.5)" }}>Just a moment</p>
+            <h1 className="text-2xl font-bold text-white mb-2">Verifying your payment...</h1>
+            <p className="text-sm" style={{ color: "rgba(255,255,255,.5)" }}>Checking with Yoco — just a moment</p>
+          </>
+        ) : status === "not_paid" ? (
+          <>
+            <div className="w-16 h-16 rounded-full mx-auto mb-5 flex items-center justify-center" style={{ background: "rgba(255,77,106,.15)", border: "2px solid rgba(255,77,106,.25)" }}>
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">Payment Not Confirmed</h1>
+            <p className="text-sm mb-4" style={{ color: "rgba(255,255,255,.5)" }}>
+              We couldn&apos;t verify your payment with our payment provider. If you were charged, your plan will be activated automatically within a few minutes. If not, please try again.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Link href="/pricing" className="inline-block px-5 py-3 rounded-xl text-sm font-bold no-underline" style={{ background: "rgba(255,255,255,.06)", color: "white", border: "1px solid rgba(255,255,255,.1)" }}>
+                Try Again
+              </Link>
+              <Link href="/dashboard" className="inline-block px-5 py-3 rounded-xl text-sm font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+                Go to Dashboard
+              </Link>
+            </div>
           </>
         ) : (
           <>
