@@ -144,7 +144,7 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-3 mb-4">
             <Link href="/login" onClick={() => handleSignupClick("hero")} className="no-underline px-7 py-3.5 rounded-xl text-sm font-bold" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 25px rgba(0,229,160,.35)" }}>
-              Try Free — 1 Scan on Us
+              Try Free
             </Link>
             <Link href="/login" className="no-underline px-7 py-3.5 rounded-xl text-sm font-semibold" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", color: "#fff" }}>
               Sign In
