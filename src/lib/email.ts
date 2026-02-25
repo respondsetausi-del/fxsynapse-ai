@@ -92,7 +92,7 @@ export async function sendPaymentSuccessToUser(email: string, planName: string, 
       </div>
     </div>
     <div style="text-align:center;margin-top:24px;">
-      <a href="https://fxsynapse.co.za/dashboard" style="display:inline-block;background:linear-gradient(135deg,#00e5a0,#00b87d);color:#0a0b0f;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:13px;font-weight:700;">Start Scanning →</a>
+      <a href="https://fxsynapse-ai.vercel.app/dashboard" style="display:inline-block;background:linear-gradient(135deg,#00e5a0,#00b87d);color:#0a0b0f;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:13px;font-weight:700;">Start Scanning →</a>
     </div>`;
   return sendEmail(email, `✅ ${planName} Activated — FXSynapse AI`, html);
 }
@@ -106,7 +106,7 @@ export async function sendPaymentNotificationToAdmin(userEmail: string, planName
       <div><span style="color:rgba(255,255,255,.4);font-size:11px;">Amount:</span> <span style="color:#fff;font-size:13px;font-weight:600;">${amount}</span></div>
     </div>
     <div style="margin-top:16px;">
-      <a href="https://fxsynapse.co.za/admin" style="color:#4da0ff;font-size:12px;">View Admin Dashboard →</a>
+      <a href="https://fxsynapse-ai.vercel.app/admin" style="color:#4da0ff;font-size:12px;">View Admin Dashboard →</a>
     </div>`;
   return sendEmail(ADMIN_EMAIL, `💰 New Purchase: ${planName} — ${userEmail}`, html);
 }
@@ -120,7 +120,7 @@ export async function sendChatNotificationToAdmin(userEmail: string, message: st
       <div style="color:rgba(255,255,255,.6);font-size:13px;line-height:1.5;white-space:pre-wrap;">${preview}</div>
     </div>
     <div style="margin-top:16px;">
-      <a href="https://fxsynapse.co.za/admin" style="color:#4da0ff;font-size:12px;">Reply in Admin Dashboard →</a>
+      <a href="https://fxsynapse-ai.vercel.app/admin" style="color:#4da0ff;font-size:12px;">Reply in Admin Dashboard →</a>
     </div>`;
   return sendEmail(ADMIN_EMAIL, `💬 Chat from ${userEmail}`, html);
 }
@@ -135,7 +135,7 @@ export async function sendFreeCreditsEmail(email: string, credits: number) {
     <h2 style="color:#fff;font-size:20px;text-align:center;margin:0 0 8px;">${credits} Free Scan${credits > 1 ? "s" : ""} Added!</h2>
     <p style="color:rgba(255,255,255,.5);font-size:13px;text-align:center;margin:0 0 24px;">We've added ${credits} free AI chart scan${credits > 1 ? "s" : ""} to your account. Use ${credits > 1 ? "them" : "it"} before ${credits > 1 ? "they" : "it"} expire${credits > 1 ? "" : "s"}!</p>
     <div style="text-align:center;">
-      <a href="https://fxsynapse.co.za/dashboard" style="display:inline-block;background:linear-gradient(135deg,#00e5a0,#00b87d);color:#0a0b0f;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:13px;font-weight:700;">Scan Now →</a>
+      <a href="https://fxsynapse-ai.vercel.app/dashboard" style="display:inline-block;background:linear-gradient(135deg,#00e5a0,#00b87d);color:#0a0b0f;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:13px;font-weight:700;">Scan Now →</a>
     </div>
     <p style="color:rgba(255,255,255,.25);font-size:10px;text-align:center;margin-top:20px;">Limited time offer. Credits will be available in your dashboard.</p>`;
   return sendEmail(email, `🎁 ${credits} Free Scan${credits > 1 ? "s" : ""} — FXSynapse AI`, html);

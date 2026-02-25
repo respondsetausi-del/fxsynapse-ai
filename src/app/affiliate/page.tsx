@@ -89,7 +89,7 @@ export default function AffiliatePage() {
 
   const copyLink = () => {
     if (!affiliate) return;
-    navigator.clipboard.writeText(`https://fxsynapse.co.za/?ref=${affiliate.ref_code}`);
+    navigator.clipboard.writeText(`${window.location.origin}/?ref=${affiliate.ref_code}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -231,7 +231,7 @@ export default function AffiliatePage() {
         <div className="rounded-xl p-4 mb-6 flex items-center gap-3" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.1)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "#00e5a0" }}>YOUR LINK</div>
           <div className="flex-1 font-mono text-xs px-3 py-2 rounded-lg" style={{ background: "rgba(0,0,0,.3)", color: "rgba(255,255,255,.6)" }}>
-            https://fxsynapse.co.za/?ref={affiliate?.ref_code}
+            {typeof window !== "undefined" ? window.location.origin : ""}/?ref={affiliate?.ref_code}
           </div>
           <button onClick={copyLink} className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer"
             style={{ background: "#00e5a0", color: "#0a0b0f", border: "none" }}>

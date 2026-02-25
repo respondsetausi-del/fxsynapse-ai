@@ -92,7 +92,7 @@ function buildBulkEmailHtml(subject: string, body: string) {
     <div style="font-size:15px;line-height:1.7;color:rgba(255,255,255,0.7)">${body.replace(/\n/g, "<br>")}</div>
   </div>
   <div style="text-align:center;margin-top:24px">
-    <a href="https://fxsynapse.co.za/dashboard" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#00e5a0,#00b87d);color:#0a0b0f;font-weight:700;text-decoration:none;border-radius:10px;font-size:14px">Open FXSynapse</a>
+    <a href="https://fxsynapse-ai.vercel.app/dashboard" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#00e5a0,#00b87d);color:#0a0b0f;font-weight:700;text-decoration:none;border-radius:10px;font-size:14px">Open FXSynapse</a>
   </div>
   <div style="text-align:center;margin-top:32px;font-size:12px;color:rgba(255,255,255,0.25)">
     © ${new Date().getFullYear()} FXSynapse AI — Chart Intelligence Engine
