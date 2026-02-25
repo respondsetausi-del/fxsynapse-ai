@@ -11,11 +11,6 @@ import LiveMarketEngine from "@/components/LiveMarketEngine";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const PX = Array.from({ length: 25 }, (_, i) => ({
-  id: i, x: Math.random() * 100, y: Math.random() * 100,
-  s: Math.random() * 2.5 + 1, d: Math.random() * 20 + 12, dl: Math.random() * 8,
-}));
-
 const STEPS = [
   { l: "Reading price axis", t: 0 }, { l: "Mapping market structure", t: 14 },
   { l: "Detecting S/R & order blocks", t: 28 }, { l: "Scanning liquidity & FVGs", t: 42 },
@@ -194,10 +189,10 @@ export default function Dashboard() {
   const A = analysis;
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ background: "#0a0b0f" }}>
+    <div className="min-h-screen relative overflow-hidden" style={{ background: "#050507" }}>
       {/* LOADING WALL — blocks everything until auth + plan verified */}
       {authLoading && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center" style={{ background: "#0a0b0f" }}>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center" style={{ background: "#050507" }}>
           <div className="text-center">
             <div className="w-12 h-12 rounded-lg mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)" }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
@@ -208,32 +203,30 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* BG */}
+      {/* BG — Ambient Glass Orbs */}
       <div className="fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute rounded-full" style={{ top: "-20%", left: "-10%", width: 550, height: 550, background: "radial-gradient(circle,rgba(0,229,160,.07) 0%,transparent 70%)", filter: "blur(80px)" }} />
-        <div className="absolute rounded-full" style={{ bottom: "-20%", right: "-10%", width: 450, height: 450, background: "radial-gradient(circle,rgba(77,160,255,.05) 0%,transparent 70%)", filter: "blur(80px)" }} />
-        {PX.map((p) => (
-          <div key={p.id} className="absolute rounded-full" style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.s, height: p.s, background: p.id % 3 === 0 ? "#00e5a0" : "#4da0ff", animation: `float ${p.d}s ${p.dl}s infinite ease-in-out` }} />
-        ))}
-        <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px)", backgroundSize: "60px 60px" }} />
+        <div className="absolute" style={{ top: "-15%", left: "-8%", width: 650, height: 650, background: "radial-gradient(circle,rgba(0,229,160,.07) 0%,transparent 65%)", filter: "blur(100px)", animation: "orbF 20s ease-in-out infinite" }} />
+        <div className="absolute" style={{ bottom: "-10%", right: "-8%", width: 550, height: 550, background: "radial-gradient(circle,rgba(77,160,255,.05) 0%,transparent 65%)", filter: "blur(100px)", animation: "orbF 25s ease-in-out infinite reverse" }} />
+        <div className="absolute" style={{ top: "40%", left: "50%", width: 400, height: 400, background: "radial-gradient(circle,rgba(168,85,247,.03) 0%,transparent 60%)", filter: "blur(100px)", animation: "orbF 22s 5s ease-in-out infinite" }} />
+        <div className="absolute inset-0" style={{ opacity: 0.015, backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
       </div>
 
       {/* Sidebar */}
       <Sidebar user={user} credits={credits} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="relative z-[1] min-h-screen flex flex-col">
-        {/* Header */}
-        <header className="flex items-center justify-between" style={{ padding: "14px 22px", paddingTop: 48, borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+        {/* Header — Floating Glass */}
+        <header className="flex items-center justify-between mx-3" style={{ padding: "14px 18px", marginTop: 16, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.07)", backdropFilter: "blur(40px) saturate(1.4)", WebkitBackdropFilter: "blur(40px) saturate(1.4)", borderRadius: 20, boxShadow: "0 8px 32px rgba(0,0,0,.2)" }}>
           <div className="flex items-center gap-3">
             {/* Hamburger */}
-            <button onClick={() => setSidebarOpen(true)} className="flex flex-col gap-1 cursor-pointer p-1.5 rounded-lg" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)" }}>
+            <button onClick={() => setSidebarOpen(true)} className="flex flex-col gap-1 cursor-pointer p-1.5 rounded-xl" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.08)" }}>
               <div style={{ width: 16, height: 2, background: "rgba(255,255,255,.5)", borderRadius: 1 }} />
               <div style={{ width: 16, height: 2, background: "rgba(255,255,255,.5)", borderRadius: 1 }} />
               <div style={{ width: 16, height: 2, background: "rgba(255,255,255,.5)", borderRadius: 1 }} />
             </button>
             <div className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#00e5a0,#00b87d)", boxShadow: "0 4px 18px rgba(0,229,160,.25)" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
+              <div className="flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: 12, background: "linear-gradient(135deg,#00e5a0,#00b87d)", boxShadow: "0 4px 18px rgba(0,229,160,.25)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#050507" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
               </div>
               <div>
                 <div className="text-[17px] font-bold text-white" style={{ letterSpacing: "-.5px" }}>FXSynapse<span className="font-extrabold" style={{ color: "#00e5a0" }}> AI</span></div>
@@ -266,7 +259,7 @@ export default function Dashboard() {
         </header>
 
         {/* ── Dashboard View Toggle ── */}
-        <div className="flex items-center gap-1 mx-4 mt-2 p-1 rounded-xl" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+        <div className="flex items-center gap-1 mx-4 mt-3 p-1 rounded-2xl" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", backdropFilter: "blur(20px)" }}>
           {([
             { id: "scanner", label: "📸 Chart Scanner", color: "#00e5a0" },
             { id: "fundamentals", label: "📊 AI Fundamentals", color: "#f0b90b" },
@@ -306,7 +299,7 @@ export default function Dashboard() {
 
         {/* Upgrade Banner for Free Users */}
         {user?.plan_id === "free" && stage !== "analyzing" && (
-          <div className="mx-4 mt-2 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
+          <div className="mx-4 mt-3 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.06), rgba(77,160,255,.04))", border: "1px solid rgba(0,229,160,.12)", backdropFilter: "blur(20px)" }}>
             <div className="flex items-center gap-2">
               <span className="text-sm">⚡</span>
               <div>
@@ -314,7 +307,7 @@ export default function Dashboard() {
                 <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Pro from R99/mo</span>
               </div>
             </div>
-            <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+            <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
               Upgrade Now
             </Link>
           </div>
@@ -377,7 +370,7 @@ export default function Dashboard() {
                 )}
                 <div className="flex gap-2.5 p-4">
                   <button onClick={reset} className="flex-1 py-3 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.55)" }}>Cancel</button>
-                  <button onClick={analyzeChart} className="flex-[2] py-3 rounded-xl text-sm font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none", color: "#0a0b0f", boxShadow: "0 4px 20px rgba(0,229,160,.3)" }}>⚡ Analyze & Annotate</button>
+                  <button onClick={analyzeChart} className="flex-[2] py-3 rounded-xl text-sm font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none", color: "#050507", boxShadow: "0 4px 20px rgba(0,229,160,.3)" }}>⚡ Analyze & Annotate</button>
                 </div>
               </div>
             </div>
@@ -450,7 +443,7 @@ export default function Dashboard() {
                         <h3 className="text-base font-bold text-white mb-1">Annotated Chart Locked</h3>
                         <p className="text-[11px] mb-4 text-center px-6" style={{ color: "rgba(255,255,255,.45)" }}>Upgrade to see AI annotations, entry/exit points, and zones on your chart.</p>
                         <div className="flex gap-2">
-                          <Link href="/pricing" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>Upgrade — From R49/mo</Link>
+                          <Link href="/pricing" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>Upgrade — From R49/mo</Link>
                           <Link href="/pricing?topup=1" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up</Link>
                         </div>
                       </div>
@@ -684,7 +677,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#0a0b0f" }}>
+                        <div className="px-3 py-1.5 rounded-lg text-[10px] font-bold" style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#050507" }}>
                           Start Trading →
                         </div>
                       </div>
@@ -708,7 +701,7 @@ export default function Dashboard() {
       {/* Paywall */}
       {showPaywall && (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={{ background: "rgba(0,0,0,.85)", backdropFilter: "blur(15px)" }} onClick={() => setShowPaywall(false)}>
-          <div className="max-w-sm w-full mx-4 rounded-2xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "#12131a", border: "1px solid rgba(255,255,255,.08)" }}>
+          <div className="max-w-sm w-full mx-4 rounded-3xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "rgba(20,21,30,.85)", border: "1px solid rgba(255,255,255,.08)", backdropFilter: "blur(60px) saturate(1.6)", boxShadow: "0 25px 60px rgba(0,0,0,.5)" }}>
             <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
               <span className="text-2xl">{credits?.planId === "free" || credits?.planId === "none" ? (scanPaid ? "🚀" : "⚡") : "🔒"}</span>
             </div>
@@ -721,7 +714,7 @@ export default function Dashboard() {
                 : "All monthly scans used. Top up or upgrade to keep scanning."}
             </p>
             <div className="flex flex-col gap-2">
-              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
                 {credits?.planId === "free" || credits?.planId === "none" ? "View Plans — From R49/mo" : "Upgrade Plan"}
               </Link>
               <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up Scans</Link>
@@ -733,14 +726,15 @@ export default function Dashboard() {
 
       {/* Smart Broker Popup */}
       {showBrokerPopup && (
-        <div className="fixed inset-0 z-[9997] flex items-end sm:items-center justify-center" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(8px)" }} onClick={() => setShowBrokerPopup(false)}>
+        <div className="fixed inset-0 z-[9997] flex items-end sm:items-center justify-center" style={{ background: "rgba(0,0,0,.65)", backdropFilter: "blur(20px)" }} onClick={() => setShowBrokerPopup(false)}>
           <div
-            className="w-full sm:max-w-[400px] mx-0 sm:mx-4 rounded-t-2xl sm:rounded-2xl overflow-hidden"
+            className="w-full sm:max-w-[400px] mx-0 sm:mx-4 rounded-t-3xl sm:rounded-3xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "#12131a",
+              background: "rgba(20,21,30,.85)",
               border: "1px solid rgba(255,255,255,.08)",
-              boxShadow: "0 -20px 60px rgba(0,0,0,.5)",
+              backdropFilter: "blur(60px) saturate(1.6)",
+              boxShadow: "0 -20px 60px rgba(0,0,0,.5), 0 0 40px rgba(240,185,11,.05)",
               animation: "slideUp 0.4s cubic-bezier(0.16,1,0.3,1)",
             }}
           >
@@ -778,7 +772,7 @@ export default function Dashboard() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full py-3 rounded-xl text-sm font-bold no-underline text-center transition-all"
-                style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#0a0b0f", boxShadow: "0 4px 20px rgba(240,185,11,.25)" }}
+                style={{ background: "linear-gradient(135deg, #f0b90b, #e6a800)", color: "#050507", boxShadow: "0 4px 20px rgba(240,185,11,.25)" }}
                 onClick={() => { trackEvent("broker_click", "dashboard_popup"); setShowBrokerPopup(false); }}
               >
                 Open Trading Account →

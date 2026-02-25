@@ -68,6 +68,12 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes orbF {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 15px) scale(0.95); }
+}
+
 /* Glass card */
 .glass {
   background: var(--glass-bg);

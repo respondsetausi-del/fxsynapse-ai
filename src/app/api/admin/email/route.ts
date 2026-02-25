@@ -12,17 +12,28 @@ export async function POST(req: NextRequest) {
     const { data: admin } = await service.from("profiles").select("role").eq("id", user.id).single();
     if (admin?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    const { userId, subject, body, email } = await req.json();
-    if (!subject || !body || !email) {
-      return NextResponse.json({ error: "Missing required fields (subject, body, email)" }, { status: 400 });
+    const { userId, subject, body, email, templateId } = await req.json();
+    if (!email) {
+      return NextResponse.json({ error: "Missing email" }, { status: 400 });
     }
 
-    // Send via Brevo SMTP (shared email utility)
-    const html = `
-      <h1 style="color:#fff;font-size:22px;font-weight:700;margin:0 0 20px;">${subject}</h1>
-      <div style="font-size:15px;line-height:1.7;color:rgba(255,255,255,0.7);">${body.replace(/\n/g, "<br>")}</div>`;
-    
-    const sent = await sendEmail(email, subject, html);
+    let emailSubject = subject;
+    let emailHtml: string;
+
+    if (templateId) {
+      const { getTemplate } = await import("@/lib/email-templates");
+      const template = getTemplate(templateId);
+      if (!template) return NextResponse.json({ error: "Template not found" }, { status: 400 });
+      emailSubject = template.subject;
+      emailHtml = template.html;
+    } else {
+      if (!subject || !body) return NextResponse.json({ error: "Missing subject/body or templateId" }, { status: 400 });
+      emailHtml = `
+        <h1 style="color:#fff;font-size:22px;font-weight:700;margin:0 0 20px;">${subject}</h1>
+        <div style="font-size:15px;line-height:1.7;color:rgba(255,255,255,0.7);">${body.replace(/\n/g, "<br>")}</div>`;
+    }
+
+    const sent = await sendEmail(email, emailSubject, emailHtml);
     const status = sent ? "sent" : "failed";
 
     // Log in DB

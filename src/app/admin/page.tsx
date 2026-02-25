@@ -405,15 +405,27 @@ export default function AdminDashboard() {
     if (!bulkSubject || !bulkBody) return;
     setBulkSending(true);
     try {
+      // Detect if using a template
+      const isTemplate = bulkBody.startsWith("[Template:");
+      const templateId = isTemplate ? bulkBody.match(/\[Template: (.+?)\]/)?.[1] : null;
+      
       const res = await fetch("/api/admin/email/bulk", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: bulkSubject, body: bulkBody, target: bulkTarget }),
+        body: JSON.stringify({ 
+          subject: bulkSubject, 
+          body: isTemplate ? undefined : bulkBody, 
+          target: bulkTarget,
+          templateId: templateId || undefined,
+        }),
       });
       if (res.ok) {
         const d = await res.json();
         showToast(`Sent to ${d.sent} users${d.failed > 0 ? ` (${d.failed} failed)` : ""}`);
         setBulkSubject(""); setBulkBody(""); setBulkEmail(false); fetchEmailLogs();
-      } else showToast("Bulk send failed", "error");
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.error || "Bulk send failed", "error");
+      }
     } catch { showToast("Error sending", "error"); }
     setBulkSending(false);
   };
@@ -422,9 +434,17 @@ export default function AdminDashboard() {
     if (!quickSendTo || !quickSendSubject || !quickSendBody) return;
     setQuickSending(true);
     try {
+      const isTemplate = quickSendBody.startsWith("[Template:");
+      const templateId = isTemplate ? quickSendBody.match(/\[Template: (.+?)\]/)?.[1]?.trim() : null;
+      
       const res = await fetch("/api/admin/email", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: quickSendTo, subject: quickSendSubject, body: quickSendBody }),
+        body: JSON.stringify({ 
+          email: quickSendTo, 
+          subject: quickSendSubject, 
+          body: isTemplate ? undefined : quickSendBody,
+          templateId: templateId || undefined,
+        }),
       });
       if (res.ok) {
         showToast(`Email sent to ${quickSendTo}`);
@@ -450,7 +470,7 @@ export default function AdminDashboard() {
   ];
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0a0b0f" }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#050507" }}>
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 rounded-lg" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", animation: "pulse 1.5s infinite" }} />
         <div className="text-xs font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Loading command center...</div>
@@ -459,7 +479,7 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen" style={{ background: "#0a0b0f" }}>
+    <div className="min-h-screen" style={{ background: "#050507" }}>
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-[100] px-4 py-3 rounded-xl text-sm font-semibold shadow-2xl" style={{
@@ -856,7 +876,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
-                      {["Date", "User", "Type", "Amount", "Plan/Credits", "Status", "Checkout ID"].map((h) => (
+                      {["Date", "User", "Type", "Amount", "Plan/Credits", "Status", "Actions"].map((h) => (
                         <th key={h} className="text-left px-4 py-3 font-mono font-semibold text-[10px] tracking-wider" style={{ color: "rgba(255,255,255,.3)" }}>{h}</th>
                       ))}
                     </tr>
@@ -872,7 +892,49 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 font-mono font-bold text-white">{fmt(p.amount_cents)}</td>
                         <td className="px-4 py-3 font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{p.type === "subscription" ? p.plan_id : `${p.credits_amount || 0} credits`}</td>
                         <td className="px-4 py-3"><span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: p.status === "completed" ? "rgba(0,229,160,.08)" : p.status === "failed" ? "rgba(255,77,106,.08)" : "rgba(240,185,11,.08)", color: p.status === "completed" ? "#00e5a0" : p.status === "failed" ? "#ff4d6a" : "#f0b90b" }}>{p.status}</span></td>
-                        <td className="px-4 py-3 font-mono text-[9px]" style={{ color: "rgba(255,255,255,.2)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.yoco_checkout_id || "—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            {(p.status === "pending" || p.status === "failed") && (
+                              <button onClick={async () => {
+                                try {
+                                  const res = await fetch("/api/admin/payment-followup", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ paymentId: p.id, templateId: "payment_issue" }),
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) showToast(`💬 Sent to ${data.email}`);
+                                  else showToast(data.error || "Failed", "error");
+                                } catch { showToast("Send failed", "error"); }
+                              }}
+                                className="px-2 py-1 rounded text-[9px] font-bold cursor-pointer"
+                                style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.15)", color: "#4da0ff" }}
+                                title="Send payment help email">
+                                💬 Help
+                              </button>
+                            )}
+                            {(p.status === "pending" || p.status === "failed") && (
+                              <button onClick={async () => {
+                                try {
+                                  const res = await fetch("/api/admin/payment-followup", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ paymentId: p.id, templateId: "payment_retry" }),
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) showToast(`🔄 Retry sent to ${data.email}`);
+                                  else showToast(data.error || "Failed", "error");
+                                } catch { showToast("Send failed", "error"); }
+                              }}
+                                className="px-2 py-1 rounded text-[9px] font-bold cursor-pointer"
+                                style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.15)", color: "#00e5a0" }}
+                                title="Send retry encouragement">
+                                🔄 Retry
+                              </button>
+                            )}
+                            {p.status === "completed" && <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>—</span>}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -908,6 +970,41 @@ export default function AdminDashboard() {
               </div>
               {quickSendOpen && (
                 <div className="p-4 space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>USE TEMPLATE (optional)</label>
+                    <select onChange={(e) => {
+                      if (!e.target.value) return;
+                      const templates: Record<string, { subject: string; body: string }> = {
+                        winback_free_scan: { subject: "Your free AI chart scan is waiting — don't miss it", body: "[Template: 🔥 Your Free Scan is Waiting]" },
+                        winback_urgency: { subject: "⏰ Your free scan expires soon — use it now", body: "[Template: ⏰ Last Chance]" },
+                        convert_after_scan: { subject: "You tried it — now unlock unlimited scans", body: "[Template: 💎 Upgrade]" },
+                        feature_showcase: { subject: "3 things FXSynapse AI can do that you haven't tried", body: "[Template: 🧠 Features]" },
+                        payment_issue: { subject: "Having trouble with your payment? Let us help", body: "[Template: 💳 Payment Help]" },
+                        payment_retry: { subject: "Your FXSynapse AI plan is one click away", body: "[Template: 🔄 Retry]" },
+                        promo_limited: { subject: "🎉 Limited time: Get bonus scans when you subscribe today", body: "[Template: 🎉 Promo]" },
+                      };
+                      const t = templates[e.target.value];
+                      if (t) { setQuickSendSubject(t.subject); setQuickSendBody(t.body); }
+                    }}
+                      className="w-full px-4 py-3 rounded-xl text-sm text-white outline-none" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
+                      <option value="">— Select template or write custom —</option>
+                      <optgroup label="🔥 Win Back">
+                        <option value="winback_free_scan">🔥 Your Free Scan is Waiting</option>
+                        <option value="winback_urgency">⏰ Last Chance: Free Scan Expiring</option>
+                      </optgroup>
+                      <optgroup label="💎 Conversion">
+                        <option value="convert_after_scan">💎 Loved Your Scan? Get More</option>
+                        <option value="feature_showcase">🧠 Did You Know? AI Features</option>
+                      </optgroup>
+                      <optgroup label="💳 Payment">
+                        <option value="payment_issue">💳 Payment Trouble? We're Here</option>
+                        <option value="payment_retry">🔄 Ready to Try Again?</option>
+                      </optgroup>
+                      <optgroup label="🎉 Promo">
+                        <option value="promo_limited">🎉 Special Offer: Extra Scans</option>
+                      </optgroup>
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>TO (EMAIL ADDRESS)</label>
                     <input type="email" value={quickSendTo} onChange={(e) => setQuickSendTo(e.target.value)} placeholder="someone@example.com"
@@ -950,10 +1047,12 @@ export default function AdminDashboard() {
                     <div className="flex gap-2 flex-wrap">
                       {[
                         { id: "all", label: "All Users" },
-                        { id: "starter", label: "Starter Only" },
-                        { id: "pro", label: "Pro Only" },
-                        { id: "premium", label: "Premium Only" },
-                        { id: "active", label: "Active Subscribers" },
+                        { id: "free", label: "Free Users" },
+                        { id: "never_scanned", label: "Never Scanned" },
+                        { id: "starter", label: "Starter" },
+                        { id: "pro", label: "Pro" },
+                        { id: "premium", label: "Premium" },
+                        { id: "active", label: "Active Subs" },
                       ].map((t) => (
                         <button key={t.id} onClick={() => setBulkTarget(t.id)}
                           className="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-all"
@@ -966,12 +1065,47 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div>
+                    <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>USE TEMPLATE (optional)</label>
+                    <select onChange={(e) => {
+                      if (!e.target.value) return;
+                      const templates: Record<string, { subject: string }> = {
+                        winback_free_scan: { subject: "Your free AI chart scan is waiting — don't miss it" },
+                        winback_urgency: { subject: "⏰ Your free scan expires soon — use it now" },
+                        convert_after_scan: { subject: "You tried it — now unlock unlimited scans" },
+                        feature_showcase: { subject: "3 things FXSynapse AI can do that you haven't tried" },
+                        payment_issue: { subject: "Having trouble with your payment? Let us help" },
+                        payment_retry: { subject: "Your FXSynapse AI plan is one click away" },
+                        promo_limited: { subject: "🎉 Limited time: Get bonus scans when you subscribe today" },
+                      };
+                      const t = templates[e.target.value];
+                      if (t) { setBulkSubject(t.subject); setBulkBody(`[Template: ${e.target.value}]`); }
+                    }}
+                      className="w-full px-4 py-3 rounded-xl text-sm text-white outline-none" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
+                      <option value="">— Select template or write custom —</option>
+                      <optgroup label="🔥 Win Back (best for Never Scanned)">
+                        <option value="winback_free_scan">🔥 Your Free Scan is Waiting</option>
+                        <option value="winback_urgency">⏰ Last Chance: Free Scan Expiring</option>
+                      </optgroup>
+                      <optgroup label="💎 Conversion (best for Free users)">
+                        <option value="convert_after_scan">💎 Loved Your Scan? Get More</option>
+                        <option value="feature_showcase">🧠 Did You Know? AI Features</option>
+                      </optgroup>
+                      <optgroup label="💳 Payment (best for failed payments)">
+                        <option value="payment_issue">💳 Payment Trouble? We're Here</option>
+                        <option value="payment_retry">🔄 Ready to Try Again?</option>
+                      </optgroup>
+                      <optgroup label="🎉 Promo">
+                        <option value="promo_limited">🎉 Special Offer: Extra Scans</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>SUBJECT</label>
                     <input type="text" value={bulkSubject} onChange={(e) => setBulkSubject(e.target.value)} placeholder="Email subject..."
                       className="w-full px-4 py-3 rounded-xl text-sm text-white outline-none font-mono" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }} />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>BODY</label>
+                    <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>BODY (ignored if template selected)</label>
                     <textarea value={bulkBody} onChange={(e) => setBulkBody(e.target.value)} placeholder="Write your message... (supports line breaks)" rows={5}
                       className="w-full px-4 py-3 rounded-xl text-sm text-white outline-none font-mono resize-none" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }} />
                   </div>
