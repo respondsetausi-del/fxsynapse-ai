@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Call Claude Vision (with retry + model fallback for 429/529)
-    const models = ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"];
+    const models = ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022"];
     let response: Response | null = null;
 
     for (const model of models) {
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         }],
       });
 
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 2; attempt++) {
         response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -95,8 +95,8 @@ export async function POST(req: NextRequest) {
           body: apiBody,
         });
         if (response.status !== 429 && response.status !== 529) break;
-        console.log(`[ANALYZE] ${model} returned ${response.status}, retry ${attempt + 1}/3...`);
-        if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+        console.log(`[ANALYZE] ${model} returned ${response.status}, retry ${attempt + 1}/2...`);
+        if (attempt < 1) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
       }
 
       if (response && response.ok) {
