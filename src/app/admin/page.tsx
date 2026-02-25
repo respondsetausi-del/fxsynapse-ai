@@ -1284,6 +1284,94 @@ export default function AdminDashboard() {
                 </table>
               </div>
             )}
+
+            {/* Affiliate Chat */}
+            <div className="rounded-xl overflow-hidden" style={{ background: "#12131a", border: "1px solid rgba(77,160,255,.1)" }}>
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+                <span className="text-xs font-bold" style={{ color: "#4da0ff" }}>💬 Affiliate Messages</span>
+                {affChatConvos.reduce((sum: number, c: any) => sum + c.unread_count, 0) > 0 && (
+                  <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(255,77,106,.15)", color: "#ff4d6a" }}>
+                    {affChatConvos.reduce((sum: number, c: any) => sum + c.unread_count, 0)} unread
+                  </span>
+                )}
+              </div>
+              <div className="flex" style={{ height: 420 }}>
+                {/* Conversations List */}
+                <div className="overflow-y-auto" style={{ width: 240, borderRight: "1px solid rgba(255,255,255,.04)", scrollbarWidth: "thin" }}>
+                  {affChatConvos.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-[10px]" style={{ color: "rgba(255,255,255,.3)" }}>No affiliate messages yet</div>
+                  ) : affChatConvos.map((c: any) => (
+                    <button key={c.affiliate_id} onClick={() => { setAffChatActive(c.affiliate_id); loadAffChatMessages(c.affiliate_id); }}
+                      className="w-full text-left px-3 py-3 cursor-pointer"
+                      style={{
+                        background: affChatActive === c.affiliate_id ? "rgba(77,160,255,.06)" : "transparent",
+                        border: "none", borderBottom: "1px solid rgba(255,255,255,.03)", color: "#fff",
+                      }}>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-semibold truncate" style={{ maxWidth: 160 }}>{c.full_name || c.email}</div>
+                        {c.unread_count > 0 && (
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                            style={{ background: "#ff4d6a", color: "#fff" }}>{c.unread_count}</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] font-mono truncate mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>
+                        {c.last_message?.message?.substring(0, 40)}{(c.last_message?.message?.length || 0) > 40 ? "..." : ""}
+                      </div>
+                      <div className="text-[9px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.2)" }}>
+                        {c.ref_code} · {new Date(c.last_message?.created_at).toLocaleDateString("en-ZA")}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Chat Messages */}
+                <div className="flex-1 flex flex-col">
+                  {!affChatActive ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-2xl mb-2">💬</div>
+                        <div className="text-xs" style={{ color: "rgba(255,255,255,.3)" }}>Select a conversation</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 overflow-y-auto px-4 py-3" style={{ scrollbarWidth: "thin" }}>
+                        {affChatMessages.map((m: any) => (
+                          <div key={m.id} className={`flex mb-3 ${m.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
+                            <div className="max-w-[75%] rounded-xl px-3 py-2" style={{
+                              background: m.sender_role === "admin" ? "rgba(77,160,255,.1)" : "rgba(255,255,255,.05)",
+                              border: `1px solid ${m.sender_role === "admin" ? "rgba(77,160,255,.15)" : "rgba(255,255,255,.04)"}`,
+                            }}>
+                              <div className="text-[10px] font-mono mb-0.5" style={{ color: m.sender_role === "admin" ? "#4da0ff" : "#00e5a0" }}>
+                                {m.sender_role === "admin" ? "You (Admin)" : "Affiliate"}
+                              </div>
+                              <div className="text-xs" style={{ color: "rgba(255,255,255,.75)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.message}</div>
+                              <div className="text-[9px] font-mono mt-1" style={{ color: "rgba(255,255,255,.2)" }}>
+                                {new Date(m.created_at).toLocaleString("en-ZA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <div ref={affChatEndRef} />
+                      </div>
+                      <div className="px-3 py-3 flex gap-2" style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+                        <input type="text" value={affChatReply}
+                          onChange={(e) => setAffChatReply(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendAffChatReply()}
+                          placeholder="Reply to affiliate..."
+                          className="flex-1 px-3 py-2.5 rounded-xl text-xs"
+                          style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff", outline: "none" }} />
+                        <button onClick={sendAffChatReply} disabled={affChatSending || !affChatReply.trim()}
+                          className="px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
+                          style={{ background: affChatReply.trim() ? "linear-gradient(135deg,#4da0ff,#2d7dd2)" : "rgba(255,255,255,.04)", color: affChatReply.trim() ? "#fff" : "rgba(255,255,255,.2)", border: "none" }}>
+                          {affChatSending ? "..." : "Send"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
