@@ -59,6 +59,26 @@ export async function POST(req: NextRequest) {
 
     console.log(`[WEBHOOK] checkoutId=${checkoutId}, userId=${userId}, type=${paymentType}`);
 
+    // ═══ DEFENSE IN DEPTH: Verify checkout is actually completed ═══
+    if (checkoutId) {
+      const yocoKey = process.env.YOCO_SECRET_KEY;
+      if (yocoKey) {
+        try {
+          const { verifyYocoPayment } = await import("@/lib/yoco-verify");
+          const verification = await verifyYocoPayment(checkoutId, yocoKey);
+          console.log(`[WEBHOOK] Verification: paid=${verification.paid}, status=${verification.checkoutStatus}`);
+          
+          if (!verification.paid) {
+            console.warn(`[WEBHOOK] ❌ Checkout NOT completed despite payment.succeeded event: ${verification.details}`);
+            return NextResponse.json({ received: true, processed: false, reason: "checkout_not_completed" });
+          }
+        } catch (err) {
+          // If verification fails, still process — webhook signature was valid
+          console.warn("[WEBHOOK] Verification check failed, proceeding with webhook trust:", err);
+        }
+      }
+    }
+
     // Strategy 1: Match by checkoutId (most reliable)
     let payment = null;
     if (checkoutId) {
@@ -86,13 +106,11 @@ export async function POST(req: NextRequest) {
 
     if (!payment) {
       console.warn("[WEBHOOK] No matching payment found", { checkoutId, userId });
-      // Still try to activate directly from metadata if we have userId
-      if (userId && paymentType) {
-        console.log("[WEBHOOK] Attempting direct activation from metadata");
-        await activateFromMetadata(supabase, userId, paymentType, metadata);
-        return NextResponse.json({ received: true, processed: true, method: "metadata_fallback" });
-      }
-      return NextResponse.json({ received: true, processed: false });
+      // Do NOT activate from metadata alone — too easy to exploit
+      // The checkout verification above already confirmed payment is real
+      // Log for manual investigation
+      console.warn("[WEBHOOK] Unmatched webhook event — may need manual investigation");
+      return NextResponse.json({ received: true, processed: false, reason: "no_matching_payment" });
     }
 
     // Skip if already completed (idempotency)

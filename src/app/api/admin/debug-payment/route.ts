@@ -3,9 +3,9 @@ import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/serv
 import { verifyYocoPayment } from "@/lib/yoco-verify";
 
 /**
- * Debug endpoint: Shows raw Yoco API response for a checkout
+ * Debug endpoint: Shows raw Yoco API response for checkouts
+ * GET /api/admin/debug-payment?all=true  (checks first 10 completed)
  * GET /api/admin/debug-payment?checkoutId=ch_xxx
- * GET /api/admin/debug-payment?all=true  (checks first 5 completed)
  */
 export async function GET(req: NextRequest) {
   try {
@@ -25,49 +25,35 @@ export async function GET(req: NextRequest) {
     const all = url.searchParams.get("all") === "true";
 
     if (checkoutId) {
-      // Debug single checkout
-      const verification = await verifyYocoPayment(checkoutId, yocoKey, true);
-      return NextResponse.json({ checkoutId, verification });
+      const checkoutRes = await fetch(
+        `https://payments.yoco.com/api/checkouts/${checkoutId}`,
+        { headers: { Authorization: `Bearer ${yocoKey}` } }
+      );
+      const rawCheckout = checkoutRes.ok ? await checkoutRes.json() : { error: checkoutRes.status };
+      const verification = await verifyYocoPayment(checkoutId, yocoKey);
+      return NextResponse.json({ checkoutId, rawCheckout, verification });
     }
 
     if (all) {
-      // Debug first 5 completed payments
       const { data: payments } = await service
         .from("payments")
         .select("*")
-        .eq("status", "completed")
+        .in("status", ["completed", "pending"])
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(20);
 
-      if (!payments?.length) {
-        return NextResponse.json({ message: "No completed payments" });
-      }
+      if (!payments?.length) return NextResponse.json({ message: "No payments" });
 
       const debugResults = [];
       for (const p of payments) {
         if (!p.yoco_checkout_id) continue;
         
-        // Get raw checkout response
         const checkoutRes = await fetch(
           `https://payments.yoco.com/api/checkouts/${p.yoco_checkout_id}`,
           { headers: { Authorization: `Bearer ${yocoKey}` } }
         );
         const rawCheckout = checkoutRes.ok ? await checkoutRes.json() : { error: checkoutRes.status };
-
-        // Get profile
         const { data: profile } = await service.from("profiles").select("email").eq("id", p.user_id).single();
-
-        // Try payment API if paymentId exists
-        const paymentId = rawCheckout.paymentId || rawCheckout.payment?.id;
-        let rawPayment = null;
-        if (paymentId) {
-          const paymentRes = await fetch(
-            `https://payments.yoco.com/api/payments/${paymentId}`,
-            { headers: { Authorization: `Bearer ${yocoKey}` } }
-          );
-          rawPayment = paymentRes.ok ? await paymentRes.json() : { error: paymentRes.status };
-        }
-
         const verification = await verifyYocoPayment(p.yoco_checkout_id, yocoKey);
 
         debugResults.push({
@@ -75,28 +61,19 @@ export async function GET(req: NextRequest) {
           amount: `R${(p.amount_cents || 0) / 100}`,
           plan: p.plan_id,
           dbStatus: p.status,
-          checkoutId: p.yoco_checkout_id,
-          rawCheckout,
-          rawPayment,
-          verification: {
-            paid: verification.paid,
-            checkoutStatus: verification.checkoutStatus,
-            paymentStatus: verification.paymentStatus,
-            details: verification.details,
-          },
+          yocoCheckoutStatus: rawCheckout.status,
+          hasPaymentId: !!rawCheckout.paymentId,
+          verification,
         });
 
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 200));
       }
 
       return NextResponse.json({ count: debugResults.length, results: debugResults });
     }
 
-    return NextResponse.json({ 
-      usage: "GET /api/admin/debug-payment?checkoutId=ch_xxx OR ?all=true",
-    });
+    return NextResponse.json({ usage: "?all=true or ?checkoutId=ch_xxx" });
   } catch (err) {
-    console.error("[DEBUG-PAYMENT] Error:", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
