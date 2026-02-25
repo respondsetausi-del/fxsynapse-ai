@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FROM_EMAIL = "fxsynapseai@gmail.com";
+const FROM_EMAIL = "noreply@fxsynapse.co.za";
 const FROM_NAME = "FXSynapse AI";
 const ADMIN_EMAIL = "fxsynapseai@gmail.com";
 
