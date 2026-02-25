@@ -201,16 +201,20 @@ export async function recordScan(
 ) {
   const supabase = createServiceSupabase();
 
-  await supabase.from("scans").insert({
-    user_id: userId,
-    pair: (analysis.pair as string) || null,
-    timeframe: (analysis.timeframe as string) || null,
-    trend: (analysis.trend as string) || null,
-    bias: (analysis.bias as string) || null,
-    confidence: (analysis.confidence as number) || null,
-    analysis,
-    credit_source: source,
-  });
+  await Promise.all([
+    supabase.from("scans").insert({
+      user_id: userId,
+      pair: (analysis.pair as string) || null,
+      timeframe: (analysis.timeframe as string) || null,
+      trend: (analysis.trend as string) || null,
+      bias: (analysis.bias as string) || null,
+      confidence: (analysis.confidence as number) || null,
+      analysis,
+      credit_source: source,
+    }),
+    // Update last_seen_at for activity tracking
+    supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", userId),
+  ]);
 }
 
 export async function adminAllocateCredits(

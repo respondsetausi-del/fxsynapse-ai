@@ -13,11 +13,14 @@ export async function GET() {
     const service = createServiceSupabase();
     const { data: profile } = await service
       .from("profiles")
-      .select("*, plans(name, daily_scans, price_cents)")
+      .select("*, plans(name, daily_scans, monthly_scans, price_cents)")
       .eq("id", user.id)
       .single();
 
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+
+    // Update last_seen_at for activity tracking (fire and forget)
+    service.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", user.id).then(() => {});
 
     const credits = await checkCredits(user.id);
 

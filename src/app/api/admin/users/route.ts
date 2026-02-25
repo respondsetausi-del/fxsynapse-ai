@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     let query = service
       .from("profiles")
-      .select("*, plans(name, price_cents)", { count: "exact" })
+      .select("*, plans(name, price_cents, monthly_scans, daily_scans)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 

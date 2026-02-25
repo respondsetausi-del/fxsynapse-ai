@@ -316,7 +316,7 @@ export async function POST(req: NextRequest) {
     // 7. Deduct credit AFTER successful analysis
     await deductCredit(user.id, creditCheck.source);
 
-    // 8. Record scan
+    // 8. Record scan + update last_seen_at
     await recordScan(user.id, creditCheck.source, analysis);
 
     // 9. Return with updated credit info

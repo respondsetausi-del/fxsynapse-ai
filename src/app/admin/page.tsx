@@ -15,9 +15,9 @@ interface Stats {
 interface UserRow {
   id: string; email: string; full_name: string; role: string; plan_id: string;
   credits_balance: number; daily_scans_used: number; subscription_status: string;
-  total_scans: number; created_at: string; is_blocked: boolean; blocked_reason: string | null;
+  monthly_scans_used: number; total_scans: number; created_at: string; is_blocked: boolean; blocked_reason: string | null;
   last_seen_at: string | null;
-  plans: { name: string; price_cents: number };
+  plans: { name: string; price_cents: number; monthly_scans?: number; daily_scans?: number } | null;
 }
 interface PaymentRow {
   id: string; user_id: string; yoco_checkout_id: string; amount_cents: number;
@@ -492,7 +492,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
-                      {["User", "Plan", "Credits", "Scans", "Last Seen", "Status", "Actions"].map((h) => (
+                      {["User", "Plan", "Monthly Usage", "Top-up", "Total Scans", "Last Seen", "Status", "Actions"].map((h) => (
                         <th key={h} className="text-left px-4 py-3 font-mono font-semibold text-[10px] tracking-wider" style={{ color: "rgba(255,255,255,.3)" }}>{h}</th>
                       ))}
                     </tr>
@@ -520,6 +520,15 @@ export default function AdminDashboard() {
                             background: u.plan_id === "premium" ? "rgba(240,185,11,.1)" : u.plan_id === "pro" ? "rgba(77,160,255,.1)" : "rgba(255,255,255,.04)",
                             color: u.plan_id === "premium" ? "#f0b90b" : u.plan_id === "pro" ? "#4da0ff" : "rgba(255,255,255,.35)",
                           }}>{u.plans?.name || u.plan_id}</span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          {u.subscription_status === "active" ? (
+                            <span style={{ color: "#00e5a0" }}>
+                              {u.monthly_scans_used || 0}/{u.plans?.monthly_scans === -1 ? "∞" : (u.plans?.monthly_scans ?? u.plans?.daily_scans ?? 0)}
+                            </span>
+                          ) : (
+                            <span style={{ color: "rgba(255,255,255,.3)" }}>—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 font-mono text-white">{u.credits_balance}</td>
                         <td className="px-4 py-3 font-mono" style={{ color: "rgba(255,255,255,.45)" }}>{u.total_scans}</td>
