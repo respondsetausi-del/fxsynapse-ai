@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [showBrokerPopup, setShowBrokerPopup] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [scanPaid, setScanPaid] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileObjRef = useRef<File | null>(null);
   const supabase = createClient();
@@ -154,7 +155,15 @@ export default function Dashboard() {
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       clearInterval(iv); setProgress(100);
       if (data.credits) setCredits((prev) => prev ? { ...prev, ...data.credits } : prev);
-      setTimeout(() => { setAnalysis(data.analysis); setStage("result"); setTimeout(() => setShowResult(true), 100); }, 500);
+      setScanPaid(true);
+      setTimeout(() => {
+        setAnalysis(data.analysis); setStage("result");
+        setTimeout(() => {
+          setShowResult(true);
+          // Auto-show dismissable paywall for non-paid users after results load
+          if (!isPaidUser) setTimeout(() => setShowPaywall(true), 1500);
+        }, 100);
+      }, 500);
     } catch (err) {
       clearInterval(iv);
       setError(err instanceof Error ? err.message : "Analysis failed.");
@@ -167,6 +176,7 @@ export default function Dashboard() {
     setShowResult(false); setActiveTab("overview"); setViewMode("split");
     setFullscreen(false); setAnalysis(null); setError(null);
     setRating(0); setRatingHover(0); setRatingSubmitted(false);
+    setScanPaid(false);
     fileObjRef.current = null;
   };
 
@@ -420,9 +430,9 @@ export default function Dashboard() {
               <div className="result-layout flex gap-3" style={{ flexDirection: viewMode === "analysis" ? "column" : "row" }}>
                 {viewMode !== "analysis" && (
                   <div className="result-chart glass overflow-hidden animate-fadeUp relative" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
-                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => isPaidUser ? setFullscreen(true) : null} />
-                    {/* Blur overlay for free users */}
-                    {!isPaidUser && (
+                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => (isPaidUser || scanPaid) ? setFullscreen(true) : null} />
+                    {/* Blur overlay — only for scans done without credits (not free scan, not paid) */}
+                    {!isPaidUser && !scanPaid && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center z-20" style={{ backdropFilter: "blur(12px)", background: "rgba(10,11,15,.6)" }}>
                         <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
                           <span className="text-2xl">🔒</span>
@@ -690,15 +700,15 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={{ background: "rgba(0,0,0,.85)", backdropFilter: "blur(15px)" }} onClick={() => setShowPaywall(false)}>
           <div className="max-w-sm w-full mx-4 rounded-2xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "#12131a", border: "1px solid rgba(255,255,255,.08)" }}>
             <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
-              <span className="text-2xl">{credits?.planId === "free" || credits?.planId === "none" ? "⚡" : "🔒"}</span>
+              <span className="text-2xl">{credits?.planId === "free" || credits?.planId === "none" ? (scanPaid ? "🚀" : "⚡") : "🔒"}</span>
             </div>
             <h3 className="text-lg font-bold text-white mb-1">
-              {credits?.planId === "free" || credits?.planId === "none" ? "Liked what you saw?" : "Scans Used Up"}
+              {credits?.planId === "free" || credits?.planId === "none" ? (scanPaid ? "Loved your analysis?" : "Liked what you saw?") : "Scans Used Up"}
             </h3>
             <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,.45)" }}>
               {credits?.planId === "free" || credits?.planId === "none"
-                ? "Your free scan has been used. Subscribe to unlock more AI chart analysis."
-                : "You\u0027ve used all your monthly scans. Top up or upgrade to keep scanning."}
+                ? (scanPaid ? "Your free scan is done! Subscribe to keep getting AI-powered chart analysis." : "Your free scan has been used. Subscribe to unlock more AI chart analysis.")
+                : "All monthly scans used. Top up or upgrade to keep scanning."}
             </p>
             <div className="flex flex-col gap-2">
               <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>

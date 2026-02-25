@@ -31,7 +31,7 @@ interface EmailLog {
 }
 
 type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel" | "chat" | "affiliates";
-type ModalType = "credits" | "plan" | "role" | "trial" | "block" | "email";
+type ModalType = "credits" | "plan" | "role" | "trial" | "block" | "email" | "delete";
 type UserFilter = "all" | "starter" | "pro" | "premium" | "blocked" | "unpaid";
 
 /* ─── Helpers ─── */
@@ -366,6 +366,17 @@ export default function AdminDashboard() {
         return;
       }
 
+      if (modal.type === "delete") {
+        const res = await fetch("/api/admin/delete-user", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: modal.user.id }),
+        });
+        if (res.ok) { showToast(`${modal.user.email} permanently deleted`); setModal(null); fetchUsers(); fetchStats(); }
+        else showToast("Failed to delete user", "error");
+        setActionLoading(false);
+        return;
+      }
+
       let body: Record<string, unknown> = {};
       if (modal.type === "credits") body = { action: "allocate_credits", userId: modal.user.id, amount: parseInt(modalValue), description: modalDesc };
       else if (modal.type === "plan") body = { action: "change_plan", userId: modal.user.id, planId: modalValue };
@@ -626,6 +637,7 @@ export default function AdminDashboard() {
                             <Btn color={u.is_blocked ? "#00e5a0" : "#ff4d6a"} label={u.is_blocked ? "Unblock" : "Block"} onClick={() => { setModal({ user: u, type: "block" }); setModalDesc(""); }} />
                             <Btn color="#a855f7" label="Email" onClick={() => { setModal({ user: u, type: "email" }); setEmailSubject(""); setEmailBody(""); }} />
                             {(u.plan_id === "none" || u.plan_id === "free") && <Btn color="#a855f7" label="🎁 Trial" onClick={() => { setModal({ user: u, type: "trial" }); setModalValue("7"); }} />}
+                            <Btn color="#ff4d6a" label="🗑️" onClick={() => { setModal({ user: u, type: "delete" }); }} />
                           </div>
                         </td>
                       </tr>
@@ -1380,7 +1392,7 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,.75)", backdropFilter: "blur(12px)" }} onClick={() => setModal(null)}>
           <div className="w-full max-w-md rounded-2xl p-6 mx-4" onClick={(e) => e.stopPropagation()} style={{ background: "#111218", border: "1px solid rgba(255,255,255,.08)", animation: "scaleIn 0.2s ease" }}>
             <h3 className="text-lg font-bold text-white mb-0.5">
-              {modal.type === "credits" ? "Allocate Credits" : modal.type === "plan" ? "Change Plan" : modal.type === "trial" ? "Gift Pro Trial" : modal.type === "block" ? (modal.user.is_blocked ? "Unblock User" : "Block User") : modal.type === "email" ? "Send Email" : "Change Role"}
+              {modal.type === "credits" ? "Allocate Credits" : modal.type === "plan" ? "Change Plan" : modal.type === "trial" ? "Gift Pro Trial" : modal.type === "block" ? (modal.user.is_blocked ? "Unblock User" : "Block User") : modal.type === "email" ? "Send Email" : modal.type === "delete" ? "Delete User" : "Change Role"}
             </h3>
             <p className="text-[10px] font-mono mb-4" style={{ color: "rgba(255,255,255,.35)" }}>
               {modal.user.email} — {modal.user.full_name || "No name"}
@@ -1475,15 +1487,25 @@ export default function AdminDashboard() {
               </>
             )}
 
+            {/* Delete Modal */}
+            {modal.type === "delete" && (
+              <div className="rounded-xl p-4 mb-4" style={{ background: "rgba(255,77,106,.06)", border: "1px solid rgba(255,77,106,.15)" }}>
+                <div className="text-sm font-bold mb-2" style={{ color: "#ff4d6a" }}>⚠️ This action is permanent</div>
+                <p className="text-xs" style={{ color: "rgba(255,255,255,.5)" }}>
+                  This will permanently delete <strong className="text-white">{modal.user.email}</strong> and all their data including scans, payments, referrals, and affiliate records. This cannot be undone.
+                </p>
+              </div>
+            )}
+
             {/* Modal Buttons */}
             <div className="flex gap-2">
               <button onClick={() => setModal(null)} className="flex-1 py-3 rounded-xl text-sm font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.45)" }}>Cancel</button>
               <button onClick={handleAction} disabled={actionLoading} className="flex-1 py-3 rounded-xl text-sm font-bold cursor-pointer"
                 style={{
-                  background: modal.type === "block" && !modal.user.is_blocked ? "linear-gradient(135deg,#ff4d6a,#e6364f)" : "linear-gradient(135deg,#00e5a0,#00b87d)",
-                  color: "#0a0b0f", opacity: actionLoading ? 0.5 : 1,
+                  background: (modal.type === "block" && !modal.user.is_blocked) || modal.type === "delete" ? "linear-gradient(135deg,#ff4d6a,#e6364f)" : "linear-gradient(135deg,#00e5a0,#00b87d)",
+                  color: modal.type === "delete" ? "#fff" : "#0a0b0f", opacity: actionLoading ? 0.5 : 1,
                 }}>
-                {actionLoading ? "Processing..." : modal.type === "block" ? (modal.user.is_blocked ? "Unblock" : "Block User") : modal.type === "email" ? "Send Email" : "Confirm"}
+                {actionLoading ? "Processing..." : modal.type === "block" ? (modal.user.is_blocked ? "Unblock" : "Block User") : modal.type === "email" ? "Send Email" : modal.type === "delete" ? "Delete Permanently" : "Confirm"}
               </button>
             </div>
           </div>
