@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { checkCredits, deductCredit, recordScan } from "@/lib/credits";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 async function getAuthUser() {
   const cookieStore = await cookies();

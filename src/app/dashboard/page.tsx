@@ -148,7 +148,18 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append("image", fileObjRef.current);
-      const res = await fetch("/api/analyze", { method: "POST", body: formData });
+
+      // Retry logic for 529 (Vercel throttling)
+      let res: Response | null = null;
+      let lastErr = "";
+      for (let attempt = 0; attempt < 3; attempt++) {
+        res = await fetch("/api/analyze", { method: "POST", body: formData });
+        if (res.status !== 529) break;
+        lastErr = `Server busy (attempt ${attempt + 1}/3)...`;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+      }
+      if (!res || res.status === 529) throw new Error("Server is busy — please try again in a moment.");
+
       const data = await res.json();
       if (res.status === 403) { clearInterval(iv); router.push("/pricing?gate=1"); return; }
       if (res.status === 402) { clearInterval(iv); setShowPaywall(true); setStage("preview"); return; }
