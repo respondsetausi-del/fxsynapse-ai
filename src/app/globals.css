@@ -3,7 +3,7 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0b0f;
+  --bg: #050507;
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.06);
   --accent: #00e5a0;
@@ -74,28 +74,134 @@ body {
   66% { transform: translate(-20px, 15px) scale(0.95); }
 }
 
-/* Glass card */
-.glass {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 18px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+@keyframes borderSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* Stat card */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Scanning beam — sweeps across chart */
+@keyframes scanBeam {
+  0% { left: -10%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 110%; opacity: 0; }
+}
+
+/* Activity ticker scroll */
+@keyframes tickerScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Aurora mouse follow */
+@keyframes auroraShift {
+  0%, 100% { filter: blur(80px) hue-rotate(0deg); }
+  50% { filter: blur(100px) hue-rotate(30deg); }
+}
+
+/* Shimmer on glass cards */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Orbit particles around icon */
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(40px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(40px) rotate(-360deg); }
+}
+
+@keyframes orbit2 {
+  from { transform: rotate(120deg) translateX(48px) rotate(-120deg); }
+  to { transform: rotate(480deg) translateX(48px) rotate(-480deg); }
+}
+
+@keyframes orbit3 {
+  from { transform: rotate(240deg) translateX(35px) rotate(-240deg); }
+  to { transform: rotate(600deg) translateX(35px) rotate(-600deg); }
+}
+
+/* Breathing glow */
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Number tick up */
+@keyframes numberPop {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Stagger reveal for results */
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Neural grid pulse for scanning */
+@keyframes gridPulse {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.08; }
+}
+
+/* Magnetic hover lift */
+.mag-lift {
+  transition: transform 0.4s cubic-bezier(.16,1,.3,1), box-shadow 0.4s ease;
+}
+.mag-lift:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 20px 60px rgba(0,0,0,.3), 0 0 40px rgba(0,229,160,.06);
+}
+
+/* Shimmer overlay for glass cards */
+.glass-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.glass-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.03), transparent);
+  animation: shimmer 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Glass card — iOS 26.3 frosted */
+.glass {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 24px;
+  backdrop-filter: blur(40px) saturate(1.5);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+/* Stat card — frosted */
 .stat-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
   padding: 13px 15px;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(.16,1,.3,1);
+  backdrop-filter: blur(20px);
 }
 
 .stat-card:hover {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(0, 229, 160, 0.2);
-  transform: translateY(-2px);
+  border-color: rgba(0, 229, 160, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,.2), 0 0 30px rgba(0,229,160,.04);
 }
 
 /* Responsive result layout */

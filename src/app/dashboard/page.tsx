@@ -320,37 +320,58 @@ export default function Dashboard() {
           {stage === "upload" && (
             <div className="max-w-[530px] w-full animate-fadeUp">
               <div className="text-center mb-8">
-                <h1 className="font-extrabold text-white leading-[1.15] mb-2.5" style={{ fontSize: "clamp(24px,5vw,36px)", letterSpacing: "-1px" }}>
+                <h1 className="font-extrabold text-white leading-[1.15] mb-2.5" style={{ fontSize: "clamp(24px,5vw,36px)", letterSpacing: "-1.5px" }}>
                   Scan any chart.<br />
-                  <span style={{ background: "linear-gradient(90deg,#00e5a0,#4da0ff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  <span style={{ background: "linear-gradient(135deg,#00e5a0 0%,#4da0ff 40%,#a855f7 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundSize: "200% 200%", animation: "gradientShift 4s ease infinite" }}>
                     Get annotated intelligence.
                   </span>
                 </h1>
-                <p className="text-sm max-w-[400px] mx-auto" style={{ color: "rgba(255,255,255,.55)" }}>
-                  Upload a forex chart screenshot — FXSynapse AI annotates your chart with key levels, zones, and trade setups.
+                <p className="text-[13px] max-w-[400px] mx-auto" style={{ color: "rgba(255,255,255,.4)", lineHeight: 1.7 }}>
+                  Upload a chart screenshot — AI annotates it with key levels, zones, and trade-ready setups in seconds.
                 </p>
                 {credits && (
-                  <p className="text-[10px] font-mono mt-2" style={{ color: (credits.monthlyRemaining ?? 0) > 0 || credits.monthlyRemaining === -1 ? "rgba(0,229,160,.6)" : "rgba(255,77,106,.6)" }}>
+                  <p className="text-[10px] font-mono mt-3 px-3 py-1.5 rounded-full inline-flex items-center gap-2" style={{
+                    background: (credits.monthlyRemaining ?? 0) > 0 || credits.monthlyRemaining === -1 ? "rgba(0,229,160,.06)" : "rgba(255,77,106,.06)",
+                    border: `1px solid ${(credits.monthlyRemaining ?? 0) > 0 || credits.monthlyRemaining === -1 ? "rgba(0,229,160,.12)" : "rgba(255,77,106,.12)"}`,
+                    color: (credits.monthlyRemaining ?? 0) > 0 || credits.monthlyRemaining === -1 ? "#00e5a0" : "#ff4d6a",
+                  }}>
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: (credits.monthlyRemaining ?? 0) > 0 || credits.monthlyRemaining === -1 ? "#00e5a0" : "#ff4d6a", boxShadow: `0 0 6px ${(credits.monthlyRemaining ?? 0) > 0 || credits.monthlyRemaining === -1 ? "#00e5a0" : "#ff4d6a"}` }} />
                     {credits.monthlyRemaining === -1 ? "Unlimited scans" :
-                     (credits.monthlyRemaining ?? 0) > 0 ? `${credits.monthlyRemaining}/${credits.monthlyLimit} scans remaining this month` :
+                     (credits.monthlyRemaining ?? 0) > 0 ? `${credits.monthlyRemaining}/${credits.monthlyLimit} scans remaining` :
                      (credits.topupBalance ?? 0) > 0 ? `${credits.topupBalance} top-up scans remaining` :
                      "No scans remaining"}
                     {(credits.topupBalance ?? 0) > 0 && (credits.monthlyRemaining ?? 0) > 0 ? ` + ${credits.topupBalance} top-up` : ""}
                   </p>
                 )}
               </div>
-              <div className="glass text-center cursor-pointer transition-all" style={{ padding: "50px 34px", borderColor: isDrag ? "#00e5a0" : undefined, background: isDrag ? "rgba(0,229,160,.15)" : undefined }}
-                onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }} onDragLeave={() => setIsDrag(false)} onDrop={handleDrop} onClick={() => fileRef.current?.click()}>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-                <div className="mx-auto mb-4 flex items-center justify-center" style={{ width: 62, height: 62, borderRadius: 15, background: "rgba(0,229,160,.15)", border: "1px solid rgba(0,229,160,.15)" }}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                </div>
-                <p className="text-[15px] font-semibold text-white mb-1">Drop your chart screenshot here</p>
-                <p className="text-[13px]" style={{ color: "rgba(255,255,255,.55)" }}>or click to browse • PNG, JPG</p>
-                <div className="flex gap-1.5 justify-center mt-4 flex-wrap">
-                  {["MT4", "MT5", "TradingView", "cTrader"].map((p) => (
-                    <span key={p} className="px-2.5 py-0.5 rounded-full text-[10px] font-mono" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)", color: "rgba(255,255,255,.3)" }}>{p}</span>
-                  ))}
+              {/* Animated border upload zone */}
+              <div className="relative group">
+                <div className="absolute -inset-[1px] rounded-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" style={{ background: "conic-gradient(from 0deg, #00e5a0, #4da0ff, #a855f7, #00e5a0)", animation: isDrag ? "none" : "borderSpin 4s linear infinite", filter: "blur(2px)" }} />
+                <div className="relative text-center cursor-pointer transition-all rounded-3xl overflow-hidden"
+                  style={{ padding: "55px 34px", background: isDrag ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.025)", border: "1px solid transparent", backdropFilter: "blur(40px) saturate(1.5)", boxShadow: isDrag ? "0 0 60px rgba(0,229,160,.15), inset 0 0 60px rgba(0,229,160,.05)" : "0 8px 32px rgba(0,0,0,.25)" }}
+                  onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }} onDragLeave={() => setIsDrag(false)} onDrop={handleDrop} onClick={() => fileRef.current?.click()}>
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                  <div className="mx-auto mb-5 relative flex items-center justify-center" style={{ width: 80, height: 80 }}>
+                    {/* Orbit particles */}
+                    <div className="absolute w-2 h-2 rounded-full" style={{ background: "#00e5a0", boxShadow: "0 0 10px #00e5a0", animation: "orbit 3s linear infinite", opacity: 0.7 }} />
+                    <div className="absolute w-1.5 h-1.5 rounded-full" style={{ background: "#4da0ff", boxShadow: "0 0 8px #4da0ff", animation: "orbit2 4s linear infinite", opacity: 0.5 }} />
+                    <div className="absolute w-1 h-1 rounded-full" style={{ background: "#a855f7", boxShadow: "0 0 6px #a855f7", animation: "orbit3 5s linear infinite", opacity: 0.4 }} />
+                    {/* Orbit ring */}
+                    <div className="absolute" style={{ inset: -4, borderRadius: "50%", border: "1px solid rgba(0,229,160,.08)", animation: "breathe 3s ease infinite" }} />
+                    <div className="flex items-center justify-center" style={{ width: 64, height: 64, borderRadius: 20, background: "rgba(0,229,160,.08)", border: "1px solid rgba(0,229,160,.12)", boxShadow: "0 0 40px rgba(0,229,160,.1)" }}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                  </div>
+                  <p className="text-[17px] font-bold text-white mb-1.5">Drop your chart here</p>
+                  <p className="text-[13px] mb-2" style={{ color: "rgba(255,255,255,.45)" }}>or tap to browse • PNG, JPG</p>
+                  <p className="text-[10px] font-mono px-3 py-1 rounded-full inline-flex items-center gap-1.5" style={{ background: "rgba(0,229,160,.06)", border: "1px solid rgba(0,229,160,.1)", color: "#00e5a0" }}>
+                    <span style={{ animation: "breathe 2s ease infinite" }}>⚡</span> AI analyzes in under 10 seconds
+                  </p>
+                  <div className="flex gap-2 justify-center mt-5 flex-wrap">
+                    {["MT4", "MT5", "TradingView", "cTrader"].map((p) => (
+                      <span key={p} className="px-3 py-1 rounded-full text-[10px] font-mono" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)", color: "rgba(255,255,255,.3)" }}>{p}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -379,16 +400,28 @@ export default function Dashboard() {
           {/* ANALYZING */}
           {stage === "analyzing" && (
             <div className="max-w-[450px] w-full text-center animate-fadeUp">
-              <div className="glass" style={{ padding: "38px 30px" }}>
-                <div className="relative mx-auto mb-5 flex items-center justify-center" style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(0,229,160,.15)", border: "2px solid rgba(0,229,160,.15)" }}>
-                  <div className="absolute" style={{ inset: -4, borderRadius: "50%", border: "2px solid transparent", borderTopColor: "#00e5a0", animation: "rotate 1.2s linear infinite" }} />
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
-                </div>
-                <h2 className="text-lg font-bold text-white mb-1">Synapse Processing</h2>
-                <p className="text-xs mb-5" style={{ color: "rgba(255,255,255,.55)" }}>Decoding structure, order flow & liquidity...</p>
-                <div className="w-full rounded-full overflow-hidden mb-4" style={{ height: 5, background: "rgba(255,255,255,.05)" }}>
-                  <div className="h-full rounded-full transition-[width] duration-300" style={{ background: "linear-gradient(90deg,#00e5a0,#4da0ff)", width: `${Math.min(progress, 100)}%`, animation: "progressPulse 2s infinite" }} />
-                </div>
+              <div className="relative overflow-hidden" style={{ padding: "42px 32px", background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)", backdropFilter: "blur(40px) saturate(1.5)", borderRadius: 28, boxShadow: "0 12px 40px rgba(0,0,0,.3), 0 0 80px rgba(0,229,160,.05)" }}>
+                {/* Neural grid background */}
+                <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(0,229,160,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,.04) 1px,transparent 1px)", backgroundSize: "24px 24px", animation: "gridPulse 3s ease infinite" }} />
+                {/* Scanning beam */}
+                <div className="absolute left-0 w-full" style={{ height: 2, background: "linear-gradient(90deg, transparent, #00e5a0, transparent)", boxShadow: "0 0 20px rgba(0,229,160,.5), 0 0 60px rgba(0,229,160,.2)", animation: "scanBeam 2.5s ease-in-out infinite", top: `${30 + Math.sin(progress * 0.1) * 20}%` }} />
+                {/* Ambient glow */}
+                <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 30%, rgba(0,229,160,.06) 0%, transparent 60%)" }} />
+                <div className="relative">
+                  <div className="relative mx-auto mb-6 flex items-center justify-center" style={{ width: 88, height: 88, borderRadius: "50%", background: "rgba(0,229,160,.08)", border: "2px solid rgba(0,229,160,.12)" }}>
+                    <div className="absolute" style={{ inset: -5, borderRadius: "50%", border: "2px solid transparent", borderTopColor: "#00e5a0", animation: "rotate 1s linear infinite" }} />
+                    <div className="absolute" style={{ inset: -10, borderRadius: "50%", border: "1.5px solid transparent", borderBottomColor: "#4da0ff", animation: "rotate 2s linear infinite reverse" }} />
+                    <div className="absolute" style={{ inset: -16, borderRadius: "50%", border: "1px solid transparent", borderLeftColor: "#a855f7", animation: "rotate 3s linear infinite" }} />
+                    {/* Orbit dots */}
+                    <div className="absolute w-1.5 h-1.5 rounded-full" style={{ background: "#00e5a0", boxShadow: "0 0 8px #00e5a0", animation: "orbit 2s linear infinite" }} />
+                    <div className="absolute w-1 h-1 rounded-full" style={{ background: "#4da0ff", boxShadow: "0 0 6px #4da0ff", animation: "orbit2 3s linear infinite" }} />
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
+                  </div>
+                  <h2 className="text-xl font-extrabold text-white mb-1" style={{ textShadow: "0 0 40px rgba(0,229,160,.15)" }}>Synapse Processing</h2>
+                  <p className="text-xs mb-6" style={{ color: "rgba(255,255,255,.45)" }}>Decoding structure, order flow & liquidity...</p>
+                  <div className="w-full rounded-full overflow-hidden mb-5" style={{ height: 6, background: "rgba(255,255,255,.04)" }}>
+                    <div className="h-full rounded-full transition-[width] duration-300" style={{ background: "linear-gradient(90deg,#00e5a0,#4da0ff,#a855f7)", backgroundSize: "200% 100%", animation: "gradientShift 2s ease infinite", width: `${Math.min(progress, 100)}%`, boxShadow: "0 0 20px rgba(0,229,160,.3)" }} />
+                  </div>
                 <div className="flex flex-col gap-1.5 items-start">
                   {STEPS.map((s, i) => (
                     <div key={i} className="flex items-center gap-2 transition-opacity" style={{ opacity: progress >= s.t ? 1 : 0.3 }}>
@@ -400,6 +433,7 @@ export default function Dashboard() {
                   ))}
                 </div>
               </div>
+            </div>
             </div>
           )}
 
