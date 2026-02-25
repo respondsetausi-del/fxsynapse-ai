@@ -66,31 +66,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "API key not configured." }, { status: 500 });
     }
 
-    // 5. Call Claude Vision
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 5000,
-        system: SYSTEM_PROMPT,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-            { type: "text", text: USER_PROMPT },
-          ],
-        }],
-      }),
+    // 5. Call Claude Vision (with retry for 429/529)
+    const apiBody = JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 5000,
+      system: SYSTEM_PROMPT,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+          { type: "text", text: USER_PROMPT },
+        ],
+      }],
     });
 
-    if (!response.ok) {
-      console.error("Claude API error:", response.status, await response.text());
-      return NextResponse.json({ error: `AI analysis failed (${response.status}).` }, { status: 502 });
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: apiBody,
+      });
+      // Retry on 429 (rate limit) or 529 (overloaded)
+      if (response.status === 429 || response.status === 529) {
+        console.log(`[ANALYZE] Anthropic ${response.status}, retry ${attempt + 1}/3...`);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
+        continue;
+      }
+      break;
+    }
+
+    if (!response || !response.ok) {
+      const status = response?.status || 500;
+      const body = response ? await response.text() : "No response";
+      console.error("Claude API error:", status, body);
+      const msg = status === 529 ? "AI is temporarily overloaded — please try again." 
+        : status === 429 ? "Too many requests — please wait a moment." 
+        : `AI analysis failed (${status}).`;
+      return NextResponse.json({ error: msg }, { status: 502 });
     }
 
     const data = await response.json();
