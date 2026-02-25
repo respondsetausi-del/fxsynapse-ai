@@ -66,45 +66,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "API key not configured." }, { status: 500 });
     }
 
-    // 5. Call Claude Vision (with retry for 429/529)
-    const apiBody = JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 5000,
-      system: SYSTEM_PROMPT,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-          { type: "text", text: USER_PROMPT },
-        ],
-      }],
-    });
-
+    // 5. Call Claude Vision (with retry + model fallback for 429/529)
+    const models = ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"];
     let response: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: apiBody,
+
+    for (const model of models) {
+      const apiBody = JSON.stringify({
+        model,
+        max_tokens: 5000,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+            { type: "text", text: USER_PROMPT },
+          ],
+        }],
       });
-      // Retry on 429 (rate limit) or 529 (overloaded)
-      if (response.status === 429 || response.status === 529) {
-        console.log(`[ANALYZE] Anthropic ${response.status}, retry ${attempt + 1}/3...`);
-        if (attempt < 2) await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: apiBody,
+        });
+        if (response.status !== 429 && response.status !== 529) break;
+        console.log(`[ANALYZE] ${model} returned ${response.status}, retry ${attempt + 1}/3...`);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+      }
+
+      if (response && response.ok) {
+        console.log(`[ANALYZE] Success with model: ${model}`);
+        break;
+      }
+      if (response && (response.status === 429 || response.status === 529)) {
+        console.log(`[ANALYZE] ${model} overloaded after retries, trying fallback...`);
         continue;
       }
-      break;
+      break; // Other errors (400, 401, etc) — don't fallback
     }
 
     if (!response || !response.ok) {
       const status = response?.status || 500;
       const body = response ? await response.text() : "No response";
       console.error("Claude API error:", status, body);
-      const msg = status === 529 ? "AI is temporarily overloaded — please try again." 
+      const msg = status === 529 ? "AI is temporarily overloaded — please try again in a minute." 
         : status === 429 ? "Too many requests — please wait a moment." 
         : `AI analysis failed (${status}).`;
       return NextResponse.json({ error: msg }, { status: 502 });
