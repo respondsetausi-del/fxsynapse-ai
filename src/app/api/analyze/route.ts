@@ -351,6 +351,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       analysis,
       credits: {
+        canScan: updatedCredits.canScan,
         monthlyUsed: updatedCredits.monthlyUsed,
         monthlyLimit: updatedCredits.monthlyLimit,
         monthlyRemaining: updatedCredits.monthlyRemaining,

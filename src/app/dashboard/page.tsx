@@ -157,9 +157,11 @@ export default function Dashboard() {
       }
       if (!res || res.status === 529) throw new Error("Server is busy — please try again in a moment.");
 
-      const data = await res.json();
+      // Check status codes BEFORE parsing body (body might not be valid JSON on errors)
       if (res.status === 403) { clearInterval(iv); router.push("/pricing?gate=1"); return; }
       if (res.status === 402) { clearInterval(iv); setShowPaywall(true); setStage("preview"); return; }
+
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       clearInterval(iv); setProgress(100);
       if (data.credits) setCredits((prev) => prev ? { ...prev, ...data.credits } : prev);
