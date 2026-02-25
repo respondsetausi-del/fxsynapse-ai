@@ -23,9 +23,15 @@ export async function POST() {
 
     if (listRes.ok) {
       const existing = await listRes.json();
-      const alreadyRegistered = existing?.results?.find((w: { url: string }) => w.url === webhookUrl);
+      const webhooks = existing?.results || existing || [];
+      const arr = Array.isArray(webhooks) ? webhooks : [];
+      const alreadyRegistered = arr.find((w: { url: string }) => w.url === webhookUrl);
       if (alreadyRegistered) {
-        return NextResponse.json({ message: "Webhook already registered", webhook: alreadyRegistered });
+        return NextResponse.json({ 
+          success: true,
+          message: "Webhook already registered ✅", 
+          webhook: alreadyRegistered 
+        });
       }
     }
 

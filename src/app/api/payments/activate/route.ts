@@ -73,8 +73,12 @@ export async function POST() {
       return NextResponse.json({ status: "no_pending_payment" });
     }
 
-    // ═══ CRITICAL: Verify with Yoco API before activating ═══
-    // Yoco docs: "Do not use successUrl to verify payment success. Always use webhooks."
+    // ═══ CRITICAL: Verify ACTUAL PAYMENT status with Yoco ═══
+    // checkout.status === "completed" does NOT mean payment succeeded!
+    // Cards can be DECLINED and checkout still shows "completed".
+    // We must verify the payment object itself.
+    const { verifyYocoPayment } = await import("@/lib/yoco-verify");
+
     const yocoKey = process.env.YOCO_SECRET_KEY;
     if (!yocoKey) {
       console.error("[ACTIVATE] No YOCO_SECRET_KEY — cannot verify payment");
@@ -87,34 +91,30 @@ export async function POST() {
       return NextResponse.json({ status: "no_checkout_id" }, { status: 400 });
     }
 
-    // Check with Yoco if this checkout was actually paid
+    // Verify with Yoco — checks actual payment status, not just checkout
     let yocoVerified = false;
     try {
-      const yocoRes = await fetch(`https://payments.yoco.com/api/checkouts/${checkoutId}`, {
-        headers: { Authorization: `Bearer ${yocoKey}` },
-      });
+      const verification = await verifyYocoPayment(checkoutId, yocoKey);
+      console.log(`[ACTIVATE] Yoco verification:`, JSON.stringify(verification));
 
-      if (yocoRes.ok) {
-        const checkout = await yocoRes.json();
-        if (checkout.status === "completed" || checkout.paymentId) {
-          yocoVerified = true;
-          console.log(`[ACTIVATE] ✅ Yoco verified: checkout=${checkoutId}, status=${checkout.status}`);
-        } else {
-          console.log(`[ACTIVATE] ❌ Yoco NOT paid: checkout=${checkoutId}, status=${checkout.status}`);
-          return NextResponse.json({ 
-            status: "not_paid", 
-            yocoStatus: checkout.status,
-            message: "Payment was not completed. Please try again."
-          });
-        }
-      } else {
-        // Yoco API error — fail-open to not block real payers
-        console.warn(`[ACTIVATE] ⚠️ Yoco API ${yocoRes.status} — proceeding with caution`);
+      if (verification.paid) {
         yocoVerified = true;
+        console.log(`[ACTIVATE] ✅ Payment CONFIRMED: ${verification.details}`);
+      } else {
+        console.log(`[ACTIVATE] ❌ Payment NOT confirmed: ${verification.details}`);
+        return NextResponse.json({ 
+          status: "not_paid", 
+          details: verification.details,
+          message: "Payment was not completed successfully. If you were charged, please contact support."
+        });
       }
     } catch (err) {
       console.error("[ACTIVATE] Yoco verification error:", err);
-      yocoVerified = true; // fail-open on network error
+      // FAIL CLOSED — do not activate without verification
+      return NextResponse.json({ 
+        status: "verification_error", 
+        message: "Could not verify payment. Please try again or contact support."
+      }, { status: 503 });
     }
 
     if (!yocoVerified) {

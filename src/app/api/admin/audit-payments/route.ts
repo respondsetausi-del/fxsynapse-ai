@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
+import { verifyYocoPayment } from "@/lib/yoco-verify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       plan: string;
       amount: number;
       yocoStatus: string;
+      paymentStatus: string;
       verdict: string;
     }> = [];
 
@@ -44,27 +46,15 @@ export async function POST(req: NextRequest) {
       if (!checkoutId) {
         results.push({
           id: payment.id, email: "?", plan: payment.plan_id || "topup",
-          amount: (payment.amount_cents || 0) / 100, yocoStatus: "no_checkout_id", verdict: "unknown",
+          amount: (payment.amount_cents || 0) / 100, yocoStatus: "no_checkout_id",
+          paymentStatus: "unknown", verdict: "unknown",
         });
         continue;
       }
 
       try {
-        const yocoRes = await fetch(`https://payments.yoco.com/api/checkouts/${checkoutId}`, {
-          headers: { Authorization: `Bearer ${yocoKey}` },
-        });
-
-        if (!yocoRes.ok) {
-          errors++;
-          results.push({
-            id: payment.id, email: "?", plan: payment.plan_id || "topup",
-            amount: (payment.amount_cents || 0) / 100, yocoStatus: `api_error_${yocoRes.status}`, verdict: "error",
-          });
-          continue;
-        }
-
-        const checkout = await yocoRes.json();
-        const isPaid = checkout.status === "completed" || !!checkout.paymentId;
+        // Use proper payment-level verification (not just checkout status!)
+        const verification = await verifyYocoPayment(checkoutId, yocoKey);
 
         const { data: profile } = await service
           .from("profiles")
@@ -72,42 +62,64 @@ export async function POST(req: NextRequest) {
           .eq("id", payment.user_id)
           .single();
 
-        if (isPaid) {
+        const email = profile?.email || "?";
+
+        if (verification.paid) {
           reallyPaid++;
           results.push({
-            id: payment.id, email: profile?.email || "?", plan: payment.plan_id || "topup",
-            amount: (payment.amount_cents || 0) / 100, yocoStatus: checkout.status, verdict: "REAL",
+            id: payment.id, email, plan: payment.plan_id || "topup",
+            amount: (payment.amount_cents || 0) / 100,
+            yocoStatus: verification.checkoutStatus,
+            paymentStatus: verification.paymentStatus || "confirmed",
+            verdict: "REAL",
           });
         } else {
           notPaid++;
 
           if (fix) {
+            // Revert payment to failed
             await service.from("payments").update({
               status: "failed",
             }).eq("id", payment.id);
 
+            // Downgrade user to free if this was a subscription
             if (payment.type === "subscription") {
-              await service.from("profiles").update({
-                plan_id: "free",
-                subscription_status: "none",
-                subscription_expires_at: null,
-              }).eq("id", payment.user_id);
+              // Check if user has any OTHER real completed payments still
+              const { data: otherPayments } = await service
+                .from("payments")
+                .select("id")
+                .eq("user_id", payment.user_id)
+                .eq("status", "completed")
+                .neq("id", payment.id);
+
+              // Only downgrade if they have no other completed payments
+              if (!otherPayments || otherPayments.length === 0) {
+                await service.from("profiles").update({
+                  plan_id: "free",
+                  subscription_status: "none",
+                  subscription_expires_at: null,
+                }).eq("id", payment.user_id);
+              }
             }
           }
 
           results.push({
-            id: payment.id, email: profile?.email || "?", plan: payment.plan_id || "topup",
-            amount: (payment.amount_cents || 0) / 100, yocoStatus: checkout.status,
+            id: payment.id, email, plan: payment.plan_id || "topup",
+            amount: (payment.amount_cents || 0) / 100,
+            yocoStatus: verification.checkoutStatus,
+            paymentStatus: verification.paymentStatus || "not_paid",
             verdict: fix ? "FAKE_REVERTED" : "FAKE",
           });
         }
 
-        await new Promise(r => setTimeout(r, 200));
+        // Rate limit Yoco API calls
+        await new Promise(r => setTimeout(r, 300));
       } catch (err) {
         errors++;
         results.push({
           id: payment.id, email: "?", plan: payment.plan_id || "topup",
-          amount: (payment.amount_cents || 0) / 100, yocoStatus: String(err), verdict: "error",
+          amount: (payment.amount_cents || 0) / 100, yocoStatus: String(err),
+          paymentStatus: "error", verdict: "error",
         });
       }
     }

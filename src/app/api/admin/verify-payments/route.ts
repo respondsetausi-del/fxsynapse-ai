@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
 import { sendPaymentSuccessToUser, sendPaymentNotificationToAdmin } from "@/lib/email";
 import { processAffiliateCommission } from "@/lib/affiliate";
+import { verifyYocoPayment } from "@/lib/yoco-verify";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,23 +41,12 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        // Check checkout status with Yoco API
-        const yocoRes = await fetch(`https://payments.yoco.com/api/checkouts/${checkoutId}`, {
-          headers: { Authorization: `Bearer ${yocoKey}` },
-        });
-
-        if (!yocoRes.ok) {
-          results.push({ id: payment.id, email: "?", plan: payment.plan_id, status: "error", reason: `Yoco ${yocoRes.status}` });
-          failed++;
-          continue;
-        }
-
-        const checkout = await yocoRes.json();
+        // Use proper payment-level verification
+        const verification = await verifyYocoPayment(checkoutId, yocoKey);
         verified++;
 
-        // Check if payment was completed on Yoco's side
-        if (checkout.status === "completed" || checkout.paymentId) {
-          // Activate the payment!
+        if (verification.paid) {
+          // Actually paid — activate!
           await service.from("payments").update({
             status: "completed",
             completed_at: new Date().toISOString(),
@@ -77,7 +67,6 @@ export async function POST(req: NextRequest) {
               monthly_scans_reset_at: new Date().toISOString(),
             }).eq("id", userId);
 
-            // Get user email for notification
             const { data: profile } = await service.from("profiles").select("email").eq("id", userId).single();
             const email = profile?.email || "unknown";
 
@@ -88,8 +77,6 @@ export async function POST(req: NextRequest) {
 
             sendPaymentSuccessToUser(email, pName, pPrice).catch(console.error);
             sendPaymentNotificationToAdmin(email, pName, pPrice).catch(console.error);
-
-            // Process affiliate commission
             processAffiliateCommission(userId, payment.id, payment.amount_cents).catch(console.error);
 
             results.push({ id: payment.id, email, plan: pName, status: "activated" });
@@ -117,12 +104,15 @@ export async function POST(req: NextRequest) {
           }
 
         } else {
-          // Payment not completed on Yoco's side
-          results.push({ id: payment.id, email: "?", plan: payment.plan_id, status: "not_paid", reason: `Yoco status: ${checkout.status}` });
+          // Not actually paid
+          results.push({
+            id: payment.id, email: "?", plan: payment.plan_id,
+            status: "not_paid", reason: verification.details,
+          });
         }
 
         // Rate limit
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 300));
 
       } catch (err) {
         results.push({ id: payment.id, email: "?", plan: payment.plan_id, status: "error", reason: String(err) });
