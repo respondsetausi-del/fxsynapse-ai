@@ -161,6 +161,11 @@ export default function AdminDashboard() {
   const [bulkSubject, setBulkSubject] = useState("");
   const [bulkBody, setBulkBody] = useState("");
   const [bulkSending, setBulkSending] = useState(false);
+  const [quickSendOpen, setQuickSendOpen] = useState(false);
+  const [quickSendTo, setQuickSendTo] = useState("");
+  const [quickSendSubject, setQuickSendSubject] = useState("");
+  const [quickSendBody, setQuickSendBody] = useState("");
+  const [quickSending, setQuickSending] = useState(false);
   const [chatThreads, setChatThreads] = useState<any[]>([]);
   const [chatActive, setChatActive] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -406,6 +411,22 @@ export default function AdminDashboard() {
       } else showToast("Bulk send failed", "error");
     } catch { showToast("Error sending", "error"); }
     setBulkSending(false);
+  };
+
+  const handleQuickSend = async () => {
+    if (!quickSendTo || !quickSendSubject || !quickSendBody) return;
+    setQuickSending(true);
+    try {
+      const res = await fetch("/api/admin/email", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: quickSendTo, subject: quickSendSubject, body: quickSendBody }),
+      });
+      if (res.ok) {
+        showToast(`Email sent to ${quickSendTo}`);
+        setQuickSendTo(""); setQuickSendSubject(""); setQuickSendBody(""); setQuickSendOpen(false); fetchEmailLogs();
+      } else showToast("Failed to send email", "error");
+    } catch { showToast("Error sending", "error"); }
+    setQuickSending(false);
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/"); };
@@ -803,6 +824,43 @@ export default function AdminDashboard() {
         {/* ═══════════════════════════════════ EMAIL TAB ═══════════════════════════════════ */}
         {tab === "email" && (
           <div className="space-y-5" style={{ animation: "fadeUp 0.3s ease" }}>
+            {/* Quick Send to Any Email */}
+            <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+              <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
+                <div>
+                  <h2 className="text-sm font-bold text-white">Quick Send</h2>
+                  <p className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>Send email to any address — doesn&apos;t have to be a user</p>
+                </div>
+                <button onClick={() => setQuickSendOpen(!quickSendOpen)} className="px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all" style={{ background: quickSendOpen ? "rgba(255,77,106,.1)" : "rgba(168,85,247,.1)", border: `1px solid ${quickSendOpen ? "rgba(255,77,106,.2)" : "rgba(168,85,247,.2)"}`, color: quickSendOpen ? "#ff4d6a" : "#a855f7" }}>
+                  {quickSendOpen ? "Cancel" : "✉️ Compose"}
+                </button>
+              </div>
+              {quickSendOpen && (
+                <div className="p-4 space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>TO (EMAIL ADDRESS)</label>
+                    <input type="email" value={quickSendTo} onChange={(e) => setQuickSendTo(e.target.value)} placeholder="someone@example.com"
+                      className="w-full px-4 py-3 rounded-xl text-sm text-white outline-none font-mono" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>SUBJECT</label>
+                    <input type="text" value={quickSendSubject} onChange={(e) => setQuickSendSubject(e.target.value)} placeholder="Email subject..."
+                      className="w-full px-4 py-3 rounded-xl text-sm text-white outline-none font-mono" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono mb-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.35)" }}>BODY</label>
+                    <textarea value={quickSendBody} onChange={(e) => setQuickSendBody(e.target.value)} placeholder="Write your message... (supports line breaks)" rows={5}
+                      className="w-full px-4 py-3 rounded-xl text-sm text-white outline-none font-mono resize-none" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }} />
+                  </div>
+                  <button onClick={handleQuickSend} disabled={quickSending || !quickSendTo || !quickSendSubject || !quickSendBody}
+                    className="px-6 py-3 rounded-xl text-sm font-bold cursor-pointer transition-all"
+                    style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", color: "#fff", opacity: quickSending || !quickSendTo || !quickSendSubject || !quickSendBody ? 0.5 : 1 }}>
+                    {quickSending ? "Sending..." : `Send to ${quickSendTo || "..."}`}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Bulk Email Section */}
             <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
               <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>

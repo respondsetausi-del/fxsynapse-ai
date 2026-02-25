@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
     if (admin?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { userId, subject, body, email } = await req.json();
-    if (!userId || !subject || !body || !email) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!subject || !body || !email) {
+      return NextResponse.json({ error: "Missing required fields (subject, body, email)" }, { status: 400 });
     }
 
     // Send via Resend
@@ -48,14 +48,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Log in DB
-    await service.from("email_logs").insert({
-      recipient_id: userId,
+    const logEntry: Record<string, unknown> = {
       recipient_email: email,
       subject,
       body,
       sent_by: user.id,
       status,
-    });
+    };
+    if (userId) logEntry.recipient_id = userId;
+    await service.from("email_logs").insert(logEntry);
 
     return NextResponse.json({ success: true, status });
   } catch (err) {
