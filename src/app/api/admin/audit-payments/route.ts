@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
             id: payment.id, email, plan: payment.plan_id || "topup",
             amount: (payment.amount_cents || 0) / 100,
             yocoStatus: verification.checkoutStatus,
-            paymentStatus: verification.paymentStatus || "confirmed",
+            paymentStatus: verification.checkoutStatus,
             verdict: "REAL",
           });
         } else {
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
             id: payment.id, email, plan: payment.plan_id || "topup",
             amount: (payment.amount_cents || 0) / 100,
             yocoStatus: verification.checkoutStatus,
-            paymentStatus: verification.paymentStatus || "not_paid",
+            paymentStatus: verification.checkoutStatus,
             verdict: fix ? "FAKE_REVERTED" : "FAKE",
           });
         }
