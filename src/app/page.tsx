@@ -348,6 +348,26 @@ export default function LandingPage() {
           </a>
         </section>
 
+        {/* EARN WITH US */}
+        <section style={{ padding: "0 24px 60px" }}>
+          <div className="max-w-2xl mx-auto rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(156,106,222,.05), rgba(0,229,160,.03))", border: "1px solid rgba(156,106,222,.12)" }}>
+            <div className="flex items-center justify-between px-5 py-5 gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, rgba(156,106,222,.15), rgba(156,106,222,.08))", border: "1px solid rgba(156,106,222,.2)" }}>
+                  <span className="text-lg">💰</span>
+                </div>
+                <div>
+                  <div className="text-[13px] font-semibold text-white">Earn 20% Recurring Commission</div>
+                  <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Refer traders to FXSynapse AI • Earn every month they stay subscribed</div>
+                </div>
+              </div>
+              <Link href="/affiliate" className="px-4 py-2 rounded-lg text-[11px] font-bold no-underline" style={{ background: "linear-gradient(135deg, #9b6ade, #7c4dcd)", color: "#fff" }}>
+                Become an Affiliate →
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* FOOTER */}
         <footer className="text-center" style={{ padding: "24px", borderTop: "1px solid rgba(255,255,255,.04)" }}>
           <div className="flex items-center justify-center gap-2 mb-2">
@@ -355,6 +375,11 @@ export default function LandingPage() {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
             </div>
             <span className="text-xs font-bold text-white">FXSynapse AI</span>
+          </div>
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <Link href="/pricing" className="text-[10px] font-mono no-underline" style={{ color: "rgba(255,255,255,.3)" }}>Pricing</Link>
+            <Link href="/affiliate" className="text-[10px] font-mono no-underline" style={{ color: "rgba(255,255,255,.3)" }}>Affiliate Program</Link>
+            <Link href="/login" className="text-[10px] font-mono no-underline" style={{ color: "rgba(255,255,255,.3)" }}>Sign In</Link>
           </div>
           <p className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>
             Chart analysis for educational purposes only. Not financial advice. Always manage your risk.
