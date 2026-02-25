@@ -2,9 +2,20 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { sendPaymentSuccessToUser, sendPaymentNotificationToAdmin } from "@/lib/email";
-import { processAffiliateCommission } from "@/lib/affiliate";
 
+/**
+ * Payment Activation Endpoint (called from /payment/success page)
+ * 
+ * This endpoint does NOT activate payments. Only the webhook does.
+ * This endpoint POLLS to see if the webhook has already processed it.
+ * 
+ * Flow:
+ * 1. User pays on Yoco → redirected to /payment/success
+ * 2. Success page calls this endpoint
+ * 3. We check if webhook already processed the payment
+ * 4. If yes → return "activated"
+ * 5. If no → return "processing" (success page will retry)
+ */
 export async function POST() {
   try {
     const cookieStore = await cookies();
@@ -27,8 +38,48 @@ export async function POST() {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Find most recent pending payment for this user
-    const { data: payment } = await service
+    // Check if user already has an active subscription (webhook processed it)
+    const { data: profile } = await service
+      .from("profiles")
+      .select("plan_id, subscription_status, credits_balance")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.subscription_status === "active" && profile?.plan_id !== "free") {
+      return NextResponse.json({ 
+        status: "activated", 
+        plan: profile.plan_id, 
+        type: "subscription",
+        method: "webhook_processed"
+      });
+    }
+
+    // Check if there's a recently completed payment (webhook processed it)
+    const { data: completedPayment } = await service
+      .from("payments")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (completedPayment) {
+      const completedAt = new Date(completedPayment.completed_at || completedPayment.updated_at || completedPayment.created_at);
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+      
+      if (completedAt > tenMinAgo) {
+        return NextResponse.json({
+          status: "activated",
+          plan: completedPayment.plan_id,
+          type: completedPayment.type,
+          method: "webhook_processed",
+        });
+      }
+    }
+
+    // Check if there's a pending payment (webhook hasn't processed yet)
+    const { data: pendingPayment } = await service
       .from("payments")
       .select("*")
       .eq("user_id", user.id)
@@ -37,153 +88,30 @@ export async function POST() {
       .limit(1)
       .single();
 
-    if (!payment) {
-      const { data: profile } = await service
-        .from("profiles")
-        .select("plan_id, subscription_status")
-        .eq("id", user.id)
-        .single();
+    if (pendingPayment) {
+      // Payment exists but webhook hasn't fired yet — tell frontend to wait
+      const createdAt = new Date(pendingPayment.created_at);
+      const minutesAgo = (Date.now() - createdAt.getTime()) / (1000 * 60);
 
-      if (profile?.subscription_status === "active") {
-        return NextResponse.json({ status: "already_active", plan: profile.plan_id });
-      }
-
-      const { data: recentPayment } = await service
-        .from("payments")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (recentPayment) {
-        const completedAt = new Date(recentPayment.updated_at || recentPayment.created_at);
-        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-        if (completedAt > fiveMinAgo) {
-          return NextResponse.json({
-            status: "activated",
-            plan: recentPayment.plan_id,
-            type: recentPayment.type,
-            method: "webhook_already_processed",
-          });
-        }
-      }
-
-      return NextResponse.json({ status: "no_pending_payment" });
-    }
-
-    // ═══ CRITICAL: Verify ACTUAL PAYMENT status with Yoco ═══
-    // checkout.status === "completed" does NOT mean payment succeeded!
-    // Cards can be DECLINED and checkout still shows "completed".
-    // We must verify the payment object itself.
-    const { verifyYocoPayment } = await import("@/lib/yoco-verify");
-
-    const yocoKey = process.env.YOCO_SECRET_KEY;
-    if (!yocoKey) {
-      console.error("[ACTIVATE] No YOCO_SECRET_KEY — cannot verify payment");
-      return NextResponse.json({ status: "verification_unavailable" }, { status: 503 });
-    }
-
-    const checkoutId = payment.yoco_checkout_id;
-    if (!checkoutId) {
-      console.error("[ACTIVATE] No checkout ID on payment record");
-      return NextResponse.json({ status: "no_checkout_id" }, { status: 400 });
-    }
-
-    // Verify with Yoco — checks actual payment status, not just checkout
-    let yocoVerified = false;
-    try {
-      const verification = await verifyYocoPayment(checkoutId, yocoKey);
-      console.log(`[ACTIVATE] Yoco verification:`, JSON.stringify(verification));
-
-      if (verification.paid) {
-        yocoVerified = true;
-        console.log(`[ACTIVATE] ✅ Payment CONFIRMED: ${verification.details}`);
-      } else {
-        console.log(`[ACTIVATE] ❌ Payment NOT confirmed: ${verification.details}`);
+      if (minutesAgo < 5) {
+        // Recent payment — webhook should arrive soon
         return NextResponse.json({ 
-          status: "not_paid", 
-          details: verification.details,
-          message: "Payment was not completed successfully. If you were charged, please contact support."
+          status: "processing",
+          message: "Payment is being confirmed. This usually takes a few seconds.",
+        });
+      } else {
+        // Old pending payment — webhook may have failed
+        return NextResponse.json({ 
+          status: "processing_delayed",
+          message: "Payment confirmation is taking longer than usual. If you were charged, your plan will activate shortly.",
         });
       }
-    } catch (err) {
-      console.error("[ACTIVATE] Yoco verification error:", err);
-      // FAIL CLOSED — do not activate without verification
-      return NextResponse.json({ 
-        status: "verification_error", 
-        message: "Could not verify payment. Please try again or contact support."
-      }, { status: 503 });
     }
 
-    if (!yocoVerified) {
-      return NextResponse.json({ status: "not_paid", message: "Payment verification failed" });
-    }
-
-    // ═══ Payment verified — proceed with activation ═══
-    console.log(`[ACTIVATE] Processing verified payment ${payment.id} for user ${user.id}`);
-
-    await service.from("payments").update({
-      status: "completed",
-      completed_at: new Date().toISOString(),
-    }).eq("id", payment.id);
-
-    if (payment.type === "subscription") {
-      const expiry = new Date();
-      expiry.setMonth(expiry.getMonth() + 1);
-
-      await service.from("profiles").update({
-        plan_id: payment.plan_id,
-        subscription_status: "active",
-        subscription_expires_at: expiry.toISOString(),
-        billing_cycle_start: new Date().toISOString(),
-        monthly_scans_used: 0,
-        monthly_scans_reset_at: new Date().toISOString(),
-      }).eq("id", user.id);
-
-      console.log(`[ACTIVATE] ✅ Subscription activated: user=${user.id}, plan=${payment.plan_id}`);
-
-      const planNames: Record<string, string> = { starter: "Starter", pro: "Pro", premium: "Premium" };
-      const planPrices: Record<string, string> = { starter: "R49", pro: "R99", premium: "R199" };
-      const pName = planNames[payment.plan_id] || payment.plan_id;
-      const pPrice = planPrices[payment.plan_id] || `R${(payment.amount_cents || 0) / 100}`;
-      sendPaymentSuccessToUser(user.email!, pName, pPrice).catch(console.error);
-      sendPaymentNotificationToAdmin(user.email!, pName, pPrice).catch(console.error);
-      processAffiliateCommission(user.id, payment.id, payment.amount_cents).catch(console.error);
-
-      return NextResponse.json({ status: "activated", plan: payment.plan_id, type: "subscription" });
-
-    } else if (payment.type === "topup" || payment.type === "credits") {
-      const creditsAmount = payment.credits_amount || 0;
-
-      const { data: profile } = await service
-        .from("profiles")
-        .select("credits_balance")
-        .eq("id", user.id)
-        .single();
-
-      if (profile) {
-        await service.from("profiles").update({
-          credits_balance: (profile.credits_balance || 0) + creditsAmount,
-        }).eq("id", user.id);
-
-        await service.from("credit_transactions").insert({
-          user_id: user.id,
-          amount: creditsAmount,
-          type: "purchase",
-          description: `Purchased ${creditsAmount} top-up credits`,
-        });
-      }
-
-      processAffiliateCommission(user.id, payment.id, payment.amount_cents).catch(console.error);
-      console.log(`[ACTIVATE] ✅ Credits added: user=${user.id}, credits=${creditsAmount}`);
-      return NextResponse.json({ status: "activated", credits: creditsAmount, type: "topup" });
-    }
-
-    return NextResponse.json({ status: "unknown_type" });
+    // No pending or completed payment found
+    return NextResponse.json({ status: "no_pending_payment" });
   } catch (error) {
     console.error("[ACTIVATE] Error:", error);
-    return NextResponse.json({ error: "Failed to activate" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to check payment status" }, { status: 500 });
   }
 }

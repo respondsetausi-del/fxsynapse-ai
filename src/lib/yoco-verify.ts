@@ -1,22 +1,28 @@
 /**
  * Yoco Payment Verification Utility
  * 
- * CRITICAL FINDINGS (from raw Yoco API responses):
+ * CRITICAL FINDINGS from real Yoco API testing:
  * 
- * 1. checkout.paymentId exists on ALL checkouts — even unpaid ones. NEVER use it.
- * 2. Yoco's /api/payments/{id} returns 404 for Online Checkout payments. Unusable.
- * 3. The ONLY reliable indicator is checkout.status:
- *    - "started"    = user opened checkout page, may have entered card, but payment NOT collected
- *    - "processing" = payment attempt in progress, NOT yet collected
- *    - "completed"  = payment SUCCEEDED, money collected ✅
- *    - "expired"    = checkout session expired
+ * 1. checkout.status stays "started" even AFTER successful payment
+ * 2. checkout.paymentId exists on ALL checkouts including unpaid
+ * 3. /api/payments/{id} returns 404 for Online Checkout payments
+ * 4. There is NO reliable way to verify payment via Yoco's REST API
  * 
- * DO NOT check paymentId. DO NOT call /api/payments/. 
- * ONLY checkout.status === "completed" means real money.
+ * THEREFORE: Only the webhook (payment.succeeded event) is reliable.
+ * The activate endpoint should NOT mark payments as completed —
+ * it should only check if the webhook already processed it.
+ * 
+ * Payment activation flow:
+ * 1. User pays → Yoco sends webhook → webhook marks "completed" (TRUSTED)
+ * 2. User redirected to success page → polls for completion
+ * 3. If webhook beats redirect → user sees "activated"
+ * 4. If redirect beats webhook → user sees "processing, please wait"
  */
 
+// This function is kept for admin tools but returns "unverifiable"
+// since Yoco's API cannot distinguish paid from unpaid checkouts
 export interface YocoVerifyResult {
-  paid: boolean;
+  paid: boolean | null;  // null = cannot determine
   checkoutStatus: string;
   paymentId: string | null;
   details: string;
@@ -33,7 +39,7 @@ export async function verifyYocoPayment(
 
   if (!checkoutRes.ok) {
     return {
-      paid: false,
+      paid: null,
       checkoutStatus: `api_error_${checkoutRes.status}`,
       paymentId: null,
       details: `Checkout API returned ${checkoutRes.status}`,
@@ -44,15 +50,23 @@ export async function verifyYocoPayment(
   const status = (checkout.status || "unknown").toLowerCase();
   const paymentId = checkout.paymentId || null;
 
-  // ONLY "completed" means money was collected
-  const paid = status === "completed";
+  // Yoco's checkout status is NOT reliable for payment verification
+  // "started" can mean paid OR unpaid
+  // Only "completed" is somewhat reliable but Yoco doesn't always set it
+  if (status === "completed") {
+    return {
+      paid: true,
+      checkoutStatus: status,
+      paymentId,
+      details: `Checkout status: completed — likely paid`,
+    };
+  }
 
+  // For all other statuses, we CANNOT determine payment status
   return {
-    paid,
+    paid: null,  // null = unknown, not false
     checkoutStatus: status,
     paymentId,
-    details: paid
-      ? `✅ Checkout ${checkoutId} status: completed — payment collected`
-      : `❌ Checkout ${checkoutId} status: ${status} — NOT paid`,
+    details: `Checkout status: ${status} — cannot verify via API (Yoco limitation)`,
   };
 }

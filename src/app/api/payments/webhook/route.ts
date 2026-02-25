@@ -59,25 +59,8 @@ export async function POST(req: NextRequest) {
 
     console.log(`[WEBHOOK] checkoutId=${checkoutId}, userId=${userId}, type=${paymentType}`);
 
-    // ═══ DEFENSE IN DEPTH: Verify checkout is actually completed ═══
-    if (checkoutId) {
-      const yocoKey = process.env.YOCO_SECRET_KEY;
-      if (yocoKey) {
-        try {
-          const { verifyYocoPayment } = await import("@/lib/yoco-verify");
-          const verification = await verifyYocoPayment(checkoutId, yocoKey);
-          console.log(`[WEBHOOK] Verification: paid=${verification.paid}, status=${verification.checkoutStatus}`);
-          
-          if (!verification.paid) {
-            console.warn(`[WEBHOOK] ❌ Checkout NOT completed despite payment.succeeded event: ${verification.details}`);
-            return NextResponse.json({ received: true, processed: false, reason: "checkout_not_completed" });
-          }
-        } catch (err) {
-          // If verification fails, still process — webhook signature was valid
-          console.warn("[WEBHOOK] Verification check failed, proceeding with webhook trust:", err);
-        }
-      }
-    }
+    // The webhook event payment.succeeded IS the source of truth
+    // (signature already verified above)
 
     // Strategy 1: Match by checkoutId (most reliable)
     let payment = null;

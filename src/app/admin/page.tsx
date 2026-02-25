@@ -814,22 +814,25 @@ export default function AdminDashboard() {
                     {verifyingPayments ? "Verifying..." : "⚡ Verify Pending"}
                   </button>
                   <button onClick={async () => {
-                    setAuditing(true); setAuditResult(null);
+                    const email = prompt("Enter user email to activate:");
+                    if (!email) return;
+                    const planId = prompt("Enter plan (starter/pro/premium):");
+                    if (!planId || !["starter","pro","premium"].includes(planId)) { showToast("Invalid plan", "error"); return; }
+                    if (!confirm(`Activate ${planId} plan for ${email}?`)) return;
                     try {
-                      const res = await fetch("/api/admin/audit-payments", {
+                      const res = await fetch("/api/admin/manual-activate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ fix: false }),
+                        body: JSON.stringify({ email, planId }),
                       });
                       const data = await res.json();
-                      setAuditResult(data);
-                      showToast(`Audit: ${data.reallyPaid} real, ${data.notPaid} fake`);
-                    } catch { showToast("Audit failed", "error"); }
-                    setAuditing(false);
-                  }} disabled={auditing}
+                      if (data.success) { showToast(data.message); fetchPayments(); fetchUsers(); fetchStats(); }
+                      else showToast(data.error || "Failed", "error");
+                    } catch { showToast("Activation failed", "error"); }
+                  }}
                     className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
-                    style={{ background: "rgba(255,77,106,.1)", border: "1px solid rgba(255,77,106,.2)", color: "#ff4d6a", opacity: auditing ? 0.5 : 1 }}>
-                    {auditing ? "Auditing..." : "🔍 Audit Completed"}
+                    style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.2)", color: "#00e5a0" }}>
+                    ✅ Manual Activate
                   </button>
                 </div>
               </div>
@@ -846,44 +849,6 @@ export default function AdminDashboard() {
                         <div key={i} className="text-[10px] font-mono" style={{ color: "#00e5a0" }}>✅ {r.email} → {r.plan}</div>
                       ))}
                     </div>
-                  )}
-                </div>
-              )}
-              {auditResult && (
-                <div className="p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)", background: "rgba(255,77,106,.03)" }}>
-                  <div className="flex gap-4 flex-wrap text-[11px] font-mono mb-2">
-                    <span style={{ color: "#00e5a0" }}>✅ Real: {auditResult.reallyPaid} ({auditResult.realRevenue})</span>
-                    <span style={{ color: "#ff4d6a" }}>❌ Fake: {auditResult.notPaid} ({auditResult.fakeRevenue})</span>
-                    {auditResult.errors > 0 && <span style={{ color: "rgba(255,255,255,.4)" }}>Errors: {auditResult.errors}</span>}
-                  </div>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {auditResult.results?.map((r: { email: string; plan: string; amount: number; verdict: string }, i: number) => (
-                      <div key={i} className="text-[10px] font-mono" style={{ color: r.verdict === "REAL" ? "#00e5a0" : r.verdict.includes("FAKE") ? "#ff4d6a" : "rgba(255,255,255,.4)" }}>
-                        {r.verdict === "REAL" ? "✅" : "❌"} {r.email} — R{r.amount} {r.plan} [{r.verdict}]
-                      </div>
-                    ))}
-                  </div>
-                  {auditResult.notPaid > 0 && !auditResult.fixed && (
-                    <button onClick={async () => {
-                      if (!confirm(`This will revert ${auditResult.notPaid} fake payments and deactivate those users. Are you sure?`)) return;
-                      setAuditing(true);
-                      try {
-                        const res = await fetch("/api/admin/audit-payments", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ fix: true }),
-                        });
-                        const data = await res.json();
-                        setAuditResult(data);
-                        fetchPayments(); fetchUsers(); fetchStats();
-                        showToast(`Fixed: ${data.notPaid} fake payments reverted`);
-                      } catch { showToast("Fix failed", "error"); }
-                      setAuditing(false);
-                    }}
-                      className="mt-3 px-4 py-2 rounded-lg text-[10px] font-bold cursor-pointer"
-                      style={{ background: "rgba(255,77,106,.15)", border: "1px solid rgba(255,77,106,.3)", color: "#ff4d6a" }}>
-                      🗑️ Fix: Revert {auditResult.notPaid} fake payments
-                    </button>
                   )}
                 </div>
               )}
