@@ -52,6 +52,7 @@ export default function Dashboard() {
   const supabase = createClient();
   const router = useRouter();
   const isPaidUser = user?.subscription_status === "active" && user?.plan_id && user.plan_id !== "free" && user.plan_id !== "none";
+  const showFull = isPaidUser || false; // Only paid subscribers see full data — free scans get teaser
 
   useEffect(() => {
     (async () => {
@@ -165,8 +166,8 @@ export default function Dashboard() {
         setAnalysis(data.analysis); setStage("result");
         setTimeout(() => {
           setShowResult(true);
-          // Auto-show dismissable paywall for non-paid users after results load
-          if (!isPaidUser) setTimeout(() => setShowPaywall(true), 1500);
+          // Auto-show paywall for free users after they see the chart (the hook)
+          if (!showFull) setTimeout(() => setShowPaywall(true), 2500);
         }, 100);
       }, 500);
     } catch (err) {
@@ -467,19 +468,11 @@ export default function Dashboard() {
               <div className="result-layout flex gap-3" style={{ flexDirection: viewMode === "analysis" ? "column" : "row" }}>
                 {viewMode !== "analysis" && (
                   <div className="result-chart glass overflow-hidden animate-fadeUp relative" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
-                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => (isPaidUser || scanPaid) ? setFullscreen(true) : null} />
-                    {/* Blur overlay — only for scans done without credits (not free scan, not paid) */}
-                    {!isPaidUser && !scanPaid && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center z-20" style={{ backdropFilter: "blur(12px)", background: "rgba(10,11,15,.6)" }}>
-                        <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
-                          <span className="text-2xl">🔒</span>
-                        </div>
-                        <h3 className="text-base font-bold text-white mb-1">Annotated Chart Locked</h3>
-                        <p className="text-[11px] mb-4 text-center px-6" style={{ color: "rgba(255,255,255,.45)" }}>Upgrade to see AI annotations, entry/exit points, and zones on your chart.</p>
-                        <div className="flex gap-2">
-                          <Link href="/pricing" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>Upgrade — From R79/mo</Link>
-                          <Link href="/pricing?topup=1" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up</Link>
-                        </div>
+                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => showFull ? setFullscreen(true) : setShowPaywall(true)} />
+                    {/* Fullscreen locked badge for free users */}
+                    {!showFull && (
+                      <div className="absolute bottom-12 right-3 px-2 py-1 rounded-md cursor-pointer" onClick={() => setShowPaywall(true)} style={{ background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.08)" }}>
+                        <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>🔒 Fullscreen — Pro</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between" style={{ padding: "9px 13px", borderTop: "1px solid rgba(255,255,255,.04)" }}>
@@ -494,24 +487,50 @@ export default function Dashboard() {
                 {viewMode !== "chart" && (
                   <div className="result-analysis flex flex-col gap-2.5 animate-slideInRight" style={{ width: viewMode === "analysis" ? "100%" : "42%" }}>
                     <div className="grid grid-cols-2 gap-1.5">
-                      {[{ l: "Trend", v: A.trend, c: "#00e5a0" }, { l: "Structure", v: A.structure?.length > 20 ? (A.structure.split("/")[0]?.trim() + " / " + (A.structure.split("/")[1]?.trim() || "")) : A.structure, c: "#4da0ff" },
+                      {[{ l: "Trend", v: A.trend, c: "#00e5a0", free: true }, { l: "Structure", v: A.structure?.length > 20 ? (A.structure.split("/")[0]?.trim() + " / " + (A.structure.split("/")[1]?.trim() || "")) : A.structure, c: "#4da0ff", free: true },
                         ...(A.all_levels && A.all_levels.length > 0
-                          ? A.all_levels.map((lv: any, idx: number) => ({ l: lv.type === "support" ? `Support ${idx + 1}` : `Resistance ${idx + 1}`, v: lv.price, c: lv.type === "support" ? "#00e5a0" : "#ff4d6a" }))
-                          : [{ l: "Support", v: A.support, c: "#00e5a0" }, { l: "Resistance", v: A.resistance, c: "#ff4d6a" }]
+                          ? A.all_levels.map((lv: any, idx: number) => ({ l: lv.type === "support" ? `Support ${idx + 1}` : `Resistance ${idx + 1}`, v: lv.price, c: lv.type === "support" ? "#00e5a0" : "#ff4d6a", free: false }))
+                          : [{ l: "Support", v: A.support, c: "#00e5a0", free: false }, { l: "Resistance", v: A.resistance, c: "#ff4d6a", free: false }]
                         )
                       ].map((s, i) => (
-                        <div key={i} className="stat-card">
+                        <div key={i} className="stat-card relative overflow-hidden">
                           <div className="text-[9px] font-mono uppercase tracking-wider mb-1" style={{ color: "rgba(255,255,255,.3)" }}>{s.l}</div>
-                          <div className="text-sm font-bold" style={{ color: s.c }}>{s.v}</div>
+                          {showFull || s.free ? (
+                            <div className="text-sm font-bold" style={{ color: s.c }}>{s.v}</div>
+                          ) : (
+                            <div className="text-sm font-bold font-mono select-none" style={{ color: s.c, filter: "blur(6px)", userSelect: "none" }}>●●●●●●</div>
+                          )}
                         </div>
                       ))}
                     </div>
-                    <div className="glass overflow-hidden flex-1">
+
+                    {/* Unlock banner for free users */}
+                    {!showFull && (
+                      <Link href="/pricing" className="no-underline block rounded-xl text-center" style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
+                        <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: "#00e5a0" }}>🔒 FULL ANALYSIS LOCKED</div>
+                        <div className="text-xs font-bold text-white">Unlock entry, TP, SL & AI insights</div>
+                        <div className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,.35)" }}>Subscribe from R79/mo to see all trade data</div>
+                      </Link>
+                    )}
+
+                    <div className="glass overflow-hidden flex-1 relative">
                       <div className="flex" style={{ borderBottom: "1px solid rgba(255,255,255,.05)", padding: "0 13px" }}>
                         {(["overview", "indicators"] as const).map((t) => (
                           <button key={t} onClick={() => setActiveTab(t)} className="py-2.5 px-3 text-[11px] font-semibold capitalize cursor-pointer" style={{ background: "none", border: "none", color: activeTab === t ? "#00e5a0" : "rgba(255,255,255,.3)", borderBottom: activeTab === t ? "2px solid #00e5a0" : "2px solid transparent" }}>{t}</button>
                         ))}
                       </div>
+
+                      {/* Blur overlay for non-paid users */}
+                      {!showFull && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center" style={{ top: 38, backdropFilter: "blur(8px)", background: "rgba(10,11,16,.5)" }}>
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-2" style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.15)" }}>
+                            <span className="text-lg">🔒</span>
+                          </div>
+                          <div className="text-xs font-bold text-white mb-1">Subscribe to Unlock</div>
+                          <div className="text-[10px] mb-3 text-center px-4" style={{ color: "rgba(255,255,255,.4)" }}>Entry, TP, SL, risk:reward, AI analysis, confluences</div>
+                          <Link href="/pricing" className="px-5 py-2 rounded-xl text-[11px] font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>View Plans</Link>
+                        </div>
+                      )}
                       <div style={{ padding: 13 }}>
                         {activeTab === "overview" && (
                           <div className="flex flex-col gap-2.5">
@@ -734,25 +753,38 @@ export default function Dashboard() {
 
       {/* Paywall */}
       {showPaywall && (
-        <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={{ background: "rgba(0,0,0,.85)", backdropFilter: "blur(15px)" }} onClick={() => setShowPaywall(false)}>
-          <div className="max-w-sm w-full mx-4 rounded-3xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "rgba(20,21,30,.85)", border: "1px solid rgba(255,255,255,.08)", backdropFilter: "blur(60px) saturate(1.6)", boxShadow: "0 25px 60px rgba(0,0,0,.5)" }}>
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={{ background: "rgba(0,0,0,.88)", backdropFilter: "blur(20px)" }} onClick={() => showFull ? setShowPaywall(false) : null}>
+          <div className="max-w-sm w-full mx-4 rounded-3xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "rgba(20,21,30,.9)", border: "1px solid rgba(255,255,255,.08)", backdropFilter: "blur(60px) saturate(1.6)", boxShadow: "0 25px 60px rgba(0,0,0,.5)" }}>
             <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
-              <span className="text-2xl">{credits?.planId === "free" || credits?.planId === "none" ? (scanPaid ? "🚀" : "⚡") : "🔒"}</span>
+              <span className="text-2xl">{!showFull ? "🔒" : "🚀"}</span>
             </div>
             <h3 className="text-lg font-bold text-white mb-1">
-              {credits?.planId === "free" || credits?.planId === "none" ? (scanPaid ? "Loved your analysis?" : "Liked what you saw?") : "Scans Used Up"}
+              {!showFull ? "Unlock Your Full Analysis" : "Scans Used Up"}
             </h3>
-            <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,.45)" }}>
-              {credits?.planId === "free" || credits?.planId === "none"
-                ? (scanPaid ? "Your free scan is done! Subscribe to keep getting AI-powered chart analysis." : "Your free scan has been used. Subscribe to unlock more AI chart analysis.")
+            <p className="text-xs mb-1" style={{ color: "rgba(255,255,255,.45)" }}>
+              {!showFull
+                ? "Your AI analysis is ready — subscribe to see entry prices, TP, SL, risk:reward, and all trading insights."
                 : "All monthly scans used. Top up or upgrade to keep scanning."}
             </p>
-            <div className="flex flex-col gap-2">
+            {!showFull && (
+              <div className="flex gap-1.5 justify-center mb-3 mt-2">
+                {["Entry Price", "TP / SL", "R:R Ratio", "AI Insights"].map((f, i) => (
+                  <span key={i} className="text-[9px] font-mono px-2 py-0.5 rounded" style={{ background: "rgba(0,229,160,.08)", color: "#00e5a0", border: "1px solid rgba(0,229,160,.1)" }}>{f}</span>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-col gap-2 mt-3">
               <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
-                {credits?.planId === "free" || credits?.planId === "none" ? "View Plans — From R79/mo" : "Upgrade Plan"}
+                {!showFull ? "Subscribe — From R79/mo" : "Upgrade Plan"}
               </Link>
-              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up Scans</Link>
-              <button onClick={() => setShowPaywall(false)} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>
+              <Link href="/pricing?topup=1" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up Scans</Link>
+              {/* Only show close if paid user (ran out of monthly scans) */}
+              {showFull && (
+                <button onClick={() => setShowPaywall(false)} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>
+              )}
+              {!showFull && (
+                <button onClick={() => setShowPaywall(false)} className="w-full py-2 text-[10px] cursor-pointer" style={{ background: "none", border: "none", color: "rgba(255,255,255,.15)" }}>continue with limited view</button>
+              )}
             </div>
           </div>
         </div>
