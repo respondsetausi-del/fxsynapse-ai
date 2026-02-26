@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
             const email = profile?.email || "unknown";
 
             const planNames: Record<string, string> = { starter: "Starter", pro: "Pro", premium: "Premium" };
-            const planPrices: Record<string, string> = { starter: "R49", pro: "R99", premium: "R199" };
+            const planPrices: Record<string, string> = { starter: "R79", pro: "R149", premium: "R299" };
             const pName = planNames[payment.plan_id] || payment.plan_id;
             const pPrice = planPrices[payment.plan_id] || `R${(payment.amount_cents || 0) / 100}`;
 

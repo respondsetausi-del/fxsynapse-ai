@@ -7,7 +7,7 @@ import ChatWidget from "@/components/ChatWidget";
 
 const PLANS = [
   {
-    id: "starter", name: "Starter", price: 49, period: "/month",
+    id: "starter", name: "Starter", price: 79, period: "/month",
     scans: "15 scans/month", badge: null,
     features: [
       { text: "15 chart scans per month", included: true },
@@ -22,7 +22,7 @@ const PLANS = [
     color: "#4da0ff",
   },
   {
-    id: "pro", name: "Pro", price: 99, period: "/month",
+    id: "pro", name: "Pro", price: 149, period: "/month",
     scans: "50 scans/month", badge: "MOST POPULAR",
     features: [
       { text: "50 chart scans per month", included: true },
@@ -38,7 +38,7 @@ const PLANS = [
     popular: true,
   },
   {
-    id: "premium", name: "Premium", price: 199, period: "/month",
+    id: "premium", name: "Premium", price: 299, period: "/month",
     scans: "Unlimited scans", badge: "BEST VALUE",
     features: [
       { text: "Unlimited chart scans", included: true },
@@ -55,9 +55,9 @@ const PLANS = [
 ];
 
 const TOPUP_PACKS = [
-  { id: "topup_5", credits: 5, price: 25, perScan: "R5.00" },
-  { id: "topup_10", credits: 10, price: 45, perScan: "R4.50", popular: true },
-  { id: "topup_20", credits: 20, price: 80, perScan: "R4.00" },
+  { id: "topup_5", credits: 5, price: 39, perScan: "R7.80" },
+  { id: "topup_10", credits: 10, price: 69, perScan: "R6.90", popular: true },
+  { id: "topup_20", credits: 20, price: 129, perScan: "R6.45" },
 ];
 
 function PricingContent() {

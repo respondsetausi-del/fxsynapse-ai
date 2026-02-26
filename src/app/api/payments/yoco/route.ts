@@ -3,15 +3,15 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 const TOPUP_PACKS = [
-  { id: "topup_5", credits: 5, price_cents: 2500, label: "5 Scans" },
-  { id: "topup_10", credits: 10, price_cents: 4500, label: "10 Scans" },
-  { id: "topup_20", credits: 20, price_cents: 8000, label: "20 Scans" },
+  { id: "topup_5", credits: 5, price_cents: 3900, label: "5 Scans" },
+  { id: "topup_10", credits: 10, price_cents: 6900, label: "10 Scans" },
+  { id: "topup_20", credits: 20, price_cents: 12900, label: "20 Scans" },
 ];
 
 const PLANS: Record<string, { price_cents: number; name: string; monthly_scans: number }> = {
-  starter: { price_cents: 4900, name: "Starter Plan", monthly_scans: 15 },
-  pro: { price_cents: 9900, name: "Pro Plan", monthly_scans: 50 },
-  premium: { price_cents: 19900, name: "Premium Plan", monthly_scans: -1 },
+  starter: { price_cents: 7900, name: "Starter Plan", monthly_scans: 15 },
+  pro: { price_cents: 14900, name: "Pro Plan", monthly_scans: 50 },
+  premium: { price_cents: 29900, name: "Premium Plan", monthly_scans: -1 },
 };
 
 export async function POST(req: NextRequest) {

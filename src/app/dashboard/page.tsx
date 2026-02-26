@@ -304,7 +304,7 @@ export default function Dashboard() {
               <span className="text-sm">⚡</span>
               <div>
                 <span className="text-[11px] font-semibold text-white">Unlock full trade setups, confluence grading & unlimited history</span>
-                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Pro from R99/mo</span>
+                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Pro from R149/mo</span>
               </div>
             </div>
             <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
@@ -477,7 +477,7 @@ export default function Dashboard() {
                         <h3 className="text-base font-bold text-white mb-1">Annotated Chart Locked</h3>
                         <p className="text-[11px] mb-4 text-center px-6" style={{ color: "rgba(255,255,255,.45)" }}>Upgrade to see AI annotations, entry/exit points, and zones on your chart.</p>
                         <div className="flex gap-2">
-                          <Link href="/pricing" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>Upgrade — From R49/mo</Link>
+                          <Link href="/pricing" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>Upgrade — From R79/mo</Link>
                           <Link href="/pricing?topup=1" className="px-5 py-2.5 rounded-xl text-xs font-bold no-underline" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up</Link>
                         </div>
                       </div>
@@ -749,7 +749,7 @@ export default function Dashboard() {
             </p>
             <div className="flex flex-col gap-2">
               <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
-                {credits?.planId === "free" || credits?.planId === "none" ? "View Plans — From R49/mo" : "Upgrade Plan"}
+                {credits?.planId === "free" || credits?.planId === "none" ? "View Plans — From R79/mo" : "Upgrade Plan"}
               </Link>
               <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up Scans</Link>
               <button onClick={() => setShowPaywall(false)} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>

@@ -220,7 +220,7 @@ export default function AffiliatePage() {
         </div>
         <div className="rounded-xl p-4 mb-6 text-left" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.1)" }}>
           <div className="text-[10px] font-mono uppercase tracking-wider mb-2" style={{ color: "#00e5a0" }}>EARNING POTENTIAL</div>
-          {[{ p: "Starter (R49)", e: "R9.80/mo" }, { p: "Pro (R99)", e: "R19.80/mo" }, { p: "Premium (R199)", e: "R39.80/mo" }].map((r, i) => (
+          {[{ p: "Starter (R79)", e: "R15.80/mo" }, { p: "Pro (R149)", e: "R29.80/mo" }, { p: "Premium (R299)", e: "R59.80/mo" }].map((r, i) => (
             <div key={i} className="flex justify-between text-xs py-1" style={{ borderBottom: i < 2 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
               <span style={{ color: "rgba(255,255,255,.5)" }}>Per {r.p} referral</span>
               <span className="font-bold" style={{ color: "#00e5a0" }}>{r.e}</span>
@@ -308,7 +308,7 @@ export default function AffiliatePage() {
             <div className="rounded-xl p-4" style={{ background: "#12131a", border: "1px solid rgba(255,255,255,.04)" }}>
               <div className="text-[10px] font-mono uppercase tracking-wider mb-3" style={{ color: "#4da0ff" }}>COMMISSION STRUCTURE</div>
               <div className="text-xs mb-2" style={{ color: "rgba(255,255,255,.5)" }}>You earn <span className="font-bold text-white">{Math.round((affiliate?.commission_rate || 0.20) * 100)}%</span> of every payment from your referrals.</div>
-              {[{ p: "Starter R49", e: R(Math.round(4900 * (affiliate?.commission_rate || 0.20))) }, { p: "Pro R99", e: R(Math.round(9900 * (affiliate?.commission_rate || 0.20))) }, { p: "Premium R199", e: R(Math.round(19900 * (affiliate?.commission_rate || 0.20))) }].map((r, i) => (
+              {[{ p: "Starter R79", e: R(Math.round(7900 * (affiliate?.commission_rate || 0.20))) }, { p: "Pro R149", e: R(Math.round(14900 * (affiliate?.commission_rate || 0.20))) }, { p: "Premium R299", e: R(Math.round(114900 * (affiliate?.commission_rate || 0.20))) }].map((r, i) => (
                 <div key={i} className="flex justify-between py-1.5 text-xs" style={{ borderBottom: "1px solid rgba(255,255,255,.03)" }}>
                   <span style={{ color: "rgba(255,255,255,.4)" }}>{r.p}</span>
                   <span className="font-bold" style={{ color: "#00e5a0" }}>{r.e}/mo</span>

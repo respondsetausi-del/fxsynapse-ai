@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     // Send confirmation email
     const planNames: Record<string, string> = { starter: "Starter", pro: "Pro", premium: "Premium" };
-    const planPrices: Record<string, string> = { starter: "R49", pro: "R99", premium: "R199" };
+    const planPrices: Record<string, string> = { starter: "R79", pro: "R149", premium: "R299" };
     const pName = planNames[planId] || planId;
     const pPrice = planPrices[planId] || "unknown";
 

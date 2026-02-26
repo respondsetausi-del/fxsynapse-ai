@@ -44,9 +44,9 @@ const FEATURES = [
 ];
 
 const PLANS = [
-  { name: "Starter", price: "R49", period: "/mo", scans: "15", features: ["15 scans/month", "Full annotations", "Trade setups", "S/R levels & zones", "Scan history"], cta: "Get Starter" },
-  { name: "Pro", price: "R99", period: "/mo", scans: "50", features: ["50 scans/month", "Full annotations", "Trade setups", "AI News & Fundamentals", "Confluence grading", "Full history"], cta: "Get Pro", popular: true },
-  { name: "Premium", price: "R199", period: "/mo", scans: "∞", features: ["Unlimited scans", "All Pro features", "AI Fundamentals", "Priority processing", "Priority support"], cta: "Go Premium" },
+  { name: "Starter", price: "R79", period: "/mo", scans: "15", features: ["15 scans/month", "Full annotations", "Trade setups", "S/R levels & zones", "Scan history"], cta: "Get Starter" },
+  { name: "Pro", price: "R149", period: "/mo", scans: "50", features: ["50 scans/month", "Full annotations", "Trade setups", "AI News & Fundamentals", "Confluence grading", "Full history"], cta: "Get Pro", popular: true },
+  { name: "Premium", price: "R299", period: "/mo", scans: "∞", features: ["Unlimited scans", "All Pro features", "AI Fundamentals", "Priority processing", "Priority support"], cta: "Go Premium" },
 ];
 
 // ═══ Glass component ═══
@@ -158,7 +158,7 @@ export default function LandingPage() {
               </Link>
               <Link href="/login" className="no-underline px-8 py-4 rounded-2xl text-[15px] font-semibold transition-all hover:bg-white/[.08]" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff", backdropFilter: "blur(20px)" }}>Sign In</Link>
             </div>
-            <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>No card required • 1 free scan • Plans from R49/mo</p>
+            <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>No card required • 1 free scan • Plans from R79/mo</p>
           </div>
 
           {/* Platform trust bar */}

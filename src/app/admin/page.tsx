@@ -1679,7 +1679,7 @@ export default function AdminDashboard() {
             {/* Plan Modal */}
             {modal.type === "plan" && (
               <div className="flex flex-col gap-2 mb-4">
-                {[{ id: "free", name: "Free", price: "R0" }, { id: "pro", name: "Pro", price: "R99/mo" }, { id: "premium", name: "Premium", price: "R249/mo" }].map((p) => (
+                {[{ id: "free", name: "Free", price: "R0" }, { id: "pro", name: "Pro", price: "R149/mo" }, { id: "premium", name: "Premium", price: "R299/mo" }].map((p) => (
                   <button key={p.id} onClick={() => setModalValue(p.id)} className="flex items-center justify-between px-4 py-3 rounded-xl text-sm cursor-pointer transition-all"
                     style={{ background: modalValue === p.id ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)", border: `1px solid ${modalValue === p.id ? "rgba(0,229,160,.25)" : "rgba(255,255,255,.06)"}`, color: modalValue === p.id ? "#00e5a0" : "rgba(255,255,255,.5)" }}>
                     <span className="font-semibold">{p.name}</span><span className="font-mono text-xs">{p.price}</span>

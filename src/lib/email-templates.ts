@@ -88,15 +88,15 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       ${divider}
       <div style="display:grid;gap:12px;">
         <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px;">
-          <div style="color:#00e5a0;font-weight:700;font-size:13px;">Starter — R49/mo</div>
+          <div style="color:#00e5a0;font-weight:700;font-size:13px;">Starter — R79/mo</div>
           <div style="color:rgba(255,255,255,.4);font-size:12px;margin-top:4px;">15 scans/month • Full annotations • Trade setups</div>
         </div>
         <div style="background:rgba(0,229,160,.03);border:1px solid rgba(0,229,160,.15);border-radius:10px;padding:14px;">
-          <div style="color:#00e5a0;font-weight:700;font-size:13px;">⭐ Pro — R99/mo <span style="font-size:10px;color:#f0b90b;">MOST POPULAR</span></div>
+          <div style="color:#00e5a0;font-weight:700;font-size:13px;">⭐ Pro — R149/mo <span style="font-size:10px;color:#f0b90b;">MOST POPULAR</span></div>
           <div style="color:rgba(255,255,255,.4);font-size:12px;margin-top:4px;">50 scans/month • AI News & Fundamentals • Confluence grading</div>
         </div>
         <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px;">
-          <div style="color:#00e5a0;font-weight:700;font-size:13px;">Premium — R199/mo</div>
+          <div style="color:#00e5a0;font-weight:700;font-size:13px;">Premium — R299/mo</div>
           <div style="color:rgba(255,255,255,.4);font-size:12px;margin-top:4px;">Unlimited scans • Priority processing • Priority support</div>
         </div>
       </div>

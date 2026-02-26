@@ -228,10 +228,10 @@ export async function POST(req: NextRequest) {
           converted.y2 = priceToY(a.price_low as string);
         }
 
-        // Point (Entry/TP/SL): price → y, x at right edge
+        // Point (Entry/TP/SL): price → y, x near current candle
         if (a.type === "point" && a.price) {
           converted.y = priceToY(a.price as string);
-          if (!converted.x) converted.x = 0.92;
+          if (!converted.x) converted.x = 0.82;
         }
 
         // Arrow: entry_price/tp_price → y1/y2
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest) {
             converted.y1 = priceToY(a.entry_price as string);
             converted.y2 = priceToY(a.tp_price as string);
           }
-          if (!converted.x) converted.x = 0.92;
+          if (!converted.x) converted.x = 0.82;
         }
 
         // Trendline: y1_price/y2_price → y1/y2
@@ -305,8 +305,8 @@ export async function POST(req: NextRequest) {
     const sl = points.find((a: Record<string, unknown>) => a.label === "SL");
 
     if (entry && tp && sl) {
-      // Ensure all share same x (right edge)
-      const sharedX = 0.92;
+      // Position at current candle (not at chart edge)
+      const sharedX = 0.82;
       entry.x = sharedX;
       tp.x = sharedX;
       sl.x = sharedX;
@@ -333,7 +333,7 @@ export async function POST(req: NextRequest) {
       // Fix arrow
       const arrow = analysis.annotations.find((a: Record<string, unknown>) => a.type === "arrow");
       if (arrow) {
-        arrow.x = sharedX;
+        arrow.x = sharedX;  // Same as entry
         arrow.y1 = entry.y;
         arrow.y2 = tp.y;
         arrow.color = bias === "short" ? "#ff4d6a" : "#00e5a0";
