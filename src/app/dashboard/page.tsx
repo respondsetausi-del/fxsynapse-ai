@@ -957,6 +957,62 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* First-time Onboarding Modal */}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center" style={{ background: "rgba(0,0,0,.85)", backdropFilter: "blur(24px)" }}>
+          <div className="max-w-[420px] w-full mx-4 rounded-3xl overflow-hidden" style={{ background: "rgba(20,21,30,.92)", border: "1px solid rgba(255,255,255,.08)", backdropFilter: "blur(60px) saturate(1.6)", boxShadow: "0 25px 80px rgba(0,0,0,.5)", animation: "gSU .5s cubic-bezier(.16,1,.3,1)" }}>
+            <div className="px-6 pt-7 pb-4 text-center" style={{ background: "linear-gradient(180deg,rgba(0,229,160,.06),transparent)" }}>
+              <div className="w-16 h-16 rounded-3xl mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", boxShadow: "0 8px 30px rgba(0,229,160,.3)" }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#050507" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
+              </div>
+              <h2 className="text-[22px] font-extrabold text-white mb-1.5" style={{ letterSpacing: "-.5px" }}>
+                Welcome to FXSynapse AI! 👋
+              </h2>
+              <p className="text-[13px]" style={{ color: "rgba(255,255,255,.45)" }}>
+                Here&apos;s how it works — 3 simple steps
+              </p>
+            </div>
+            <div className="px-6 pb-2">
+              <div className="flex flex-col gap-3">
+                {[
+                  { emoji: "📸", title: "Screenshot your chart", desc: "Open MT4, MT5, TradingView, or any trading app. Go fullscreen on any chart and take a screenshot.", color: "#4da0ff" },
+                  { emoji: "📤", title: "Upload it here", desc: "Drop the screenshot into the upload box. Any pair works — Gold, EUR/USD, BTC, Volatility, Boom/Crash — anything.", color: "#00e5a0" },
+                  { emoji: "🎯", title: "Get your trade levels", desc: "In 10 seconds, AI draws entry, take profit, and stop loss on your chart. Plus a buy/sell signal with confidence %.", color: "#f0b90b" },
+                ].map((step, i) => (
+                  <div key={i} className="flex gap-3 items-start rounded-xl p-3" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm" style={{ background: `${step.color}12`, border: `1px solid ${step.color}20` }}>
+                      {step.emoji}
+                    </div>
+                    <div>
+                      <div className="text-[12px] font-bold text-white">{step.title}</div>
+                      <div className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,.4)", lineHeight: 1.5 }}>{step.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-3">
+              <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: "rgba(255,77,106,.04)", border: "1px solid rgba(255,77,106,.08)" }}>
+                <span className="text-[11px]">⚠️</span>
+                <span className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>
+                  Only upload <strong style={{ color: "#ff4d6a" }}>trading charts with candles</strong>. Selfies, memes, and random images won&apos;t work.
+                </span>
+              </div>
+            </div>
+            <div className="px-6 pb-6 pt-2">
+              <button
+                onClick={() => { setShowOnboarding(false); localStorage.setItem("fxs_onboarded", "1"); }}
+                className="w-full py-3.5 rounded-2xl text-[14px] font-bold cursor-pointer transition-all hover:scale-[1.02]"
+                style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none", color: "#050507", boxShadow: "0 6px 25px rgba(0,229,160,.3)" }}
+              >
+                Got it — Let me scan! 📸
+              </button>
+              <p className="text-center text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.2)" }}>You have 1 free scan to try</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
