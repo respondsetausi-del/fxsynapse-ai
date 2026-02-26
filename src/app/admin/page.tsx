@@ -2,6 +2,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+
+const SymbolMonitor = dynamic(() => import("@/components/SymbolMonitor"), { ssr: false });
 
 /* ─── Types ─── */
 interface Stats {
@@ -1907,6 +1910,11 @@ export default function AdminDashboard() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* ── Symbol Monitor — Live Prices ── */}
+            <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+              <SymbolMonitor />
             </div>
 
             {/* Terminal iframe */}
