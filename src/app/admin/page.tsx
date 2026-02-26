@@ -1558,33 +1558,81 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Broadcast to All Affiliates */}
+            <div className="rounded-xl overflow-hidden" style={{ background: "#12131a", border: "1px solid rgba(77,160,255,.1)" }}>
+              <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+                <span className="text-xs font-bold" style={{ color: "#4da0ff" }}>📢 Broadcast to All Affiliates</span>
+                <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{affData?.stats?.activeAffiliates || 0} active</span>
+              </div>
+              <div className="px-4 py-3 flex gap-2">
+                <input type="text" placeholder="Type broadcast message for all affiliates..."
+                  className="flex-1 px-3 py-2.5 rounded-xl text-xs outline-none"
+                  style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff" }}
+                  id="affBroadcastInput"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") document.getElementById("affBroadcastBtn")?.click();
+                  }}
+                />
+                <button id="affBroadcastBtn" onClick={async () => {
+                  const input = document.getElementById("affBroadcastInput") as HTMLInputElement;
+                  const msg = input?.value?.trim();
+                  if (!msg) return;
+                  if (!confirm(`Send to all ${affData?.stats?.activeAffiliates || 0} active affiliates?\n\n"${msg}"`)) return;
+                  try {
+                    const res = await fetch("/api/admin/affiliates", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "broadcast_affiliates", message: msg }),
+                    });
+                    const data = await res.json();
+                    if (data.success) { showToast(`📢 Broadcast sent to ${data.sent} affiliates`); input.value = ""; loadAffChatConvos(); }
+                    else showToast(data.error || "Failed", "error");
+                  } catch { showToast("Broadcast failed", "error"); }
+                }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold cursor-pointer whitespace-nowrap"
+                  style={{ background: "linear-gradient(135deg,#4da0ff,#2d7dd2)", color: "#fff", border: "none" }}>
+                  📢 Send All
+                </button>
+              </div>
+            </div>
+
             {/* Affiliates Table */}
             <div className="rounded-xl overflow-hidden" style={{ background: "#12131a", border: "1px solid rgba(255,255,255,.04)" }}>
               <div className="px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,.04)" }}>
                 <span className="text-xs font-bold text-white">All Affiliates</span>
               </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead><tr style={{ borderBottom: "1px solid rgba(255,255,255,.04)" }}>
-                  {["Affiliate", "Code", "Rate", "Clicks", "Signups", "Conversions", "Earned", "Balance", "Status", "Actions"].map(h => (
-                    <th key={h} className="text-left px-3 py-2.5 font-mono uppercase text-[9px]" style={{ color: "rgba(255,255,255,.3)" }}>{h}</th>
+                  {["Affiliate", "Code", "Plan", "Credits", "Rate", "Clicks", "Signups", "Conv.", "Earned", "Balance", "Status", "Actions"].map(h => (
+                    <th key={h} className="text-left px-3 py-2.5 font-mono uppercase text-[9px] whitespace-nowrap" style={{ color: "rgba(255,255,255,.3)" }}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
                   {(!affData?.affiliates || affData.affiliates.length === 0) ? (
-                    <tr><td colSpan={10} className="px-4 py-8 text-center" style={{ color: "rgba(255,255,255,.3)" }}>No affiliates yet</td></tr>
-                  ) : affData.affiliates.map((a: any, i: number) => (
+                    <tr><td colSpan={12} className="px-4 py-8 text-center" style={{ color: "rgba(255,255,255,.3)" }}>No affiliates yet</td></tr>
+                  ) : affData.affiliates.map((a: any, i: number) => {
+                    const p = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
+                    return (
                     <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,.02)" }}>
                       <td className="px-3 py-2.5">
-                        <div className="font-semibold text-white">{a.profiles?.full_name || "—"}</div>
-                        <div className="text-[10px]" style={{ color: "rgba(255,255,255,.3)" }}>{a.profiles?.email}</div>
+                        <div className="font-semibold text-white">{p?.full_name || "—"}</div>
+                        <div className="text-[10px]" style={{ color: "rgba(255,255,255,.3)" }}>{p?.email}</div>
                       </td>
                       <td className="px-3 py-2.5 font-mono font-bold" style={{ color: "#00e5a0" }}>{a.ref_code}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{
+                          background: p?.subscription_status === "active" ? "rgba(0,229,160,.1)" : "rgba(255,255,255,.04)",
+                          color: p?.subscription_status === "active" ? "#00e5a0" : "rgba(255,255,255,.35)",
+                        }}>{p?.plan_id || "free"}</span>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono font-bold" style={{ color: (p?.credits_balance || 0) > 0 ? "#4da0ff" : "rgba(255,255,255,.2)" }}>{p?.credits_balance || 0}</td>
                       <td className="px-3 py-2.5 font-mono" style={{ color: "rgba(255,255,255,.5)" }}>{Math.round(a.commission_rate * 100)}%</td>
                       <td className="px-3 py-2.5 font-mono text-white">{a.total_clicks}</td>
                       <td className="px-3 py-2.5 font-mono text-white">{a.total_signups}</td>
                       <td className="px-3 py-2.5 font-mono" style={{ color: "#00e5a0" }}>{a.total_conversions}</td>
-                      <td className="px-3 py-2.5 font-mono" style={{ color: "#4da0ff" }}>R{(a.total_earned_cents / 100).toFixed(2)}</td>
-                      <td className="px-3 py-2.5 font-mono font-bold" style={{ color: "#f0b90b" }}>R{((a.total_earned_cents - a.total_paid_cents) / 100).toFixed(2)}</td>
+                      <td className="px-3 py-2.5 font-mono" style={{ color: "#4da0ff" }}>R{(a.total_earned_cents / 100).toFixed(0)}</td>
+                      <td className="px-3 py-2.5 font-mono font-bold" style={{ color: "#f0b90b" }}>R{((a.total_earned_cents - a.total_paid_cents) / 100).toFixed(0)}</td>
                       <td className="px-3 py-2.5">
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{
                           background: a.status === "active" ? "rgba(0,229,160,.1)" : "rgba(255,77,106,.1)",
@@ -1592,20 +1640,52 @@ export default function AdminDashboard() {
                         }}>{a.status}</span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <button onClick={async () => {
-                          const action = a.status === "active" ? "suspend_affiliate" : "activate_affiliate";
-                          await fetch("/api/admin/affiliates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, affiliateId: a.id }) });
-                          const r = await fetch("/api/admin/affiliates?tab=overview").then(r => r.json());
-                          setAffData(r);
-                        }} className="text-[10px] font-bold px-2 py-1 rounded cursor-pointer"
-                          style={{ background: a.status === "active" ? "rgba(255,77,106,.1)" : "rgba(0,229,160,.1)", border: "none", color: a.status === "active" ? "#ff4d6a" : "#00e5a0" }}>
-                          {a.status === "active" ? "Suspend" : "Activate"}
-                        </button>
+                        <div className="flex gap-1">
+                          {/* Message button — opens chat to this affiliate */}
+                          <button onClick={() => { setAffChatActive(a.id); loadAffChatMessages(a.id); }}
+                            className="text-[9px] font-bold px-2 py-1 rounded cursor-pointer"
+                            style={{ background: "rgba(77,160,255,.1)", border: "none", color: "#4da0ff" }}
+                            title="Open chat">💬</button>
+                          {/* Credit button */}
+                          <button onClick={async () => {
+                            const credits = prompt(`Give scan credits to ${p?.full_name || p?.email}:\n\nCurrent balance: ${p?.credits_balance || 0}\nEnter amount (1-100):`);
+                            if (!credits) return;
+                            const reason = prompt("Reason (optional):") || "Affiliate marketing reward";
+                            try {
+                              const res = await fetch("/api/admin/affiliates", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "credit_affiliate", affiliateId: a.id, credits, reason }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                showToast(`🎁 ${credits} credits → ${p?.full_name || "Affiliate"} (new bal: ${data.newBalance})`);
+                                const r = await fetch("/api/admin/affiliates?tab=overview").then(r => r.json());
+                                setAffData(r);
+                              } else showToast(data.error || "Failed", "error");
+                            } catch { showToast("Credit failed", "error"); }
+                          }}
+                            className="text-[9px] font-bold px-2 py-1 rounded cursor-pointer"
+                            style={{ background: "rgba(0,229,160,.1)", border: "none", color: "#00e5a0" }}
+                            title="Give credits">🎁</button>
+                          {/* Suspend/Activate */}
+                          <button onClick={async () => {
+                            const act = a.status === "active" ? "suspend_affiliate" : "activate_affiliate";
+                            await fetch("/api/admin/affiliates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: act, affiliateId: a.id }) });
+                            const r = await fetch("/api/admin/affiliates?tab=overview").then(r => r.json());
+                            setAffData(r);
+                          }} className="text-[9px] font-bold px-2 py-1 rounded cursor-pointer"
+                            style={{ background: a.status === "active" ? "rgba(255,77,106,.1)" : "rgba(0,229,160,.1)", border: "none", color: a.status === "active" ? "#ff4d6a" : "#00e5a0" }}>
+                            {a.status === "active" ? "⏸" : "▶"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* Pending Payouts */}

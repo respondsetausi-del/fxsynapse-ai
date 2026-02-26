@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       // All affiliates with profile info
       const { data: affiliates } = await service
         .from("affiliates")
-        .select("*, profiles:user_id(email, full_name, plan_id)")
+        .select("*, profiles:user_id(email, full_name, plan_id, subscription_status, credits_balance)")
         .order("total_earned_cents", { ascending: false });
 
       // Summary stats
@@ -160,6 +160,58 @@ export async function POST(req: NextRequest) {
       const r = Math.max(0.05, Math.min(0.50, parseFloat(rate)));
       await service.from("affiliates").update({ commission_rate: r }).eq("id", affiliateId);
       return NextResponse.json({ success: true });
+    }
+
+    // Credit an affiliate's account with scan credits
+    if (action === "credit_affiliate") {
+      const { affiliateId, credits, reason } = body;
+      const amount = parseInt(credits);
+      if (!amount || amount < 1 || amount > 100) return NextResponse.json({ error: "Credits must be 1-100" }, { status: 400 });
+
+      // Get affiliate's user_id
+      const { data: aff } = await service.from("affiliates").select("user_id").eq("id", affiliateId).single();
+      if (!aff) return NextResponse.json({ error: "Affiliate not found" }, { status: 404 });
+
+      // Get current balance
+      const { data: profile } = await service.from("profiles").select("credits_balance").eq("id", aff.user_id).single();
+      if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+
+      // Add credits
+      await service.from("profiles").update({ credits_balance: (profile.credits_balance || 0) + amount }).eq("id", aff.user_id);
+
+      // Log transaction
+      await service.from("credit_transactions").insert({
+        user_id: aff.user_id,
+        amount,
+        type: "admin_grant",
+        description: reason || `Affiliate reward: ${amount} scan credits`,
+        created_by: user.id,
+      });
+
+      return NextResponse.json({ success: true, newBalance: (profile.credits_balance || 0) + amount });
+    }
+
+    // Broadcast message to all active affiliates
+    if (action === "broadcast_affiliates") {
+      const { message } = body;
+      if (!message?.trim()) return NextResponse.json({ error: "Message required" }, { status: 400 });
+
+      // Get all active affiliates
+      const { data: affiliates } = await service.from("affiliates").select("id").eq("status", "active");
+      if (!affiliates || affiliates.length === 0) return NextResponse.json({ error: "No active affiliates" }, { status: 400 });
+
+      // Insert message for each affiliate
+      const messages = affiliates.map(a => ({
+        affiliate_id: a.id,
+        sender_role: "admin",
+        sender_id: user.id,
+        message: message.trim(),
+      }));
+
+      const { error: insertErr } = await service.from("affiliate_messages").insert(messages);
+      if (insertErr) throw insertErr;
+
+      return NextResponse.json({ success: true, sent: affiliates.length });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

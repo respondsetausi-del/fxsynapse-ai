@@ -87,11 +87,11 @@ export default function AffiliatePage() {
     }
   }, [chatMessages, chatOpen]);
 
-  // Load chat when affiliate dashboard loads, poll every 15s
+  // Load chat when affiliate dashboard loads, poll faster when open
   useEffect(() => {
     if (!isAffiliate) return;
     loadChat();
-    const interval = setInterval(loadChat, 15000);
+    const interval = setInterval(loadChat, chatOpen ? 4000 : 8000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAffiliate, chatOpen]);
@@ -263,6 +263,29 @@ export default function AffiliatePage() {
       </div>
 
       <div className="max-w-5xl mx-auto" style={{ padding: "20px 24px" }}>
+
+        {/* Unread message banner — impossible to miss */}
+        {chatUnread > 0 && !chatOpen && (
+          <button onClick={() => { setChatOpen(true); setChatUnread(0); loadChat(); }}
+            className="w-full mb-4 rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer"
+            style={{
+              background: "linear-gradient(135deg, rgba(77,160,255,.08), rgba(0,229,160,.06))",
+              border: "1px solid rgba(77,160,255,.2)",
+              animation: "pulse 2s infinite",
+            }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "rgba(77,160,255,.15)" }}>
+                <span className="text-lg">💬</span>
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-bold text-white">You have {chatUnread} new message{chatUnread > 1 ? "s" : ""} from FXSynapse</div>
+                <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Tap to read and reply</div>
+              </div>
+            </div>
+            <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+              style={{ background: "#ff4d6a", color: "#fff" }}>{chatUnread}</span>
+          </button>
+        )}
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           {[
@@ -545,8 +568,13 @@ export default function AffiliatePage() {
 
         {/* Chat Toggle Button */}
         <button onClick={() => { setChatOpen(!chatOpen); if (!chatOpen) { setChatUnread(0); loadChat(); } }}
-          className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer shadow-lg"
-          style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none", boxShadow: "0 4px 20px rgba(0,229,160,.3)", marginLeft: "auto", display: "block" }}>
+          className="w-14 h-14 rounded-full flex items-center justify-center cursor-pointer shadow-lg relative"
+          style={{
+            background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none",
+            boxShadow: chatUnread > 0 && !chatOpen ? "0 4px 20px rgba(255,77,106,.4), 0 0 40px rgba(255,77,106,.15)" : "0 4px 20px rgba(0,229,160,.3)",
+            marginLeft: "auto", display: "block",
+            animation: chatUnread > 0 && !chatOpen ? "pulse 1.5s infinite" : "none",
+          }}>
           <span className="text-2xl">{chatOpen ? "✕" : "💬"}</span>
           {chatUnread > 0 && !chatOpen && (
             <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
