@@ -90,43 +90,42 @@ export function useAnnotatedCanvas(
       let ly = y - th / 2;
       ly = Math.max(by + 1, Math.min(by + bh - th - 1, ly));
 
-      // Dark frosted background for readability
-      ctx.fillStyle = "rgba(10,11,16,0.82)";
+      // Dark frosted background
+      ctx.fillStyle = "rgba(10,11,16,0.85)";
       rr(lx, ly, tw, th, 4);
       ctx.fill();
-      // Left accent
-      ctx.fillStyle = rgba(mc, 0.8);
+      // Left accent — bright
+      ctx.fillStyle = rgba(color, 0.9);
       ctx.fillRect(lx, ly + 2, 2, th - 4);
       // Border
-      ctx.strokeStyle = rgba(mc, 0.25);
+      ctx.strokeStyle = rgba(mc, 0.3);
       ctx.lineWidth = 0.5;
       rr(lx, ly, tw, th, 4);
       ctx.stroke();
-      // Text
-      ctx.fillStyle = rgba(mc, 0.95);
+      // Text — BRIGHT, use original color not muted
+      ctx.fillStyle = rgba(color, 1);
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
       ctx.fillText(text, lx + px + 1, ly + th / 2);
     };
 
-    // ── Small badge ──
+    // ── Small badge — bright text on dark bg ──
     const badge = (text: string, x: number, y: number, color: string) => {
-      const mc = mute(color);
       ctx.font = `700 ${fsS}px "JetBrains Mono", monospace`;
       const m = ctx.measureText(text);
       const px = 4, py = 2;
       const tw = m.width + px * 2, th = fsS + py * 2 + 1;
       const lx = x - tw / 2, ly = y - th - 6;
 
-      ctx.fillStyle = "rgba(10,11,16,0.8)";
+      ctx.fillStyle = "rgba(10,11,16,0.85)";
       rr(lx, ly, tw, th, th / 2);
       ctx.fill();
-      ctx.strokeStyle = rgba(mc, 0.3);
+      ctx.strokeStyle = rgba(color, 0.35);
       ctx.lineWidth = 0.5;
       rr(lx, ly, tw, th, th / 2);
       ctx.stroke();
       // Pointer
-      ctx.fillStyle = "rgba(10,11,16,0.8)";
+      ctx.fillStyle = "rgba(10,11,16,0.85)";
       ctx.beginPath();
       ctx.moveTo(x - 3, ly + th);
       ctx.lineTo(x, ly + th + 3);
@@ -134,7 +133,8 @@ export function useAnnotatedCanvas(
       ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = rgba(mc, 0.9);
+      // Text — BRIGHT
+      ctx.fillStyle = rgba(color, 1);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(text, x, ly + th / 2);
@@ -208,18 +208,18 @@ export function useAnnotatedCanvas(
         // Small subtle label — left edge only, reduced opacity
         if (p > 0.5 && a.label) {
           const shortLabel = a.label.replace("Zone", "").replace("zone", "").trim();
-          ctx.globalAlpha = 0.55;
-          const mc2 = mute(a.bc || a.color);
+          ctx.globalAlpha = 0.7;
+          const mc2 = a.bc || a.color;
           ctx.font = `600 ${fsS}px "JetBrains Mono", monospace`;
           const m = ctx.measureText(shortLabel);
           const px = 4, py = 2;
           const tw = m.width + px * 2, th = fsS + py * 2;
           const lx = bx + 4, ly = ztop + (zh - th) / 2;
 
-          ctx.fillStyle = "rgba(10,11,16,0.7)";
+          ctx.fillStyle = "rgba(10,11,16,0.8)";
           rr(lx, ly, tw, th, 3);
           ctx.fill();
-          ctx.fillStyle = rgba(mc2, 0.7);
+          ctx.fillStyle = rgba(mc2, 1);
           ctx.textBaseline = "middle";
           ctx.textAlign = "left";
           ctx.fillText(shortLabel, lx + px, ly + th / 2);
