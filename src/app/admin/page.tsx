@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 
 const SymbolMonitor = dynamic(() => import("@/components/SymbolMonitor"), { ssr: false });
 const VoiceAssistant = dynamic(() => import("@/components/VoiceAssistant"), { ssr: false });
+const TradingTerminal = dynamic(() => import("@/components/TradingTerminal"), { ssr: false });
 
 /* ─── Types ─── */
 interface Stats {
@@ -1840,78 +1841,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ═══ TESTS TAB — MT5 Web Terminal ═══ */}
+        {/* ═══ TESTS TAB — Trading Terminal ═══ */}
         {tab === "tests" && (
           <div className="space-y-4">
-            {/* Terminal Connection Config */}
-            <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.15)" }}>
-                  <span className="text-sm">⚡</span>
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-white">MT5 Web Terminal</div>
-                  <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Connect to Deriv MT5 account for live testing</div>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: terminalConnected ? "#00e5a0" : "rgba(255,255,255,.15)", boxShadow: terminalConnected ? "0 0 8px #00e5a0" : "none" }} />
-                  <span className="text-[10px] font-mono" style={{ color: terminalConnected ? "#00e5a0" : "rgba(255,255,255,.3)" }}>
-                    {terminalConnected ? "CONNECTED" : "DISCONNECTED"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                <div>
-                  <label className="block text-[9px] font-mono mb-1 tracking-wider" style={{ color: "rgba(255,255,255,.3)" }}>LOGIN ID</label>
-                  <input type="text" value={terminalLogin} onChange={(e) => setTerminalLogin(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm text-white outline-none font-mono"
-                    style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}
-                    placeholder="e.g. 21632565" />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-mono mb-1 tracking-wider" style={{ color: "rgba(255,255,255,.3)" }}>SERVER</label>
-                  <input type="text" value={terminalServer} onChange={(e) => setTerminalServer(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm text-white outline-none font-mono"
-                    style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}
-                    placeholder="e.g. DerivBVI-Server" />
-                </div>
-                <div className="flex items-end gap-2">
-                  <button onClick={() => {
-                    const url = `https://mt5-real01-web-bvi.deriv.com/terminal?login=${encodeURIComponent(terminalLogin)}&server=${encodeURIComponent(terminalServer)}`;
-                    setTerminalUrl(url);
-                    setTerminalConnected(true);
-                    showToast(`Terminal connecting to ${terminalLogin}@${terminalServer}`);
-                  }} className="flex-1 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-all hover:scale-[1.02]"
-                    style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none", color: "#050507" }}>
-                    Connect
-                  </button>
-                  <button onClick={() => { setTerminalConnected(false); setTerminalUrl(""); }}
-                    className="py-2.5 px-3 rounded-xl text-[12px] font-semibold cursor-pointer"
-                    style={{ background: "rgba(255,77,106,.08)", border: "1px solid rgba(255,77,106,.15)", color: "#ff4d6a" }}>
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              {/* Quick server presets */}
-              <div className="flex gap-2 flex-wrap">
-                <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>Presets:</span>
-                {[
-                  { label: "Deriv BVI Real", login: "21632565", server: "DerivBVI-Server" },
-                  { label: "Deriv SVG Demo", login: "", server: "DerivSVG-Demo" },
-                  { label: "Deriv BVI Demo", login: "", server: "DerivBVI-Demo" },
-                ].map((preset) => (
-                  <button key={preset.label} onClick={() => {
-                    if (preset.login) setTerminalLogin(preset.login);
-                    setTerminalServer(preset.server);
-                  }} className="px-2 py-0.5 rounded text-[9px] font-mono cursor-pointer transition-all hover:opacity-80"
-                    style={{ background: "rgba(77,160,255,.06)", border: "1px solid rgba(77,160,255,.1)", color: "#4da0ff" }}>
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* ── Trading Terminal — Charts, Account, Watchlist ── */}
+            <TradingTerminal />
 
             {/* ── AI Voice Assistant ── */}
             <VoiceAssistant />
@@ -1920,51 +1854,6 @@ export default function AdminDashboard() {
             <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
               <SymbolMonitor />
             </div>
-
-            {/* Terminal iframe */}
-            {terminalConnected && terminalUrl && (
-              <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,.08)", boxShadow: "0 8px 32px rgba(0,0,0,.3)" }}>
-                <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "rgba(255,255,255,.02)", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: "rgba(255,77,106,.6)" }} />
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: "rgba(240,185,11,.6)" }} />
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: "rgba(0,229,160,.6)" }} />
-                    </div>
-                    <span className="text-[10px] font-mono ml-2" style={{ color: "rgba(255,255,255,.25)" }}>
-                      MT5 Terminal — {terminalLogin}@{terminalServer}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => window.open(terminalUrl, "_blank")}
-                      className="px-2 py-0.5 rounded text-[9px] font-mono cursor-pointer"
-                      style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.35)" }}>
-                      ↗ Pop Out
-                    </button>
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#00e5a0", animation: "pulse 2s infinite" }} />
-                    <span className="text-[9px] font-mono" style={{ color: "#00e5a0" }}>LIVE</span>
-                  </div>
-                </div>
-                <iframe
-                  src={terminalUrl}
-                  className="w-full"
-                  style={{ height: "calc(100vh - 280px)", minHeight: 500, border: "none", background: "#1a1a2e" }}
-                  allow="clipboard-read; clipboard-write"
-                  title="MT5 Web Terminal"
-                />
-              </div>
-            )}
-
-            {/* Empty state */}
-            {!terminalConnected && (
-              <div className="rounded-2xl p-12 text-center" style={{ background: "rgba(255,255,255,.015)", border: "1px solid rgba(255,255,255,.04)" }}>
-                <div className="text-4xl mb-4">📊</div>
-                <div className="text-sm font-semibold text-white mb-1">No Terminal Connected</div>
-                <div className="text-[11px] max-w-xs mx-auto" style={{ color: "rgba(255,255,255,.3)" }}>
-                  Enter your MT5 login ID and server above, then click Connect to load the web terminal.
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
