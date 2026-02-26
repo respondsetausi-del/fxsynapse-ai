@@ -4,6 +4,7 @@ import {
   Candle, Signal, SignalCondition, DEFAULT_SIGNAL_CONDITIONS,
   detectSignals, calculateSummary, IndicatorSummary,
   SMA, EMA, RSI, MACD, BollingerBands, ATR, Stochastic,
+  detectCandlePatterns, CandlePattern,
 } from "@/lib/indicators";
 
 // ═══ Types ═══
@@ -25,6 +26,7 @@ interface WatchedSymbol {
   candle_sub_id: string | null;
   timeframe: number;  // granularity in seconds
   summary: IndicatorSummary | null;
+  patterns: CandlePattern[];
 }
 
 interface IndicatorConfig {
@@ -218,6 +220,26 @@ export default function SymbolMonitor() {
     // Check signals
     const tfLabel = TIMEFRAMES.find((t) => t.value === sym.timeframe)?.label || "H1";
     const newSignals = detectSignals(sym.symbol, sym.candles, signalConditions);
+
+    // Detect candle patterns
+    const patterns = detectCandlePatterns(sym.candles);
+
+    // Generate signals from strong patterns (strength >= 2)
+    for (const pat of patterns) {
+      if (pat.strength >= 2 && pat.type !== "neutral") {
+        newSignals.push({
+          id: `pat_${pat.name}_${Date.now()}`,
+          pair: sym.symbol,
+          type: pat.type === "bullish" ? "buy" : "sell",
+          condition: `${pat.emoji} ${pat.name} (strength ${pat.strength}/3)`,
+          price: sym.candles[sym.candles.length - 1].close,
+          time: sym.candles[sym.candles.length - 1].time,
+          indicator: "PATTERN",
+          value: pat.strength,
+        });
+      }
+    }
+
     if (newSignals.length > 0) {
       setSignals((prev) => {
         const deduped = [...prev];
@@ -230,7 +252,7 @@ export default function SymbolMonitor() {
       });
     }
 
-    return { ...sym, indicators: updatedIndicators, summary };
+    return { ...sym, indicators: updatedIndicators, summary, patterns };
   }, [signalConditions]);
 
   // ═══ Subscribe / Unsubscribe ═══
@@ -241,7 +263,7 @@ export default function SymbolMonitor() {
       bid: sym.spot || 0, ask: sym.spot || 0, last: sym.spot || 0, prev: sym.spot || 0,
       high: sym.spot || 0, low: sym.spot || 0, change: 0, changePct: 0, spread: 0,
       tick_time: "", sub_id: null, flash: null,
-      indicators: [], candles: [], candle_sub_id: null, timeframe: 3600, summary: null,
+      indicators: [], candles: [], candle_sub_id: null, timeframe: 3600, summary: null, patterns: [],
     };
     setWatchlist((prev) => [...prev, newEntry]);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -287,7 +309,7 @@ export default function SymbolMonitor() {
       // If no more indicators, unsubscribe candles
       if (updated.indicators.length === 0 && s.candle_sub_id && wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ forget: s.candle_sub_id }));
-        updated.candles = []; updated.candle_sub_id = null; updated.summary = null;
+        updated.candles = []; updated.candle_sub_id = null; updated.summary = null; updated.patterns = [];
       }
       return updated;
     }));
@@ -307,7 +329,7 @@ export default function SymbolMonitor() {
           end: "latest", granularity: tf, style: "candles", subscribe: 1,
         }));
       }
-      return { ...s, timeframe: tf, candles: [], candle_sub_id: null, summary: null };
+      return { ...s, timeframe: tf, candles: [], candle_sub_id: null, summary: null, patterns: [] };
     }));
   }, []);
 
@@ -453,6 +475,12 @@ export default function SymbolMonitor() {
                           background: s.summary.overallBias.includes("buy") ? "rgba(0,229,160,.1)" : s.summary.overallBias.includes("sell") ? "rgba(255,77,106,.1)" : "rgba(255,255,255,.05)",
                           color: s.summary.overallBias.includes("buy") ? "#00e5a0" : s.summary.overallBias.includes("sell") ? "#ff4d6a" : "rgba(255,255,255,.3)",
                         }}>{s.summary.overallBias.replace("_", " ").toUpperCase()}</span>}
+                        {s.patterns.filter(p => p.strength >= 2).map((pat, pi) => (
+                          <span key={pi} className="text-[8px] font-mono font-bold px-1 rounded" style={{
+                            background: pat.type === "bullish" ? "rgba(0,229,160,.1)" : pat.type === "bearish" ? "rgba(255,77,106,.1)" : "rgba(255,255,255,.05)",
+                            color: pat.type === "bullish" ? "#00e5a0" : pat.type === "bearish" ? "#ff4d6a" : "rgba(255,255,255,.3)",
+                          }}>{pat.emoji} {pat.name}</span>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -513,6 +541,33 @@ export default function SymbolMonitor() {
                         </div>
                         <span className="text-[9px] font-mono font-bold" style={{ color: "#00e5a0" }}>{s.summary.buyScore}B</span>
                         <span className="text-[9px] font-mono font-bold" style={{ color: "#ff4d6a" }}>{s.summary.sellScore}S</span>
+                      </div>
+                    )}
+
+                    {/* Detected patterns */}
+                    {s.patterns.length > 0 && (
+                      <div className="mb-3">
+                        <div className="text-[9px] font-mono mb-2" style={{ color: "rgba(255,255,255,.2)" }}>CANDLE PATTERNS DETECTED</div>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {s.patterns.map((pat, pi) => (
+                            <div key={pi} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{
+                              background: pat.type === "bullish" ? "rgba(0,229,160,.06)" : pat.type === "bearish" ? "rgba(255,77,106,.06)" : "rgba(255,255,255,.03)",
+                              border: `1px solid ${pat.type === "bullish" ? "rgba(0,229,160,.12)" : pat.type === "bearish" ? "rgba(255,77,106,.12)" : "rgba(255,255,255,.06)"}`,
+                            }}>
+                              <span className="text-[11px]">{pat.emoji}</span>
+                              <div>
+                                <div className="text-[10px] font-bold" style={{ color: pat.type === "bullish" ? "#00e5a0" : pat.type === "bearish" ? "#ff4d6a" : "rgba(255,255,255,.5)" }}>{pat.name}</div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>{pat.type.toUpperCase()}</span>
+                                  <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>•</span>
+                                  <span className="text-[8px] font-mono" style={{ color: pat.strength === 3 ? "#f0b90b" : pat.strength === 2 ? "rgba(255,255,255,.35)" : "rgba(255,255,255,.2)" }}>
+                                    {"★".repeat(pat.strength)}{"☆".repeat(3 - pat.strength)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 

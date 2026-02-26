@@ -515,3 +515,191 @@ export function calculateSummary(candles: Candle[]): IndicatorSummary | null {
     sellScore,
   };
 }
+
+// ============================================================
+// CANDLESTICK PATTERN DETECTION ENGINE
+// ============================================================
+
+export interface CandlePattern {
+  name: string;
+  type: "bullish" | "bearish" | "neutral";
+  strength: 1 | 2 | 3; // 1=weak, 2=medium, 3=strong
+  emoji: string;
+  index: number;  // candle index where detected
+}
+
+// Helper: body and wick measurements
+function body(c: Candle) { return Math.abs(c.close - c.open); }
+function upperWick(c: Candle) { return c.high - Math.max(c.open, c.close); }
+function lowerWick(c: Candle) { return Math.min(c.open, c.close) - c.low; }
+function range(c: Candle) { return c.high - c.low; }
+function isBullish(c: Candle) { return c.close > c.open; }
+function isBearish(c: Candle) { return c.close < c.open; }
+function bodyMidpoint(c: Candle) { return (c.open + c.close) / 2; }
+function avgBody(candles: Candle[], end: number, lookback: number = 10): number {
+  let sum = 0, count = 0;
+  for (let i = Math.max(0, end - lookback); i < end; i++) { sum += body(candles[i]); count++; }
+  return count > 0 ? sum / count : 0;
+}
+
+export function detectCandlePatterns(candles: Candle[]): CandlePattern[] {
+  const patterns: CandlePattern[] = [];
+  if (candles.length < 5) return patterns;
+
+  const i = candles.length - 1;  // current candle
+  const c = candles[i];
+  const p = candles[i - 1];      // previous
+  const pp = i >= 2 ? candles[i - 2] : null; // 2 back
+  const avg = avgBody(candles, i);
+  const r = range(c);
+
+  if (r === 0 || avg === 0) return patterns;
+
+  const bodySize = body(c);
+  const upperW = upperWick(c);
+  const lowerW = lowerWick(c);
+
+  // ── SINGLE CANDLE PATTERNS ──
+
+  // Doji — body < 10% of range
+  if (bodySize < r * 0.1) {
+    if (lowerW > r * 0.6) {
+      patterns.push({ name: "Dragonfly Doji", type: "bullish", strength: 2, emoji: "🜲", index: i });
+    } else if (upperW > r * 0.6) {
+      patterns.push({ name: "Gravestone Doji", type: "bearish", strength: 2, emoji: "🜲", index: i });
+    } else {
+      patterns.push({ name: "Doji", type: "neutral", strength: 1, emoji: "✚", index: i });
+    }
+  }
+
+  // Hammer — small body at top, long lower wick (2x+ body), tiny upper wick
+  if (lowerW >= bodySize * 2 && upperW < bodySize * 0.5 && bodySize > r * 0.1) {
+    // Check prior trend (last 5 candles bearish = hammer is bullish reversal)
+    const priorTrend = candles[i - 1].close < candles[Math.max(0, i - 5)].close;
+    if (priorTrend) {
+      patterns.push({ name: "Hammer", type: "bullish", strength: 2, emoji: "🔨", index: i });
+    } else {
+      patterns.push({ name: "Hanging Man", type: "bearish", strength: 2, emoji: "🔨", index: i });
+    }
+  }
+
+  // Inverted Hammer / Shooting Star — long upper wick, small body at bottom
+  if (upperW >= bodySize * 2 && lowerW < bodySize * 0.5 && bodySize > r * 0.1) {
+    const priorTrend = candles[i - 1].close < candles[Math.max(0, i - 5)].close;
+    if (priorTrend) {
+      patterns.push({ name: "Inverted Hammer", type: "bullish", strength: 2, emoji: "⭐", index: i });
+    } else {
+      patterns.push({ name: "Shooting Star", type: "bearish", strength: 2, emoji: "💫", index: i });
+    }
+  }
+
+  // Marubozu — very large body, tiny wicks
+  if (bodySize > avg * 1.5 && upperW < bodySize * 0.1 && lowerW < bodySize * 0.1) {
+    patterns.push({
+      name: isBullish(c) ? "Bullish Marubozu" : "Bearish Marubozu",
+      type: isBullish(c) ? "bullish" : "bearish",
+      strength: 3, emoji: "🟩", index: i,
+    });
+  }
+
+  // Spinning Top — small body, both wicks larger than body
+  if (bodySize < avg * 0.5 && upperW > bodySize && lowerW > bodySize && bodySize > r * 0.1) {
+    patterns.push({ name: "Spinning Top", type: "neutral", strength: 1, emoji: "🔄", index: i });
+  }
+
+  // Pin Bar — one wick 3x+ body, other wick tiny
+  if (lowerW >= bodySize * 3 && upperW < bodySize * 0.3) {
+    patterns.push({ name: "Bullish Pin Bar", type: "bullish", strength: 3, emoji: "📌", index: i });
+  }
+  if (upperW >= bodySize * 3 && lowerW < bodySize * 0.3) {
+    patterns.push({ name: "Bearish Pin Bar", type: "bearish", strength: 3, emoji: "📌", index: i });
+  }
+
+  // ── TWO CANDLE PATTERNS ──
+
+  // Bullish Engulfing
+  if (isBearish(p) && isBullish(c) && c.open <= p.close && c.close >= p.open && body(c) > body(p)) {
+    patterns.push({ name: "Bullish Engulfing", type: "bullish", strength: 3, emoji: "🟢", index: i });
+  }
+
+  // Bearish Engulfing
+  if (isBullish(p) && isBearish(c) && c.open >= p.close && c.close <= p.open && body(c) > body(p)) {
+    patterns.push({ name: "Bearish Engulfing", type: "bearish", strength: 3, emoji: "🔴", index: i });
+  }
+
+  // Tweezer Bottom — same low, prior downtrend
+  if (Math.abs(c.low - p.low) < avg * 0.05 && isBearish(p) && isBullish(c)) {
+    patterns.push({ name: "Tweezer Bottom", type: "bullish", strength: 2, emoji: "🔧", index: i });
+  }
+
+  // Tweezer Top — same high, prior uptrend
+  if (Math.abs(c.high - p.high) < avg * 0.05 && isBullish(p) && isBearish(c)) {
+    patterns.push({ name: "Tweezer Top", type: "bearish", strength: 2, emoji: "🔧", index: i });
+  }
+
+  // Piercing Line — bearish prev, bullish current opens below prev low, closes above 50% of prev body
+  if (isBearish(p) && isBullish(c) && c.open < p.low && c.close > bodyMidpoint(p) && c.close < p.open) {
+    patterns.push({ name: "Piercing Line", type: "bullish", strength: 2, emoji: "⚡", index: i });
+  }
+
+  // Dark Cloud Cover — bullish prev, bearish current opens above prev high, closes below 50% of prev body
+  if (isBullish(p) && isBearish(c) && c.open > p.high && c.close < bodyMidpoint(p) && c.close > p.open) {
+    patterns.push({ name: "Dark Cloud Cover", type: "bearish", strength: 2, emoji: "🌑", index: i });
+  }
+
+  // Harami — current body inside previous body
+  if (body(c) < body(p) * 0.6) {
+    if (isBearish(p) && isBullish(c) && c.open > p.close && c.close < p.open) {
+      patterns.push({ name: "Bullish Harami", type: "bullish", strength: 1, emoji: "🤰", index: i });
+    }
+    if (isBullish(p) && isBearish(c) && c.open < p.close && c.close > p.open) {
+      patterns.push({ name: "Bearish Harami", type: "bearish", strength: 1, emoji: "🤰", index: i });
+    }
+  }
+
+  // Inside Bar — entire range inside previous range
+  if (c.high <= p.high && c.low >= p.low) {
+    patterns.push({ name: "Inside Bar", type: "neutral", strength: 1, emoji: "📦", index: i });
+  }
+
+  // ── THREE CANDLE PATTERNS ──
+  if (pp) {
+    // Morning Star — bearish, doji/small, bullish (reversal)
+    if (isBearish(pp) && body(p) < avg * 0.3 && isBullish(c) && c.close > bodyMidpoint(pp)) {
+      patterns.push({ name: "Morning Star", type: "bullish", strength: 3, emoji: "🌅", index: i });
+    }
+
+    // Evening Star — bullish, doji/small, bearish (reversal)
+    if (isBullish(pp) && body(p) < avg * 0.3 && isBearish(c) && c.close < bodyMidpoint(pp)) {
+      patterns.push({ name: "Evening Star", type: "bearish", strength: 3, emoji: "🌆", index: i });
+    }
+
+    // Three White Soldiers — 3 consecutive bullish candles with higher closes
+    if (isBullish(pp) && isBullish(p) && isBullish(c) &&
+        p.close > pp.close && c.close > p.close &&
+        body(pp) > avg * 0.5 && body(p) > avg * 0.5 && body(c) > avg * 0.5) {
+      patterns.push({ name: "Three White Soldiers", type: "bullish", strength: 3, emoji: "🪖", index: i });
+    }
+
+    // Three Black Crows — 3 consecutive bearish candles with lower closes
+    if (isBearish(pp) && isBearish(p) && isBearish(c) &&
+        p.close < pp.close && c.close < p.close &&
+        body(pp) > avg * 0.5 && body(p) > avg * 0.5 && body(c) > avg * 0.5) {
+      patterns.push({ name: "Three Black Crows", type: "bearish", strength: 3, emoji: "🦅", index: i });
+    }
+
+    // Three Inside Up — bearish, bullish harami, bullish continuation
+    if (isBearish(pp) && isBullish(p) && p.open > pp.close && p.close < pp.open &&
+        isBullish(c) && c.close > pp.open) {
+      patterns.push({ name: "Three Inside Up", type: "bullish", strength: 3, emoji: "📈", index: i });
+    }
+
+    // Three Inside Down — bullish, bearish harami, bearish continuation
+    if (isBullish(pp) && isBearish(p) && p.open < pp.close && p.close > pp.open &&
+        isBearish(c) && c.close < pp.open) {
+      patterns.push({ name: "Three Inside Down", type: "bearish", strength: 3, emoji: "📉", index: i });
+    }
+  }
+
+  return patterns;
+}
