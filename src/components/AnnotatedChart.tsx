@@ -12,10 +12,10 @@ interface Props {
 }
 
 const LEGEND = [
-  { c: "#00e5a0", l: "Support / Entry" },
-  { c: "#ff4d6a", l: "Resistance / SL" },
-  { c: "#4da0ff", l: "Trend / TP" },
-  { c: "#f0b90b", l: "Liquidity / OB" },
+  { c: "#00e5a0", l: "Support / Entry", glow: "0 0 8px rgba(0,229,160,.3)" },
+  { c: "#ff4d6a", l: "Resistance / SL", glow: "0 0 8px rgba(255,77,106,.3)" },
+  { c: "#4da0ff", l: "Trend / TP", glow: "0 0 8px rgba(77,160,255,.3)" },
+  { c: "#f0b90b", l: "Liquidity / OB", glow: "0 0 8px rgba(240,185,11,.3)" },
 ];
 
 export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVisible, onClick }: Props) {
@@ -28,15 +28,16 @@ export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVi
   useEffect(() => {
     if (!isVisible) return;
     let start: number | null = null;
-    const dur = 2200;
+    const dur = 2500; // Slightly longer for premium feel
     const go = (ts: number) => {
       if (!start) start = ts;
-      const p = Math.min((ts - start) / dur, 1);
-      setProg(1 - Math.pow(1 - p, 3));
-      if (p < 1) requestAnimationFrame(go);
+      const t = Math.min((ts - start) / dur, 1);
+      // Smooth cubic bezier easing
+      setProg(t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+      if (t < 1) requestAnimationFrame(go);
     };
-    const t = setTimeout(() => requestAnimationFrame(go), 500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => requestAnimationFrame(go), 400);
+    return () => clearTimeout(timer);
   }, [isVisible]);
 
   useEffect(() => {
@@ -45,8 +46,7 @@ export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVi
     img.onload = () => {
       const maxW = boxRef.current!.clientWidth;
       const ratio = img.height / img.width;
-      // Allow taller canvas for mobile screenshots (portrait images)
-      const maxH = ratio > 1.2 ? 600 : 460;
+      const maxH = ratio > 1.2 ? 600 : 480;
       setDims({ w: maxW, h: Math.min(maxW * ratio, maxH) });
     };
     img.src = dataUrl;
@@ -55,22 +55,26 @@ export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVi
   useAnnotatedCanvas(canvasRef, dataUrl, annotations, dims, prog, showAnn, chartBounds);
 
   return (
-    <div ref={boxRef} className="w-full relative">
+    <div ref={boxRef} className="w-full relative group">
       <canvas
         ref={canvasRef}
         onClick={onClick}
         className="w-full block cursor-pointer"
-        style={{ height: dims.h || 300, borderRadius: "16px 16px 0 0", background: "#111" }}
+        style={{ height: dims.h || 300, borderRadius: "20px 20px 0 0", background: "#0a0b0f" }}
       />
-      <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+
+      {/* Top controls — frosted glass */}
+      <div className="absolute top-3 right-3 flex gap-2" style={{ animation: prog > 0.1 ? "fadeUp 0.5s ease forwards" : "none", opacity: prog > 0.1 ? 1 : 0 }}>
         <button
           onClick={(e) => { e.stopPropagation(); setShowAnn(!showAnn); }}
-          className="text-[10px] font-semibold font-mono px-2.5 py-1 rounded-md cursor-pointer transition-all"
+          className="text-[10px] font-semibold font-mono px-3 py-1.5 rounded-xl cursor-pointer transition-all duration-300"
           style={{
-            background: showAnn ? "rgba(0,229,160,0.2)" : "rgba(0,0,0,0.6)",
-            border: `1px solid ${showAnn ? "rgba(0,229,160,.35)" : "rgba(255,255,255,.12)"}`,
+            background: showAnn ? "rgba(0,229,160,0.15)" : "rgba(0,0,0,0.5)",
+            border: `1px solid ${showAnn ? "rgba(0,229,160,.25)" : "rgba(255,255,255,.1)"}`,
             color: showAnn ? "#00e5a0" : "rgba(255,255,255,.5)",
-            backdropFilter: "blur(10px)",
+            backdropFilter: "blur(16px) saturate(1.5)",
+            WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+            boxShadow: showAnn ? "0 2px 12px rgba(0,229,160,.15)" : "0 2px 8px rgba(0,0,0,.3)",
           }}
         >
           {showAnn ? "◉ Annotations" : "○ Annotations"}
@@ -78,35 +82,58 @@ export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVi
         {onClick && (
           <button
             onClick={(e) => { e.stopPropagation(); onClick(); }}
-            className="text-[10px] font-semibold font-mono px-2.5 py-1 rounded-md cursor-pointer"
+            className="text-[10px] font-semibold font-mono px-3 py-1.5 rounded-xl cursor-pointer transition-all duration-300 hover:scale-105"
             style={{
-              background: "rgba(0,0,0,0.6)",
-              border: "1px solid rgba(255,255,255,.12)",
+              background: "rgba(0,0,0,0.5)",
+              border: "1px solid rgba(255,255,255,.1)",
               color: "rgba(255,255,255,.6)",
-              backdropFilter: "blur(10px)",
+              backdropFilter: "blur(16px) saturate(1.5)",
+              WebkitBackdropFilter: "blur(16px) saturate(1.5)",
+              boxShadow: "0 2px 8px rgba(0,0,0,.3)",
             }}
           >
             ⤢ Fullscreen
           </button>
         )}
       </div>
-      {showAnn && prog > 0.8 && (
+
+      {/* AI badge — top left */}
+      <div className="absolute top-3 left-3" style={{ opacity: prog > 0.3 ? 1 : 0, transition: "opacity 0.6s ease" }}>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl" style={{
+          background: "rgba(0,0,0,0.5)",
+          border: "1px solid rgba(0,229,160,.12)",
+          backdropFilter: "blur(16px) saturate(1.5)",
+          boxShadow: "0 2px 12px rgba(0,0,0,.3)",
+        }}>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#00e5a0", boxShadow: "0 0 6px #00e5a0" }} />
+          <span className="text-[9px] font-mono font-bold tracking-wider" style={{ color: "#00e5a0" }}>AI ANALYZED</span>
+        </div>
+      </div>
+
+      {/* Premium legend — frosted bar */}
+      {showAnn && prog > 0.7 && (
         <div
-          className="absolute bottom-2.5 left-2.5 flex gap-2 px-2.5 py-1.5 rounded-lg"
+          className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-3 py-2 rounded-2xl"
           style={{
-            background: "rgba(0,0,0,.75)",
-            backdropFilter: "blur(10px)",
+            background: "rgba(0,0,0,.6)",
+            backdropFilter: "blur(20px) saturate(1.5)",
+            WebkitBackdropFilter: "blur(20px) saturate(1.5)",
             border: "1px solid rgba(255,255,255,.06)",
+            boxShadow: "0 4px 20px rgba(0,0,0,.4)",
+            animation: "fadeUp 0.5s ease forwards",
           }}
         >
-          {LEGEND.map((x, i) => (
-            <div key={i} className="flex items-center gap-1">
-              <div className="w-[7px] h-[7px] rounded-sm" style={{ background: x.c }} />
-              <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.55)" }}>
-                {x.l}
-              </span>
-            </div>
-          ))}
+          <div className="flex gap-3 flex-wrap">
+            {LEGEND.map((x, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ background: x.c, boxShadow: x.glow }} />
+                <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.5)" }}>{x.l}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[8px] font-mono tracking-widest" style={{ color: "rgba(255,255,255,.2)" }}>FXSynapse AI</span>
+          </div>
         </div>
       )}
     </div>

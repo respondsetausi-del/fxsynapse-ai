@@ -61,8 +61,8 @@ export default function FullscreenModal({ dataUrl, annotations, analysis, onClos
       className="fixed inset-0 flex flex-col items-center justify-center cursor-pointer"
       style={{
         zIndex: 9999,
-        background: visible ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0)",
-        backdropFilter: visible ? "blur(20px)" : "blur(0)",
+        background: visible ? "rgba(0,0,0,0.88)" : "rgba(0,0,0,0)",
+        backdropFilter: visible ? "blur(30px) saturate(1.5)" : "blur(0)",
         transition: "all 0.4s ease",
         opacity: visible ? 1 : 0,
       }}
@@ -125,7 +125,7 @@ export default function FullscreenModal({ dataUrl, annotations, analysis, onClos
             transition: "transform 0.5s cubic-bezier(0.16,1,0.3,1)",
           }}
         >
-          <canvas ref={canvasRef} style={{ display: "block", width: dims.w || 800, height: dims.h || 500, background: "#111" }} />
+          <canvas ref={canvasRef} style={{ display: "block", width: dims.w || 800, height: dims.h || 500, background: "#0a0b0f" }} />
           {/* Legend */}
           {showAnn && prog > 0.7 && (
             <div

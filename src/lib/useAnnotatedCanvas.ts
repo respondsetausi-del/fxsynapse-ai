@@ -2,23 +2,24 @@
 import { useEffect, useRef } from "react";
 import { Annotation, ChartBounds } from "@/lib/types";
 
-const DEFAULT_BOUNDS: ChartBounds = {
-  x: 0.02,
-  y: 0.18,
-  w: 0.78,
-  h: 0.65,
-};
-
+const DEFAULT_BOUNDS: ChartBounds = { x: 0.02, y: 0.18, w: 0.78, h: 0.65 };
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
 const FIB_COLORS: Record<number, string> = {
-  0: "#ff4d6a",
-  0.236: "#ff8c42",
-  0.382: "#f0b90b",
-  0.5: "#a0a0a0",
-  0.618: "#4da0ff",
-  0.786: "#9b59b6",
-  1.0: "#00e5a0",
+  0: "#ff4d6a", 0.236: "#ff8c42", 0.382: "#f0b90b", 0.5: "#a0a0a0",
+  0.618: "#4da0ff", 0.786: "#9b59b6", 1.0: "#00e5a0",
 };
+
+// ─── Helpers ───
+const hexToRGBA = (hex: string, a: number): string => {
+  const clean = hex.replace("#", "").replace(/[^0-9a-fA-F]/g, "");
+  if (clean.length < 6) return `rgba(128,128,128,${a})`;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+};
+
+const ease = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
 export function useAnnotatedCanvas(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -44,446 +45,557 @@ export function useAnnotatedCanvas(
     const dpr = 2;
     c.width = dims.w * dpr;
     c.height = dims.h * dpr;
-    const ctx = c.getContext("2d");
+    const ctx = c.getContext("2d")!;
     if (!ctx) return;
     ctx.scale(dpr, dpr);
     const { w, h } = dims;
 
+    // ── Draw base image ──
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(imgRef.current, 0, 0, w, h);
-    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    
+    // Cinematic overlay - subtle vignette + darken
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(0, 0, w, h);
+    
+    // Vignette
+    const vg = ctx.createRadialGradient(w/2, h/2, Math.min(w,h)*0.3, w/2, h/2, Math.max(w,h)*0.7);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,0,0.15)");
+    ctx.fillStyle = vg;
     ctx.fillRect(0, 0, w, h);
 
     if (!showAnn || prog === 0) return;
 
-    // ── Chart bounds (pixel coords) ──
     const b = chartBounds && chartBounds.w > 0 ? chartBounds : DEFAULT_BOUNDS;
-    const bx = b.x * w;
-    const by = b.y * h;
-    const bw = b.w * w;
-    const bh = b.h * h;
+    const bx = b.x * w, by = b.y * h, bw = b.w * w, bh = b.h * h;
 
     const clamp = (v: number) => Math.max(0.01, Math.min(0.99, v));
-    const toPixelX = (ax: number) => bx + clamp(ax) * bw;
-    const toPixelY = (ay: number) => by + clamp(ay) * bh;
+    const toX = (ax: number) => bx + clamp(ax) * bw;
+    const toY = (ay: number) => by + clamp(ay) * bh;
 
-    const fontSize = w > 700 ? 12 : w > 400 ? 11 : 10;
-    const smallFont = w > 700 ? 10 : w > 400 ? 9 : 8;
+    const fs = w > 700 ? 11 : w > 400 ? 10 : 9;
+    const fsS = w > 700 ? 9 : w > 400 ? 8 : 7;
+    const lw = w > 700 ? 1.8 : 1.4;
 
-    // ── Label drawing helper ──
-    const lbl = (
-      text: string, x: number, y: number,
-      bg: string, fg: string, align: "left" | "right"
-    ) => {
-      ctx.font = `bold ${fontSize}px monospace`;
-      const m = ctx.measureText(text);
-      const p = 5;
-      const bw2 = m.width + p * 2;
-      const bh2 = fontSize + 6;
-      let lx = align === "right" ? x - bw2 : x;
-      if (lx < bx) lx = bx + 2;
-      if (lx + bw2 > bx + bw) lx = bx + bw - bw2 - 2;
-      let ly = y - bh2 / 2;
-      if (ly < by) ly = by + 2;
-      if (ly + bh2 > by + bh) ly = by + bh - bh2 - 2;
-
-      ctx.fillStyle = bg;
+    // ── Rounded rect helper ──
+    const rrect = (x: number, y: number, w2: number, h2: number, r: number) => {
       ctx.beginPath();
-      if ((ctx as any).roundRect) {
-        (ctx as any).roundRect(lx, ly, bw2, bh2, 3);
-      } else {
-        ctx.rect(lx, ly, bw2, bh2);
-      }
-      ctx.fill();
-      ctx.fillStyle = fg;
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "left";
-      ctx.fillText(text, lx + p, ly + bh2 / 2);
+      if ((ctx as any).roundRect) (ctx as any).roundRect(x, y, w2, h2, r);
+      else ctx.rect(x, y, w2, h2);
     };
 
-    // ── Small badge helper (for BOS/CHoCH/patterns) ──
-    const badge = (
+    // ── Premium label with glow + shadow ──
+    const drawLabel = (
       text: string, x: number, y: number,
-      bg: string, fg: string
+      color: string, align: "left" | "right", size: number = fs
     ) => {
-      ctx.font = `bold ${smallFont}px monospace`;
+      ctx.save();
+      ctx.font = `600 ${size}px "SF Mono", "JetBrains Mono", monospace`;
       const m = ctx.measureText(text);
-      const p = 4;
-      const bw2 = m.width + p * 2;
-      const bh2 = smallFont + 5;
-      const lx = x - bw2 / 2;
-      const ly = y - bh2 - 4;
+      const px = 7, py = 4;
+      const tw = m.width + px * 2;
+      const th = size + py * 2 + 1;
+      let lx = align === "right" ? x - tw : x;
+      lx = Math.max(bx + 2, Math.min(bx + bw - tw - 2, lx));
+      let ly = y - th / 2;
+      ly = Math.max(by + 2, Math.min(by + bh - th - 2, ly));
 
-      ctx.fillStyle = bg;
-      ctx.beginPath();
-      if ((ctx as any).roundRect) {
-        (ctx as any).roundRect(lx, ly, bw2, bh2, 3);
-      } else {
-        ctx.rect(lx, ly, bw2, bh2);
-      }
+      // Shadow
+      ctx.shadowColor = hexToRGBA(color, 0.25);
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 2;
+
+      // Background — frosted pill
+      ctx.fillStyle = hexToRGBA(color, 0.12);
+      rrect(lx, ly, tw, th, 6);
       ctx.fill();
 
-      // Small arrow pointing down
+      // Left accent bar
+      ctx.shadowColor = "transparent";
+      ctx.fillStyle = hexToRGBA(color, 0.6);
+      rrect(lx, ly, 2.5, th, 6);
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = hexToRGBA(color, 0.2);
+      ctx.lineWidth = 0.5;
+      rrect(lx, ly, tw, th, 6);
+      ctx.stroke();
+
+      // Text
+      ctx.fillStyle = color;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+      ctx.fillText(text, lx + px + 2, ly + th / 2);
+      ctx.restore();
+    };
+
+    // ── Premium badge (for BOS/CHoCH/patterns) ──
+    const drawBadge = (text: string, x: number, y: number, color: string) => {
+      ctx.save();
+      ctx.font = `700 ${fsS}px "SF Mono", "JetBrains Mono", monospace`;
+      const m = ctx.measureText(text);
+      const px = 5, py = 3;
+      const tw = m.width + px * 2;
+      const th = fsS + py * 2 + 1;
+      const lx = x - tw / 2;
+      const ly = y - th - 8;
+
+      ctx.shadowColor = hexToRGBA(color, 0.3);
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 2;
+
+      // Pill background
+      ctx.fillStyle = hexToRGBA(color, 0.18);
+      rrect(lx, ly, tw, th, th / 2);
+      ctx.fill();
+
+      // Border
+      ctx.shadowColor = "transparent";
+      ctx.strokeStyle = hexToRGBA(color, 0.3);
+      ctx.lineWidth = 0.5;
+      rrect(lx, ly, tw, th, th / 2);
+      ctx.stroke();
+
+      // Pointer
+      ctx.fillStyle = hexToRGBA(color, 0.18);
       ctx.beginPath();
-      ctx.moveTo(x - 4, ly + bh2);
-      ctx.lineTo(x, ly + bh2 + 4);
-      ctx.lineTo(x + 4, ly + bh2);
+      ctx.moveTo(x - 3, ly + th);
+      ctx.lineTo(x, ly + th + 4);
+      ctx.lineTo(x + 3, ly + th);
       ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = fg;
+      // Text
+      ctx.fillStyle = color;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(text, x, ly + bh2 / 2);
+      ctx.fillText(text, x, ly + th / 2);
+      ctx.restore();
     };
 
-    const lw = w > 700 ? 2 : 1.5;
+    // ── Glow line helper ──
+    const glowLine = (x1: number, y1: number, x2: number, y2: number, color: string, width: number, dash?: number[]) => {
+      ctx.save();
+      // Outer glow
+      ctx.beginPath();
+      ctx.strokeStyle = hexToRGBA(color, 0.08);
+      ctx.lineWidth = width + 6;
+      ctx.setLineDash(dash || []);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      // Inner glow
+      ctx.beginPath();
+      ctx.strokeStyle = hexToRGBA(color, 0.15);
+      ctx.lineWidth = width + 3;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      // Core line
+      ctx.beginPath();
+      ctx.strokeStyle = hexToRGBA(color, 0.75);
+      ctx.lineWidth = width;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    };
+
+    // ── Pulse dot at position ──
+    const pulseDot = (x: number, y: number, color: string, size: number = 4) => {
+      ctx.save();
+      // Outer pulse ring
+      ctx.beginPath();
+      ctx.arc(x, y, size + 4, 0, Math.PI * 2);
+      ctx.fillStyle = hexToRGBA(color, 0.08);
+      ctx.fill();
+      // Mid ring
+      ctx.beginPath();
+      ctx.arc(x, y, size + 2, 0, Math.PI * 2);
+      ctx.fillStyle = hexToRGBA(color, 0.15);
+      ctx.fill();
+      // Core
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fillStyle = hexToRGBA(color, 0.9);
+      ctx.fill();
+      // Highlight
+      ctx.beginPath();
+      ctx.arc(x - size * 0.25, y - size * 0.25, size * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.fill();
+      ctx.restore();
+    };
+
+    // ═══════════════════════════════════════
+    // RENDER ANNOTATIONS
+    // ═══════════════════════════════════════
+    const p = prog; // shorthand
 
     annotations.forEach((a) => {
-      ctx.globalAlpha = prog * 0.9;
+      ctx.globalAlpha = ease(p) * 0.92;
 
-      // ── ZONE / FVG ──
+      // ── ZONE / FVG — gradient fill with soft edges ──
       if ((a.type === "zone" || a.type === "fvg") && a.y1 !== undefined && a.y2 !== undefined) {
-        const zy1 = toPixelY(a.y1);
-        const zy2 = toPixelY(a.y2);
-        const zh = Math.abs(zy2 - zy1);
-        const ztop = Math.min(zy1, zy2);
-        const zoneDrawW = bw * prog;
+        const zy1 = toY(a.y1), zy2 = toY(a.y2);
+        const ztop = Math.min(zy1, zy2), zh = Math.abs(zy2 - zy1);
+        const drawW = bw * ease(p);
+        const baseColor = a.bc || a.color;
 
-        ctx.fillStyle = a.color;
-        ctx.fillRect(bx, ztop, zoneDrawW, zh);
-        ctx.strokeStyle = (a.bc || a.color) + "50";
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.strokeRect(bx, ztop, zoneDrawW, zh);
-        ctx.setLineDash([]);
-        if (prog > 0.5 && a.label) {
-          lbl(a.label, bx + 8, ztop + zh / 2, (a.bc || a.color) + "25", a.bc || a.color, "left");
+        // Gradient fill — fades at edges
+        const grd = ctx.createLinearGradient(bx, ztop, bx, ztop + zh);
+        grd.addColorStop(0, hexToRGBA(baseColor, 0.01));
+        grd.addColorStop(0.15, hexToRGBA(baseColor, a.type === "fvg" ? 0.06 : 0.08));
+        grd.addColorStop(0.5, hexToRGBA(baseColor, a.type === "fvg" ? 0.08 : 0.1));
+        grd.addColorStop(0.85, hexToRGBA(baseColor, a.type === "fvg" ? 0.06 : 0.08));
+        grd.addColorStop(1, hexToRGBA(baseColor, 0.01));
+        ctx.fillStyle = grd;
+        ctx.fillRect(bx, ztop, drawW, zh);
+
+        // Top & bottom border lines with glow
+        glowLine(bx, ztop, bx + drawW, ztop, baseColor, 1, [6, 4]);
+        glowLine(bx, ztop + zh, bx + drawW, ztop + zh, baseColor, 1, [6, 4]);
+
+        // Left edge accent
+        ctx.fillStyle = hexToRGBA(baseColor, 0.3);
+        ctx.fillRect(bx, ztop, 2, zh);
+
+        if (p > 0.5 && a.label) {
+          drawLabel(a.label, bx + 8, ztop + zh / 2, baseColor, "left");
         }
       }
 
-      // ── LINE / LIQUIDITY ──
+      // ── LINE / LIQUIDITY — glow line with pulse dot ──
       if ((a.type === "line" || a.type === "liquidity") && a.y !== undefined) {
-        const ly2 = toPixelY(a.y);
-        const lineEndX = bx + bw * prog;
+        const ly = toY(a.y);
+        const endX = bx + bw * ease(p);
+        const dash = a.type === "liquidity" || a.style === "dotted" ? [2, 4] : [8, 5];
+        const width = a.type === "liquidity" ? lw * 0.7 : lw;
 
-        ctx.beginPath();
-        if (a.type === "liquidity" || a.style === "dotted") {
-          ctx.setLineDash([2, 3]);
-        } else {
-          ctx.setLineDash([8, 5]);
-        }
-        ctx.strokeStyle = a.color + "bb";
-        ctx.lineWidth = a.type === "liquidity" ? lw * 0.8 : lw;
-        ctx.moveTo(bx, ly2);
-        ctx.lineTo(lineEndX, ly2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        if (prog > 0.3 && a.label) {
-          lbl(a.label, lineEndX - 6, ly2 - 13, a.color + "22", a.color, "right");
+        glowLine(bx, ly, endX, ly, a.color, width, dash);
+
+        // Pulse dot at end of line
+        if (p > 0.4) pulseDot(endX, ly, a.color, 3);
+
+        if (p > 0.3 && a.label) {
+          drawLabel(a.label, endX - 6, ly - 15, a.color, "right");
         }
       }
 
-      // ── TRENDLINE ──
+      // ── TRENDLINE — smooth glow line ──
       if (a.type === "trend" && a.x1 !== undefined && a.y1 !== undefined && a.x2 !== undefined && a.y2 !== undefined) {
-        const tx1 = toPixelX(a.x1);
-        const ty1 = toPixelY(a.y1);
-        const tx2 = toPixelX(a.x2);
-        const ty2 = toPixelY(a.y2);
-        const dx = (tx2 - tx1) * prog;
-        const dy = (ty2 - ty1) * prog;
+        const tx1 = toX(a.x1), ty1 = toY(a.y1);
+        const tx2 = toX(a.x2), ty2 = toY(a.y2);
+        const dx = (tx2 - tx1) * ease(p);
+        const dy = (ty2 - ty1) * ease(p);
 
-        ctx.beginPath();
-        ctx.strokeStyle = a.color + "99";
-        ctx.lineWidth = lw;
-        ctx.setLineDash([]);
-        ctx.moveTo(tx1, ty1);
-        ctx.lineTo(tx1 + dx, ty1 + dy);
-        ctx.stroke();
-        if (prog > 0.7 && a.label) {
-          lbl(a.label, tx1 + dx / 2, ty1 + dy / 2 - 12, a.color + "28", a.color, "left");
+        glowLine(tx1, ty1, tx1 + dx, ty1 + dy, a.color, lw);
+
+        // Dots at endpoints
+        pulseDot(tx1, ty1, a.color, 3);
+        if (p > 0.6) pulseDot(tx1 + dx, ty1 + dy, a.color, 3);
+
+        if (p > 0.7 && a.label) {
+          drawLabel(a.label, tx1 + dx / 2, ty1 + dy / 2 - 14, a.color, "left");
         }
       }
 
-      // ── FIBONACCI RETRACEMENT ──
-      if (a.type === "fib" && a.y_0 !== undefined && a.y_100 !== undefined && prog > 0.3) {
-        const y0px = toPixelY(a.y_0);
-        const y100px = toPixelY(a.y_100);
+      // ── FIBONACCI — premium gradient bands ──
+      if (a.type === "fib" && a.y_0 !== undefined && a.y_100 !== undefined && p > 0.3) {
+        const y0px = toY(a.y_0), y100px = toY(a.y_100);
         const range = y100px - y0px;
-        const fibDrawW = bw * Math.min(prog * 1.2, 1);
-        const ap = Math.min((prog - 0.3) / 0.4, 1);
-
-        ctx.globalAlpha = ap * 0.6;
+        const fibW = bw * Math.min(ease(p) * 1.2, 1);
+        const ap = Math.min((p - 0.3) / 0.4, 1);
+        ctx.globalAlpha = ap * 0.55;
 
         FIB_LEVELS.forEach((level) => {
           const fibY = y0px + range * level;
           if (fibY < by || fibY > by + bh) return;
-
           const color = FIB_COLORS[level] || "#888";
-          ctx.beginPath();
-          ctx.setLineDash([3, 5]);
-          ctx.strokeStyle = color + "66";
-          ctx.lineWidth = 1;
-          ctx.moveTo(bx, fibY);
-          ctx.lineTo(bx + fibDrawW, fibY);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          glowLine(bx, fibY, bx + fibW, fibY, color, 0.8, [3, 5]);
 
-          ctx.font = `bold ${smallFont}px monospace`;
-          ctx.fillStyle = color + "aa";
+          ctx.font = `600 ${fsS}px "SF Mono", monospace`;
+          ctx.fillStyle = hexToRGBA(color, 0.8);
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
-          ctx.fillText(`${(level * 100).toFixed(1)}%`, bx + 4, fibY - 7);
+          ctx.fillText(`${(level * 100).toFixed(1)}%`, bx + 4, fibY - 8);
         });
 
-        // Golden pocket shading
-        const gp1 = y0px + range * 0.5;
-        const gp2 = y0px + range * 0.618;
-        ctx.fillStyle = "rgba(77,160,255,0.06)";
-        ctx.fillRect(bx, gp1, fibDrawW, gp2 - gp1);
-        ctx.globalAlpha = prog * 0.9;
+        // Golden pocket — premium gradient
+        const gp1 = y0px + range * 0.5, gp2 = y0px + range * 0.618;
+        const gpGrd = ctx.createLinearGradient(bx, gp1, bx, gp2);
+        gpGrd.addColorStop(0, hexToRGBA("#4da0ff", 0.04));
+        gpGrd.addColorStop(0.5, hexToRGBA("#4da0ff", 0.08));
+        gpGrd.addColorStop(1, hexToRGBA("#4da0ff", 0.04));
+        ctx.fillStyle = gpGrd;
+        ctx.fillRect(bx, gp1, fibW, gp2 - gp1);
+        ctx.globalAlpha = ease(p) * 0.92;
       }
 
-      // ── PATTERN MARKER ──
-      if (a.type === "pattern" && a.x !== undefined && a.y !== undefined && prog > 0.5) {
-        const px = toPixelX(a.x);
-        const py = toPixelY(a.y);
-        const ap = Math.min((prog - 0.5) / 0.3, 1);
+      // ── PATTERN — diamond with glow ring ──
+      if (a.type === "pattern" && a.x !== undefined && a.y !== undefined && p > 0.5) {
+        const px2 = toX(a.x), py = toY(a.y);
+        const ap = Math.min((p - 0.5) / 0.3, 1);
         ctx.globalAlpha = ap * 0.9;
 
-        // Diamond marker
-        const sz = w > 700 ? 6 : 5;
+        const sz = w > 700 ? 7 : 5;
+        // Glow ring
         ctx.beginPath();
-        ctx.moveTo(px, py - sz);
-        ctx.lineTo(px + sz, py);
-        ctx.lineTo(px, py + sz);
-        ctx.lineTo(px - sz, py);
+        ctx.arc(px2, py, sz + 5, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRGBA(a.color, 0.08);
+        ctx.fill();
+        // Diamond
+        ctx.beginPath();
+        ctx.moveTo(px2, py - sz); ctx.lineTo(px2 + sz, py);
+        ctx.lineTo(px2, py + sz); ctx.lineTo(px2 - sz, py);
         ctx.closePath();
-        ctx.fillStyle = a.color + "cc";
+        ctx.fillStyle = hexToRGBA(a.color, 0.8);
         ctx.fill();
         ctx.strokeStyle = a.color;
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        if (a.label) {
-          badge(a.label, px, py - sz, a.color + "30", a.color);
-        }
-        ctx.globalAlpha = prog * 0.9;
+        if (a.label) drawBadge(a.label, px2, py - sz, a.color);
+        ctx.globalAlpha = ease(p) * 0.92;
       }
 
-      // ── BOS / CHoCH MARKERS ──
-      if ((a.type === "bos" || a.type === "choch") && a.x !== undefined && a.y !== undefined && prog > 0.4) {
-        const px = toPixelX(a.x);
-        const py = toPixelY(a.y);
-        const ap = Math.min((prog - 0.4) / 0.3, 1);
+      // ── BOS / CHoCH — structural markers ──
+      if ((a.type === "bos" || a.type === "choch") && a.x !== undefined && a.y !== undefined && p > 0.4) {
+        const px2 = toX(a.x), py = toY(a.y);
+        const ap = Math.min((p - 0.4) / 0.3, 1);
         ctx.globalAlpha = ap * 0.9;
 
-        // Horizontal dashed line at the break level
         const lineLen = bw * 0.25;
-        ctx.beginPath();
-        ctx.setLineDash(a.type === "bos" ? [6, 3] : [3, 3]);
-        ctx.strokeStyle = a.color + "88";
-        ctx.lineWidth = lw * 0.8;
-        ctx.moveTo(px - lineLen / 2, py);
-        ctx.lineTo(px + lineLen / 2, py);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        const dash = a.type === "bos" ? [6, 3] : [3, 3];
+        glowLine(px2 - lineLen / 2, py, px2 + lineLen / 2, py, a.color, lw * 0.8, dash);
 
-        // Circle at the break point
-        ctx.beginPath();
-        ctx.arc(px, py, 4, 0, Math.PI * 2);
-        ctx.fillStyle = a.color + "44";
-        ctx.fill();
-        ctx.strokeStyle = a.color;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        // Circle marker with glow
+        pulseDot(px2, py, a.color, 4);
 
-        if (a.label) {
-          badge(a.label, px, py, a.color + "35", a.color);
-        }
-        ctx.globalAlpha = prog * 0.9;
+        if (a.label) drawBadge(a.label, px2, py, a.color);
+        ctx.globalAlpha = ease(p) * 0.92;
       }
     });
 
-    // ── TRADE SETUP (Entry/TP/SL as right-edge price tags + connector + R:R shading) ──
-    if (prog > 0.5) {
+    // ═══════════════════════════════════════
+    // TRADE SETUP — Premium price tags + R:R visualization
+    // ═══════════════════════════════════════
+    if (p > 0.5) {
       const points = annotations.filter(a => a.type === "point" && a.y !== undefined);
       const entry = points.find(a => a.label === "Entry");
       const tp = points.find(a => a.label === "TP");
       const sl = points.find(a => a.label === "SL");
 
       if (points.length > 0) {
-        const tagW = w > 700 ? 58 : w > 400 ? 50 : 44;
-        const tagH = w > 700 ? 20 : w > 400 ? 18 : 16;
-        const tagX = bx + bw - tagW - 2;
-        const tagFontSize = w > 700 ? 10 : w > 400 ? 9 : 8;
-        const ap = Math.min((prog - 0.5) / 0.5, 1);
+        const tagW = w > 700 ? 62 : w > 400 ? 52 : 44;
+        const tagH = w > 700 ? 22 : w > 400 ? 20 : 17;
+        const tagX = bx + bw - tagW - 4;
+        const tagFs = w > 700 ? 10 : w > 400 ? 9 : 8;
+        const ap = Math.min((p - 0.5) / 0.5, 1);
 
-        // ── Risk/Reward shaded zones ──
-        if (entry && tp && sl && prog > 0.6) {
-          const entryPx = toPixelY(entry.y!);
-          const tpPx = toPixelY(tp.y!);
-          const slPx = toPixelY(sl.y!);
-          const zoneLeft = bx + bw * 0.6;
-          const zoneRight = tagX - 14;
-          const zoneW = zoneRight - zoneLeft;
-          const zap = Math.min((prog - 0.6) / 0.3, 1);
+        // ── R:R gradient zones ──
+        if (entry && tp && sl && p > 0.6) {
+          const ePx = toY(entry.y!), tPx = toY(tp.y!), sPx = toY(sl.y!);
+          const zL = bx + bw * 0.55, zR = tagX - 16, zW = zR - zL;
+          const zap = Math.min((p - 0.6) / 0.3, 1);
 
-          ctx.globalAlpha = zap * 0.12;
-          // TP zone (green)
-          ctx.fillStyle = "#00e5a0";
-          const tpTop = Math.min(entryPx, tpPx);
-          const tpBot = Math.max(entryPx, tpPx);
-          ctx.fillRect(zoneLeft, tpTop, zoneW, tpBot - tpTop);
+          // TP zone — gradient green
+          const tpGrd = ctx.createLinearGradient(zL, 0, zR, 0);
+          tpGrd.addColorStop(0, "rgba(0,229,160,0)");
+          tpGrd.addColorStop(0.4, hexToRGBA("#00e5a0", 0.08 * zap));
+          tpGrd.addColorStop(1, hexToRGBA("#00e5a0", 0.12 * zap));
+          ctx.fillStyle = tpGrd;
+          const tpTop = Math.min(ePx, tPx), tpH = Math.abs(ePx - tPx);
+          ctx.fillRect(zL, tpTop, zW, tpH);
 
-          // SL zone (red)
-          ctx.fillStyle = "#ff4d6a";
-          const slTop = Math.min(entryPx, slPx);
-          const slBot = Math.max(entryPx, slPx);
-          ctx.fillRect(zoneLeft, slTop, zoneW, slBot - slTop);
-          ctx.globalAlpha = ap;
+          // SL zone — gradient red
+          const slGrd = ctx.createLinearGradient(zL, 0, zR, 0);
+          slGrd.addColorStop(0, "rgba(255,77,106,0)");
+          slGrd.addColorStop(0.4, hexToRGBA("#ff4d6a", 0.06 * zap));
+          slGrd.addColorStop(1, hexToRGBA("#ff4d6a", 0.1 * zap));
+          ctx.fillStyle = slGrd;
+          const slTop = Math.min(ePx, sPx), slH = Math.abs(ePx - sPx);
+          ctx.fillRect(zL, slTop, zW, slH);
         }
 
-        const pointYs: { py: number; color: string; label: string }[] = [];
+        const pointData: { py: number; color: string; label: string }[] = [];
 
         points.forEach((a) => {
           if (a.y === undefined) return;
-          let py = toPixelY(a.y);
-          py = Math.max(by + 8, Math.min(by + bh - 8, py));
-          pointYs.push({ py, color: a.color, label: a.label || "" });
+          let py = toY(a.y);
+          py = Math.max(by + 10, Math.min(by + bh - 10, py));
+          pointData.push({ py, color: a.color, label: a.label || "" });
 
-          // Horizontal dashed line from left edge to tag
-          ctx.globalAlpha = ap * 0.35;
-          ctx.beginPath();
-          ctx.setLineDash([3, 4]);
-          ctx.strokeStyle = a.color + "55";
-          ctx.lineWidth = 1;
-          ctx.moveTo(bx, py);
-          ctx.lineTo(tagX, py);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          // Dashed guide line with glow
+          ctx.globalAlpha = ap * 0.3;
+          glowLine(bx, py, tagX - 2, py, a.color, 0.6, [3, 5]);
 
-          // Price tag badge (arrow shape)
+          // ── Premium arrow-shape price tag ──
           ctx.globalAlpha = ap * 0.95;
           const tagY = py - tagH / 2;
 
-          ctx.beginPath();
-          ctx.moveTo(tagX + 4, tagY);
-          ctx.lineTo(tagX + tagW, tagY);
-          ctx.lineTo(tagX + tagW, tagY + tagH);
-          ctx.lineTo(tagX + 4, tagY + tagH);
-          ctx.lineTo(tagX - 3, py);
-          ctx.closePath();
-          ctx.fillStyle = a.color + "dd";
-          ctx.fill();
+          ctx.save();
+          ctx.shadowColor = hexToRGBA(a.color, 0.3);
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 2;
 
-          ctx.font = `bold ${tagFontSize}px monospace`;
-          ctx.fillStyle = "#0a0b0f";
+          // Tag body with arrow point
+          ctx.beginPath();
+          const r = 5;
+          ctx.moveTo(tagX + r, tagY);
+          ctx.lineTo(tagX + tagW - r, tagY);
+          ctx.arcTo(tagX + tagW, tagY, tagX + tagW, tagY + r, r);
+          ctx.lineTo(tagX + tagW, tagY + tagH - r);
+          ctx.arcTo(tagX + tagW, tagY + tagH, tagX + tagW - r, tagY + tagH, r);
+          ctx.lineTo(tagX + r, tagY + tagH);
+          ctx.arcTo(tagX, tagY + tagH, tagX, tagY + tagH - r, r);
+          ctx.lineTo(tagX, py + 3);
+          ctx.lineTo(tagX - 6, py);
+          ctx.lineTo(tagX, py - 3);
+          ctx.lineTo(tagX, tagY + r);
+          ctx.arcTo(tagX, tagY, tagX + r, tagY, r);
+          ctx.closePath();
+
+          ctx.fillStyle = hexToRGBA(a.color, 0.85);
+          ctx.fill();
+          ctx.restore();
+
+          // Tag text
+          ctx.font = `700 ${tagFs}px "SF Mono", "JetBrains Mono", monospace`;
+          ctx.fillStyle = "#050507";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(a.label || "", tagX + tagW / 2 + 2, py);
+          ctx.fillText(a.label || "", tagX + tagW / 2, py);
         });
 
-        // ── Vertical connector line between points ──
-        if (pointYs.length >= 2) {
-          const sortedYs = [...pointYs].sort((a, b) => a.py - b.py);
-          const topY = sortedYs[0].py;
-          const botY = sortedYs[sortedYs.length - 1].py;
-          const connX = tagX - 8;
+        // ── Vertical connector — gradient line ──
+        if (pointData.length >= 2) {
+          const sorted = [...pointData].sort((a, b) => a.py - b.py);
+          const topPt = sorted[0], botPt = sorted[sorted.length - 1];
+          const cx2 = tagX - 10;
 
-          ctx.globalAlpha = ap * 0.7;
+          // Gradient connector
+          const connGrd = ctx.createLinearGradient(0, topPt.py, 0, botPt.py);
+          connGrd.addColorStop(0, hexToRGBA(topPt.color, 0.5));
+          connGrd.addColorStop(0.5, "rgba(255,255,255,0.15)");
+          connGrd.addColorStop(1, hexToRGBA(botPt.color, 0.5));
+
+          ctx.globalAlpha = ap * 0.8;
           ctx.beginPath();
-          ctx.strokeStyle = "rgba(255,255,255,0.2)";
+          ctx.strokeStyle = connGrd;
           ctx.lineWidth = 1.5;
-          ctx.setLineDash([]);
-          ctx.moveTo(connX, topY);
-          ctx.lineTo(connX, botY);
+          ctx.moveTo(cx2, topPt.py);
+          ctx.lineTo(cx2, botPt.py);
           ctx.stroke();
 
-          pointYs.forEach(({ py, color }) => {
-            ctx.beginPath();
-            ctx.arc(connX, py, 3, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-          });
+          // Connector dots
+          pointData.forEach(({ py, color }) => pulseDot(cx2, py, color, 3));
 
-          // R:R labels on connector
-          if (entry && tp && sl && prog > 0.8) {
-            const entryY = toPixelY(entry.y!);
-            const tpY = toPixelY(tp.y!);
-            const slY = toPixelY(sl.y!);
-            const bracketX = connX - 14;
+          // R:R labels
+          if (entry && tp && sl && p > 0.8) {
+            const eY = toY(entry.y!), tY = toY(tp.y!), sY = toY(sl.y!);
+            const bracX = cx2 - 16;
+            ctx.globalAlpha = ap * 0.7;
+            ctx.font = `700 ${tagFs - 1}px "SF Mono", monospace`;
 
-            ctx.globalAlpha = ap * 0.6;
-            ctx.font = `bold ${tagFontSize - 1}px monospace`;
+            // Reward label
+            ctx.fillStyle = "#00e5a0";
             ctx.textAlign = "right";
             ctx.textBaseline = "middle";
+            ctx.fillText("R", bracX, (eY + tY) / 2);
 
-            ctx.fillStyle = "#00e5a0";
-            ctx.fillText("R", bracketX, (entryY + tpY) / 2);
-
+            // Risk label
             ctx.fillStyle = "#ff4d6a";
-            ctx.fillText("R", bracketX, (entryY + slY) / 2);
+            ctx.fillText("R", bracX, (eY + sY) / 2);
           }
         }
-
         ctx.globalAlpha = ap;
       }
     }
 
-    // ── ARROW ──
+    // ── ARROW — animated direction with glow ──
     annotations.forEach((a) => {
-      if (a.type === "arrow" && a.y1 !== undefined && a.y2 !== undefined && prog > 0.6) {
-        const tagW = w > 700 ? 58 : w > 400 ? 50 : 44;
-        const arrowX = bx + bw - tagW - 18;
-        const sy = toPixelY(a.y1);
-        const ey = toPixelY(a.y2);
+      if (a.type === "arrow" && a.y1 !== undefined && a.y2 !== undefined && p > 0.6) {
+        const tagW = w > 700 ? 62 : w > 400 ? 52 : 44;
+        const arrowX = bx + bw - tagW - 22;
+        const sy = toY(a.y1), ey = toY(a.y2);
+        const ap = Math.min((p - 0.6) / 0.4, 1);
+        const cy = sy + (ey - sy) * ease(ap);
 
-        const ap = Math.min((prog - 0.6) / 0.4, 1);
-        const cy = sy + (ey - sy) * ap;
+        ctx.globalAlpha = ap * 0.85;
 
-        ctx.globalAlpha = ap * 0.8;
-
-        // Glow
+        // Outer glow
         ctx.beginPath();
-        ctx.strokeStyle = a.color + "30";
-        ctx.lineWidth = 6;
-        ctx.moveTo(arrowX, sy);
-        ctx.lineTo(arrowX, cy);
+        ctx.strokeStyle = hexToRGBA(a.color, 0.1);
+        ctx.lineWidth = 8;
+        ctx.moveTo(arrowX, sy); ctx.lineTo(arrowX, cy);
         ctx.stroke();
 
-        // Shaft
+        // Inner glow
         ctx.beginPath();
-        ctx.strokeStyle = a.color;
+        ctx.strokeStyle = hexToRGBA(a.color, 0.25);
+        ctx.lineWidth = 4;
+        ctx.moveTo(arrowX, sy); ctx.lineTo(arrowX, cy);
+        ctx.stroke();
+
+        // Core
+        ctx.beginPath();
+        ctx.strokeStyle = hexToRGBA(a.color, 0.9);
         ctx.lineWidth = 2;
-        ctx.setLineDash([]);
-        ctx.moveTo(arrowX, sy);
-        ctx.lineTo(arrowX, cy);
+        ctx.moveTo(arrowX, sy); ctx.lineTo(arrowX, cy);
         ctx.stroke();
 
-        // Head
-        const headSize = w > 700 ? 7 : 5;
+        // Arrowhead
+        const hs = w > 700 ? 8 : 6;
+        const dir = ey < sy ? -1 : 1;
         ctx.beginPath();
         ctx.fillStyle = a.color;
         ctx.moveTo(arrowX, cy);
-        ctx.lineTo(arrowX - headSize, cy + (ey < sy ? -headSize * 1.5 : headSize * 1.5));
-        ctx.lineTo(arrowX + headSize, cy + (ey < sy ? -headSize * 1.5 : headSize * 1.5));
+        ctx.lineTo(arrowX - hs, cy - dir * hs * 1.5);
+        ctx.lineTo(arrowX + hs, cy - dir * hs * 1.5);
         ctx.closePath();
         ctx.fill();
+
+        // Start dot
+        pulseDot(arrowX, sy, a.color, 3);
       }
     });
 
     ctx.globalAlpha = 1;
 
-    // ── Watermark ──
-    if (prog > 0.8) {
-      ctx.globalAlpha = 0.45;
-      ctx.font = `bold ${w > 700 ? 13 : 11}px monospace`;
+    // ── Premium watermark ──
+    if (p > 0.8) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.font = `800 ${w > 700 ? 12 : 10}px "SF Mono", "JetBrains Mono", monospace`;
       ctx.fillStyle = "#00e5a0";
       ctx.textAlign = "right";
       ctx.textBaseline = "bottom";
-      ctx.fillText("FXSynapse AI", bx + bw - 5, by + bh - 5);
-      ctx.globalAlpha = 1;
+      const wmX = bx + bw - 8, wmY = by + bh - 8;
+
+      // Glow behind text
+      ctx.shadowColor = "rgba(0,229,160,0.3)";
+      ctx.shadowBlur = 8;
+      ctx.fillText("⬢ FXSynapse AI", wmX, wmY);
+      ctx.restore();
     }
+
+    // ── Scan progress beam (during animation) ──
+    if (p > 0 && p < 0.95) {
+      const beamX = bx + bw * ease(p);
+      ctx.save();
+      ctx.globalAlpha = 0.15 * (1 - p);
+      const beamGrd = ctx.createLinearGradient(beamX - 20, 0, beamX + 20, 0);
+      beamGrd.addColorStop(0, "rgba(0,229,160,0)");
+      beamGrd.addColorStop(0.5, "rgba(0,229,160,0.6)");
+      beamGrd.addColorStop(1, "rgba(0,229,160,0)");
+      ctx.fillStyle = beamGrd;
+      ctx.fillRect(beamX - 20, by, 40, bh);
+      ctx.restore();
+    }
+
   }, [canvasRef, dims, prog, annotations, showAnn, dataUrl, chartBounds]);
 }
