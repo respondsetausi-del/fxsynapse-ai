@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const SymbolMonitor = dynamic(() => import("@/components/SymbolMonitor"), { ssr: false });
+const VoiceAssistant = dynamic(() => import("@/components/VoiceAssistant"), { ssr: false });
 
 /* ─── Types ─── */
 interface Stats {
@@ -1911,6 +1912,9 @@ export default function AdminDashboard() {
                 ))}
               </div>
             </div>
+
+            {/* ── AI Voice Assistant ── */}
+            <VoiceAssistant />
 
             {/* ── Symbol Monitor — Live Prices ── */}
             <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
