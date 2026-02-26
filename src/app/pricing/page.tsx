@@ -8,9 +8,9 @@ import ChatWidget from "@/components/ChatWidget";
 const PLANS = [
   {
     id: "starter", name: "Starter", price: 79, period: "/month",
-    scans: "15 scans/month", badge: null,
+    scans: "50 scans/month", badge: null,
     features: [
-      { text: "15 chart scans per month", included: true },
+      { text: "50 chart scans per month", included: true },
       { text: "Full annotations & analysis", included: true },
       { text: "Trade setups (Entry/TP/SL/R:R)", included: true },
       { text: "Support & Resistance levels", included: true },
@@ -23,9 +23,9 @@ const PLANS = [
   },
   {
     id: "pro", name: "Pro", price: 149, period: "/month",
-    scans: "50 scans/month", badge: "MOST POPULAR",
+    scans: "100 scans/month", badge: "MOST POPULAR",
     features: [
-      { text: "50 chart scans per month", included: true },
+      { text: "100 chart scans per month", included: true },
       { text: "Full annotations & analysis", included: true },
       { text: "Trade setups (Entry/TP/SL/R:R)", included: true },
       { text: "Confluence grading", included: true },
@@ -226,7 +226,7 @@ function PricingContent() {
           <h2 className="text-xl font-bold text-white text-center mb-6">Compare Plans</h2>
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,.06)" }}>
             {[
-              { feature: "Monthly scans", starter: "15", pro: "50", premium: "∞" },
+              { feature: "Monthly scans", starter: "50", pro: "100", premium: "∞" },
               { feature: "Chart annotations", starter: "✓", pro: "✓", premium: "✓" },
               { feature: "Trade setups (Entry/TP/SL)", starter: "✓", pro: "✓", premium: "✓" },
               { feature: "Risk:Reward ratio", starter: "✓", pro: "✓", premium: "✓" },

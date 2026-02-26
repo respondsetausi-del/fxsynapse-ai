@@ -44,8 +44,8 @@ const FEATURES = [
 ];
 
 const PLANS = [
-  { name: "Starter", price: "R79", period: "/mo", scans: "15", features: ["15 scans/month", "Full annotations", "Trade setups", "S/R levels & zones", "Scan history"], cta: "Get Starter" },
-  { name: "Pro", price: "R149", period: "/mo", scans: "50", features: ["50 scans/month", "Full annotations", "Trade setups", "AI News & Fundamentals", "Confluence grading", "Full history"], cta: "Get Pro", popular: true },
+  { name: "Starter", price: "R79", period: "/mo", scans: "50", features: ["50 scans/month", "Full annotations", "Trade setups", "S/R levels & zones", "Scan history"], cta: "Get Starter" },
+  { name: "Pro", price: "R149", period: "/mo", scans: "100", features: ["100 scans/month", "Full annotations", "Trade setups", "AI News & Fundamentals", "Confluence grading", "Full history"], cta: "Get Pro", popular: true },
   { name: "Premium", price: "R299", period: "/mo", scans: "∞", features: ["Unlimited scans", "All Pro features", "AI Fundamentals", "Priority processing", "Priority support"], cta: "Go Premium" },
 ];
 

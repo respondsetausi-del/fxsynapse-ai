@@ -310,8 +310,8 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <span className="text-sm">⚡</span>
               <div>
-                <span className="text-[11px] font-semibold text-white">Unlock full trade setups, confluence grading & unlimited history</span>
-                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Subscribers only</span>
+                <span className="text-[11px] font-semibold text-white">Unlock full trade setups — Entry, TP, SL, R:R & confluences</span>
+                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>From R79/mo</span>
               </div>
             </div>
             <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
@@ -559,7 +559,7 @@ export default function Dashboard() {
                           {showFull || s.free ? (
                             <div className="text-sm font-bold" style={{ color: s.c }}>{s.v}</div>
                           ) : (
-                            <div className="text-sm font-bold font-mono select-none" style={{ color: s.c, filter: "blur(6px)", userSelect: "none" }}>●●●●●●</div>
+                            <div className="text-sm font-bold font-mono select-none" style={{ color: s.c, filter: "blur(10px)", userSelect: "none", pointerEvents: "none" }}>●●●●●●</div>
                           )}
                         </div>
                       ))}
@@ -569,11 +569,11 @@ export default function Dashboard() {
                     {!showFull && (
                       <div onClick={() => setShowPaywall(true)} className="block rounded-xl text-center cursor-pointer transition-all hover:scale-[1.01]" style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
                         <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: "#00e5a0" }}>🔒 FULL ANALYSIS LOCKED</div>
-                        <div className="text-xs font-bold text-white">Tap to see plans — Entry, TP, SL & R:R included</div>
+                        <div className="text-xs font-bold text-white">Tap to unlock — Entry, TP, SL, R:R & AI insights</div>
                         <div className="flex gap-3 justify-center mt-2">
-                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>R79/mo</span>
-                          <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>R149/mo</span>
-                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>R299/mo</span>
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>50 scans R79</span>
+                          <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>100 scans R149</span>
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>Unlimited R299</span>
                         </div>
                       </div>
                     )}
@@ -585,15 +585,24 @@ export default function Dashboard() {
                         ))}
                       </div>
 
-                      {/* Blur overlay for non-paid users */}
+                      {/* Blur overlay for non-paid users — HEAVY blur, nothing readable */}
                       {!showFull && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center" style={{ top: 38, backdropFilter: "blur(8px)", background: "rgba(10,11,16,.5)" }}>
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-2" style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.15)" }}>
-                            <span className="text-lg">🔒</span>
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center" style={{ top: 38, backdropFilter: "blur(18px) saturate(0.3)", WebkitBackdropFilter: "blur(18px) saturate(0.3)", background: "rgba(10,11,16,.75)" }}>
+                          {/* Extra noise layer to kill any remaining readability */}
+                          <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(0deg, rgba(10,11,16,.15) 0px, transparent 1px, transparent 2px)", opacity: 0.6 }} />
+                          <div className="relative z-10 flex flex-col items-center">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)", boxShadow: "0 0 30px rgba(0,229,160,.1)" }}>
+                              <span className="text-xl">🔒</span>
+                            </div>
+                            <div className="text-sm font-bold text-white mb-1">Unlock Full Analysis</div>
+                            <div className="text-[10px] mb-1 text-center px-4" style={{ color: "rgba(255,255,255,.5)" }}>See the exact trade setup AI found for you</div>
+                            <div className="flex gap-1.5 mb-3 flex-wrap justify-center">
+                              {["Entry Price", "TP & SL", "R:R Ratio", "Confluences", "AI Insights"].map(f => (
+                                <span key={f} className="text-[8px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,229,160,.06)", color: "#00e5a0", border: "1px solid rgba(0,229,160,.08)" }}>{f}</span>
+                              ))}
+                            </div>
+                            <button onClick={() => setShowPaywall(true)} className="px-6 py-2.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all hover:scale-105" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", border: "none", boxShadow: "0 4px 20px rgba(0,229,160,.3)" }}>View Plans — from R79/mo</button>
                           </div>
-                          <div className="text-xs font-bold text-white mb-1">Subscribe to Unlock</div>
-                          <div className="text-[10px] mb-3 text-center px-4" style={{ color: "rgba(255,255,255,.4)" }}>Entry, TP, SL, risk:reward, AI analysis, confluences</div>
-                          <button onClick={() => setShowPaywall(true)} className="px-5 py-2 rounded-xl text-[11px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", border: "none" }}>View Plans</button>
                         </div>
                       )}
                       <div style={{ padding: 13 }}>
@@ -828,8 +837,8 @@ export default function Dashboard() {
             </h3>
             <p className="text-xs mb-1" style={{ color: "rgba(255,255,255,.45)" }}>
               {!showFull
-                ? "Subscribe to see your entry price, take profit, stop loss, and risk:reward ratio."
-                : "All monthly scans used. Top up or upgrade to keep scanning."}
+                ? "Your AI analysis is ready — subscribe to see the exact entry, take profit, stop loss, and risk:reward ratio."
+                : "All monthly scans used. Upgrade or grab a top-up pack to keep scanning."}
             </p>
             {!showFull && (
               <div className="flex gap-1.5 justify-center mb-3 mt-2 flex-wrap">
@@ -839,29 +848,52 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* ── INLINE PRICING — All 3 plans visible ── */}
-            <div className="flex flex-col gap-2 mt-4">
+            {/* ── INLINE PRICING — All 3 plans with value props ── */}
+            <div className="flex flex-col gap-2.5 mt-4">
               {[
-                { name: "Starter", price: "R79", scans: "15 scans/mo", href: "/pricing?plan=starter", popular: false },
-                { name: "Pro", price: "R149", scans: "50 scans/mo", href: "/pricing?plan=pro", popular: true },
-                { name: "Premium", price: "R299", scans: "Unlimited", href: "/pricing?plan=premium", popular: false },
+                {
+                  name: "Starter", price: "R79", scans: "50 scans/mo",
+                  href: "/pricing?plan=starter", popular: false,
+                  tagline: "Perfect for learning",
+                  perks: ["50 AI chart scans", "Entry, TP, SL & R:R on every scan", "Annotated charts with key levels"],
+                },
+                {
+                  name: "Pro", price: "R149", scans: "100 scans/mo",
+                  href: "/pricing?plan=pro", popular: true,
+                  tagline: "For active traders",
+                  perks: ["100 AI chart scans", "Everything in Starter +", "Confluence grading & AI Fundamentals"],
+                },
+                {
+                  name: "Premium", price: "R299", scans: "Unlimited",
+                  href: "/pricing?plan=premium", popular: false,
+                  tagline: "Scan every chart, every day",
+                  perks: ["Unlimited scans", "Everything in Pro +", "Priority processing & support"],
+                },
               ].map((plan) => (
-                <Link key={plan.name} href={plan.href} className="w-full no-underline block rounded-2xl px-4 py-3 text-left transition-all hover:scale-[1.02] relative" style={{
+                <Link key={plan.name} href={plan.href} className="w-full no-underline block rounded-2xl px-4 py-3.5 text-left transition-all hover:scale-[1.02] relative" style={{
                   background: plan.popular ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)",
                   border: `1px solid ${plan.popular ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.06)"}`,
                 }}>
                   {plan.popular && (
                     <div className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[8px] font-bold font-mono" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>POPULAR</div>
                   )}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-1.5">
                     <div>
                       <div className="text-[13px] font-bold text-white">{plan.name}</div>
-                      <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>{plan.scans}</div>
+                      <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{plan.tagline}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-[18px] font-extrabold" style={{ color: plan.popular ? "#00e5a0" : "#fff" }}>{plan.price}</div>
                       <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>/month</div>
                     </div>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    {plan.perks.map((perk, pi) => (
+                      <div key={pi} className="flex items-center gap-1.5">
+                        <span className="text-[8px]" style={{ color: "#00e5a0" }}>✓</span>
+                        <span className="text-[9px]" style={{ color: "rgba(255,255,255,.45)" }}>{perk}</span>
+                      </div>
+                    ))}
                   </div>
                 </Link>
               ))}

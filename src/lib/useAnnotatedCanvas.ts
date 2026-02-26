@@ -162,48 +162,87 @@ export function useAnnotatedCanvas(
     };
 
     // ═══════════════════════════════════════
-    // RENDER ANNOTATIONS
+    // RENDER ANNOTATIONS — Clean priority system
     // ═══════════════════════════════════════
+
+    // Collect all position tool Y positions to avoid label overlap
+    const ptAnns = annotations.filter(a => a.type === "point");
+    const entryAnn = ptAnns.find(a => a.label?.toLowerCase().includes("entry"));
+    const tpAnn = ptAnns.find(a => a.label?.toUpperCase() === "TP");
+    const slAnn = ptAnns.find(a => a.label?.toUpperCase() === "SL");
+    const positionYs = [entryAnn, tpAnn, slAnn].filter(Boolean).map(a => toY(a!.y!));
+    const posToolActive = entryAnn && tpAnn && slAnn;
+    const posToolLeft = bx + bw * 0.58;
+
+    // Check if a Y position is near the position tool
+    const nearPosTool = (y: number, margin: number = 25) => positionYs.some(py => Math.abs(y - py) < margin);
 
     annotations.forEach((a) => {
       ctx.globalAlpha = Math.min(p * 1.1, 0.88);
       const mc = mute(a.color);
 
-      // ── ZONE / FVG ──
+      // ── ZONE / FVG — subtle fills, small left-edge badges ──
       if ((a.type === "zone" || a.type === "fvg") && a.y1 !== undefined && a.y2 !== undefined) {
         const zy1 = toY(a.y1), zy2 = toY(a.y2);
         const ztop = Math.min(zy1, zy2), zh = Math.abs(zy2 - zy1);
-        const drawW = bw * Math.min(p * 1.1, 1);
+        // If position tool is active, only draw zone up to the tool area
+        const drawW = posToolActive ? (posToolLeft - bx - 4) : bw * Math.min(p * 1.1, 1);
         const bc = mute(a.bc || a.color);
 
         // Soft gradient fill
         const grd = ctx.createLinearGradient(bx, ztop, bx + drawW, ztop);
         grd.addColorStop(0, rgba(bc, 0.06));
-        grd.addColorStop(0.7, rgba(bc, a.type === "fvg" ? 0.04 : 0.05));
-        grd.addColorStop(1, rgba(bc, 0.02));
+        grd.addColorStop(0.7, rgba(bc, a.type === "fvg" ? 0.03 : 0.04));
+        grd.addColorStop(1, rgba(bc, 0.01));
         ctx.fillStyle = grd;
         ctx.fillRect(bx, ztop, drawW, zh);
 
-        // Top/bottom borders
+        // Subtle top/bottom borders
         ctx.setLineDash([5, 4]);
-        ctx.strokeStyle = rgba(bc, 0.3);
-        ctx.lineWidth = 0.8;
+        ctx.strokeStyle = rgba(bc, 0.2);
+        ctx.lineWidth = 0.6;
         ctx.beginPath(); ctx.moveTo(bx, ztop); ctx.lineTo(bx + drawW, ztop); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(bx, ztop + zh); ctx.lineTo(bx + drawW, ztop + zh); ctx.stroke();
         ctx.setLineDash([]);
 
+        // Small subtle label — left edge only, reduced opacity
         if (p > 0.5 && a.label) {
-          label(a.label, bx + 6, ztop + zh / 2, bc, "left");
+          const shortLabel = a.label.replace("Zone", "").replace("zone", "").trim();
+          ctx.globalAlpha = 0.55;
+          const mc2 = mute(a.bc || a.color);
+          ctx.font = `600 ${fsS}px "JetBrains Mono", monospace`;
+          const m = ctx.measureText(shortLabel);
+          const px = 4, py = 2;
+          const tw = m.width + px * 2, th = fsS + py * 2;
+          const lx = bx + 4, ly = ztop + (zh - th) / 2;
+
+          ctx.fillStyle = "rgba(10,11,16,0.7)";
+          rr(lx, ly, tw, th, 3);
+          ctx.fill();
+          ctx.fillStyle = rgba(mc2, 0.7);
+          ctx.textBaseline = "middle";
+          ctx.textAlign = "left";
+          ctx.fillText(shortLabel, lx + px, ly + th / 2);
+          ctx.globalAlpha = Math.min(p * 1.1, 0.88);
         }
       }
 
-      // ── LINE / LIQUIDITY ──
+      // ── LINE / LIQUIDITY — skip labels near position tool ──
       if ((a.type === "line" || a.type === "liquidity") && a.y !== undefined) {
         const ly = toY(a.y);
-        const endX = bx + bw * Math.min(p * 1.1, 1);
+        // Don't draw line through position tool area
+        const endX = posToolActive ? Math.min(posToolLeft - 4, bx + bw * Math.min(p * 1.1, 1)) : bx + bw * Math.min(p * 1.1, 1);
         const dash = a.type === "liquidity" || a.style === "dotted" ? [2, 4] : [6, 4];
-        drawLine(bx, ly, endX, ly, mc, a.type === "liquidity" ? lw * 0.6 : lw, dash);
-        if (p > 0.35 && a.label) label(a.label, endX - 6, ly - 12, mc, "right");
+
+        // Reduce opacity if near a position tool level
+        if (nearPosTool(ly)) ctx.globalAlpha *= 0.35;
+        drawLine(bx, ly, endX, ly, mc, a.type === "liquidity" ? lw * 0.5 : lw * 0.8, dash);
+
+        // Only show label if NOT near position tool
+        if (p > 0.35 && a.label && !nearPosTool(ly, 35)) {
+          label(a.label, endX - 6, ly - 12, mc, "right");
+        }
+        ctx.globalAlpha = Math.min(p * 1.1, 0.88);
       }
 
       // ── TRENDLINE ──
