@@ -29,6 +29,15 @@ interface EmailLog {
   id: string; recipient_id: string; recipient_email: string; subject: string;
   body: string; status: string; created_at: string;
 }
+interface Badges {
+  users: number; payments: number; paymentsCompleted: number; chat: number;
+  affiliates: number; pendingPayments: number; failedPayments: number;
+}
+interface PaymentSummary {
+  pending: { count: number; amount: number };
+  completed: { count: number; amount: number };
+  failed: { count: number; amount: number };
+}
 
 type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel" | "chat" | "affiliates";
 type ModalType = "credits" | "plan" | "role" | "trial" | "block" | "email" | "delete";
@@ -183,6 +192,8 @@ export default function AdminDashboard() {
   const [affChatMessages, setAffChatMessages] = useState<any[]>([]);
   const [affChatReply, setAffChatReply] = useState("");
   const [affChatSending, setAffChatSending] = useState(false);
+  const [badges, setBadges] = useState<Badges>({ users: 0, payments: 0, paymentsCompleted: 0, chat: 0, affiliates: 0, pendingPayments: 0, failedPayments: 0 });
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const affChatEndRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
@@ -205,8 +216,15 @@ export default function AdminDashboard() {
 
   const fetchPayments = useCallback(async () => {
     const res = await fetch(`/api/admin/payments?page=${paymentsPage}`);
-    if (res.ok) { const d = await res.json(); setPayments(d.payments); setPaymentsTotal(d.total); }
+    if (res.ok) { const d = await res.json(); setPayments(d.payments); setPaymentsTotal(d.total); if (d.summary) setPaymentSummary(d.summary); }
   }, [paymentsPage]);
+
+  const fetchBadges = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/badges");
+      if (res.ok) setBadges(await res.json());
+    } catch { /* silent */ }
+  }, []);
 
   const fetchEmailLogs = useCallback(async () => {
     const res = await fetch(`/api/admin/email?page=${emailLogsPage}`);
@@ -216,7 +234,42 @@ export default function AdminDashboard() {
   useEffect(() => { fetchStats().then(() => setLoading(false)); }, [fetchStats]);
   useEffect(() => { if (tab === "users" || tab === "overview") fetchUsers(); }, [tab, fetchUsers]);
   useEffect(() => { if (tab === "payments") fetchPayments(); }, [tab, fetchPayments]);
+  // Pre-fetch payment summary for badge accuracy
+  useEffect(() => { fetch("/api/admin/payments?page=1").then(r => r.json()).then(d => { if (d.summary) setPaymentSummary(d.summary); }).catch(() => {}); }, []);
   useEffect(() => { if (tab === "email") fetchEmailLogs(); }, [tab, fetchEmailLogs]);
+
+  // ── Badge polling — every 15s ──
+  useEffect(() => {
+    fetchBadges();
+    const iv = setInterval(fetchBadges, 15000);
+    return () => clearInterval(iv);
+  }, [fetchBadges]);
+
+  // ── Auto-refresh active tab silently — every 30s ──
+  useEffect(() => {
+    const refresh = () => {
+      if (tab === "overview") { fetchStats(); fetchUsers(); }
+      else if (tab === "users") fetchUsers();
+      else if (tab === "payments") fetchPayments();
+      else if (tab === "email") fetchEmailLogs();
+      else if (tab === "revenue" || tab === "retention") fetchStats();
+      else if (tab === "funnel") {
+        fetch("/api/tracking?days=30").then(r => r.json()).then(d => setFunnelData(d)).catch(() => {});
+        fetch("/api/ratings").then(r => r.json()).then(d => setRatingsData(d)).catch(() => {});
+      }
+      else if (tab === "affiliates") {
+        Promise.all([
+          fetch("/api/admin/affiliates?tab=overview").then(r => r.json()),
+          fetch("/api/admin/affiliates?tab=payouts").then(r => r.json()),
+        ]).then(([overview, payoutsData]) => {
+          setAffData(overview);
+          setAffPayouts(payoutsData.payouts || []);
+        }).catch(() => {});
+      }
+    };
+    const iv = setInterval(refresh, 30000);
+    return () => clearInterval(iv);
+  }, [tab, fetchStats, fetchUsers, fetchPayments, fetchEmailLogs]);
   useEffect(() => {
     if (tab === "funnel") {
       fetch("/api/tracking?days=30").then(r => r.json()).then(d => setFunnelData(d)).catch(() => {});
@@ -469,6 +522,15 @@ export default function AdminDashboard() {
     { id: "affiliates", label: "Affiliates", icon: "💰" },
   ];
 
+  const tabBadge = (id: Tab): number => {
+    if (id === "users") return badges.users;
+    if (id === "payments") return badges.payments;
+    if (id === "revenue") return badges.paymentsCompleted;
+    if (id === "chat") return badges.chat;
+    if (id === "affiliates") return badges.affiliates;
+    return 0;
+  };
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "#050507" }}>
       <div className="flex flex-col items-center gap-3">
@@ -509,17 +571,27 @@ export default function AdminDashboard() {
 
       {/* ─── TABS ─── */}
       <div className="flex gap-0.5 px-6 pt-3 pb-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {tabs.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className="px-3 py-2 rounded-t-lg text-[11px] font-semibold cursor-pointer transition-all whitespace-nowrap"
-            style={{
-              background: tab === t.id ? "rgba(255,255,255,.04)" : "transparent",
-              borderBottom: tab === t.id ? "2px solid #00e5a0" : "2px solid transparent",
-              color: tab === t.id ? "#fff" : "rgba(255,255,255,.35)",
-            }}>
-            <span className="mr-1.5 opacity-60">{t.icon}</span>{t.label}
-          </button>
-        ))}
+        {tabs.map((t) => {
+          const count = tabBadge(t.id);
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="px-3 py-2 rounded-t-lg text-[11px] font-semibold cursor-pointer transition-all whitespace-nowrap relative"
+              style={{
+                background: tab === t.id ? "rgba(255,255,255,.04)" : "transparent",
+                borderBottom: tab === t.id ? "2px solid #00e5a0" : "2px solid transparent",
+                color: tab === t.id ? "#fff" : "rgba(255,255,255,.35)",
+              }}>
+              <span className="mr-1.5 opacity-60">{t.icon}</span>{t.label}
+              {count > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold" style={{
+                  background: t.id === "payments" ? "rgba(240,185,11,.15)" : t.id === "chat" ? "rgba(255,77,106,.15)" : "rgba(0,229,160,.12)",
+                  color: t.id === "payments" ? "#f0b90b" : t.id === "chat" ? "#ff4d6a" : "#00e5a0",
+                  lineHeight: 1,
+                }}>{count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="max-w-[1400px] mx-auto px-6 py-5">
@@ -802,6 +874,35 @@ export default function AdminDashboard() {
         {/* ═══════════════════════════════════ PAYMENTS TAB ═══════════════════════════════════ */}
         {tab === "payments" && (
           <div style={{ animation: "fadeUp 0.3s ease" }}>
+            {/* Payment Summary Cards */}
+            {paymentSummary && (
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="rounded-xl p-4" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)" }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono tracking-widest" style={{ color: "rgba(240,185,11,.6)" }}>⏳ PENDING</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(240,185,11,.1)", color: "#f0b90b" }}>{paymentSummary.pending.count}</span>
+                  </div>
+                  <div className="text-xl font-bold font-mono" style={{ color: "#f0b90b" }}>{fmt(paymentSummary.pending.amount)}</div>
+                  <div className="text-[9px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.2)" }}>awaiting verification</div>
+                </div>
+                <div className="rounded-xl p-4" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.1)" }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono tracking-widest" style={{ color: "rgba(0,229,160,.6)" }}>✅ COMPLETED</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,229,160,.1)", color: "#00e5a0" }}>{paymentSummary.completed.count}</span>
+                  </div>
+                  <div className="text-xl font-bold font-mono" style={{ color: "#00e5a0" }}>{fmt(paymentSummary.completed.amount)}</div>
+                  <div className="text-[9px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.2)" }}>total revenue collected</div>
+                </div>
+                <div className="rounded-xl p-4" style={{ background: "rgba(255,77,106,.04)", border: "1px solid rgba(255,77,106,.1)" }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono tracking-widest" style={{ color: "rgba(255,77,106,.6)" }}>✕ FAILED</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(255,77,106,.1)", color: "#ff4d6a" }}>{paymentSummary.failed.count}</span>
+                  </div>
+                  <div className="text-xl font-bold font-mono" style={{ color: "#ff4d6a" }}>{fmt(paymentSummary.failed.amount)}</div>
+                  <div className="text-[9px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.2)" }}>needs follow-up</div>
+                </div>
+              </div>
+            )}
             <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
               <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                 <h2 className="text-sm font-bold text-white">Payment History</h2>
