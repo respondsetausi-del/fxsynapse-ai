@@ -351,9 +351,9 @@ export default function Dashboard() {
                   </p>
                 )}
               </div>
-              {/* Animated border upload zone */}
+              {/* Upload zone */}
               <div className="relative group">
-                <div className="absolute -inset-[1px] rounded-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" style={{ background: "conic-gradient(from 0deg, #00e5a0, #4da0ff, #a855f7, #00e5a0)", animation: isDrag ? "none" : "borderSpin 4s linear infinite", filter: "blur(2px)" }} />
+                <div className="absolute -inset-[1px] rounded-3xl opacity-30 group-hover:opacity-60 transition-opacity duration-500" style={{ background: "linear-gradient(135deg, #00e5a0, #4da0ff, #a855f7)", filter: "blur(3px)" }} />
                 <div className="relative text-center cursor-pointer transition-all rounded-3xl overflow-hidden"
                   style={{ padding: "55px 34px", background: isDrag ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.025)", border: "1px solid transparent", backdropFilter: "blur(40px) saturate(1.5)", boxShadow: isDrag ? "0 0 60px rgba(0,229,160,.15), inset 0 0 60px rgba(0,229,160,.05)" : "0 8px 32px rgba(0,0,0,.25)" }}
                   onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }} onDragLeave={() => setIsDrag(false)} onDrop={handleDrop} onClick={() => fileRef.current?.click()}>
@@ -369,8 +369,8 @@ export default function Dashboard() {
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </div>
                   </div>
-                  <p className="text-[17px] font-bold text-white mb-1.5">Drop your chart screenshot here</p>
-                  <p className="text-[13px] mb-2" style={{ color: "rgba(255,255,255,.45)" }}>or tap to browse • PNG, JPG</p>
+                  <p className="text-[17px] font-bold text-white mb-1.5">Upload your chart screenshot</p>
+                  <p className="text-[13px] mb-2" style={{ color: "rgba(255,255,255,.45)" }}>Tap here to choose a file • PNG, JPG</p>
                   <p className="text-[10px] font-mono px-3 py-1 rounded-full inline-flex items-center gap-1.5" style={{ background: "rgba(0,229,160,.06)", border: "1px solid rgba(0,229,160,.1)", color: "#00e5a0" }}>
                     <span style={{ animation: "breathe 2s ease infinite" }}>⚡</span> AI analyzes in under 10 seconds
                   </p>
