@@ -45,15 +45,23 @@ const SYMBOL_ALIASES: Record<string, string> = {
 
 export default function VoiceAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [stage, setStage] = useState<Stage>("idle");
+  const [stage, _setStage] = useState<Stage>("idle");
+  const stageRef = useRef<Stage>("idle");
+  const setStage = (s: Stage) => { stageRef.current = s; _setStage(s); };
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userName, setUserName] = useState("");
-  const [selectedSymbol, setSelectedSymbol] = useState("");
-  const [selectedSymbolDisplay, setSelectedSymbolDisplay] = useState("");
+  const [selectedSymbol, _setSelectedSymbol] = useState("");
+  const selectedSymbolRef = useRef("");
+  const setSelectedSymbol = (s: string) => { selectedSymbolRef.current = s; _setSelectedSymbol(s); };
+  const [selectedSymbolDisplay, _setSelectedSymbolDisplay] = useState("");
+  const selectedSymbolDisplayRef = useRef("");
+  const setSelectedSymbolDisplay = (s: string) => { selectedSymbolDisplayRef.current = s; _setSelectedSymbolDisplay(s); };
   const [selectedTimeframe, setSelectedTimeframe] = useState(0);
   const [selectedTfLabel, setSelectedTfLabel] = useState("");
-  const [analysis, setAnalysis] = useState<any>(null);
+  const [analysis, _setAnalysis] = useState<any>(null);
+  const analysisRef = useRef<any>(null);
+  const setAnalysis = (a: any) => { analysisRef.current = a; _setAnalysis(a); };
   const [candles, setCandles] = useState<Candle[]>([]);
   const [currentPrice, setCurrentPrice] = useState(0);
   const [wsConnected, setWsConnected] = useState(false);
@@ -64,14 +72,34 @@ export default function VoiceAssistant() {
   const recognitionRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const allSymbolsRef = useRef<any[]>([]);
+  const speechUnlocked = useRef(false);
+  const handleUserInputRef = useRef<(text: string) => void>(() => {});
+
+  // Unlock speech synthesis on first user interaction (required by iOS Safari)
+  const unlockSpeech = useCallback(() => {
+    if (speechUnlocked.current || typeof window === "undefined") return;
+    const utter = new SpeechSynthesisUtterance("");
+    utter.volume = 0;
+    window.speechSynthesis.speak(utter);
+    speechUnlocked.current = true;
+  }, []);
 
   // Auto-scroll
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   // ═══ Speech Synthesis ═══
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
+  
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const loadVoices = () => { if (window.speechSynthesis.getVoices().length > 0) setVoicesLoaded(true); };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
+
   const speak = useCallback((text: string) => {
     if (!voiceEnabled || typeof window === "undefined") return;
-    window.speechSynthesis.cancel();
+    try { window.speechSynthesis.cancel(); } catch {}
     const utter = new SpeechSynthesisUtterance(text);
     utter.rate = 1.05;
     utter.pitch = 1.0;
@@ -89,6 +117,7 @@ export default function VoiceAssistant() {
   // ═══ Speech Recognition ═══
   const startListening = useCallback(() => {
     if (typeof window === "undefined") return;
+    unlockSpeech();
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
 
@@ -100,7 +129,7 @@ export default function VoiceAssistant() {
     recognition.onresult = (event: any) => {
       const text = event.results[0][0].transcript;
       setIsListening(false);
-      handleUserInput(text);
+      handleUserInputRef.current(text);
     };
 
     recognition.onerror = () => setIsListening(false);
@@ -230,7 +259,7 @@ export default function VoiceAssistant() {
     addMsg("user", text);
 
     // Stage: idle — start conversation
-    if (stage === "idle" || stage === "done") {
+    if (stageRef.current === "idle" || stageRef.current === "done") {
       // Check for greetings
       const greetings = ["hi", "hey", "hello", "yo", "sup", "what's up", "good morning", "good afternoon", "good evening"];
       const isGreeting = greetings.some(g => lower.includes(g));
@@ -258,7 +287,7 @@ export default function VoiceAssistant() {
     }
 
     // Stage: ask_symbol
-    if (stage === "ask_symbol") {
+    if (stageRef.current === "ask_symbol") {
       const matched = matchSymbol(lower);
       if (matched) {
         setSelectedSymbol(matched.symbol);
@@ -272,15 +301,15 @@ export default function VoiceAssistant() {
     }
 
     // Stage: ask_timeframe
-    if (stage === "ask_timeframe") {
+    if (stageRef.current === "ask_timeframe") {
       const tf = matchTimeframe(lower);
       if (tf) {
         setSelectedTimeframe(tf.value);
         setSelectedTfLabel(tf.label);
         setStage("analyzing");
-        addMsg("ai", `${tf.label} timeframe, nice. Let me pull up ${selectedSymbolDisplay} and run my analysis... One moment.`);
+        addMsg("ai", `${tf.label} timeframe, nice. Let me pull up ${selectedSymbolDisplayRef.current} and run my analysis... One moment.`);
         // Fetch candles
-        fetchCandles(selectedSymbol, tf.value);
+        fetchCandles(selectedSymbolRef.current, tf.value);
         // Wait for candles then analyze
         setTimeout(() => {
           // Check if candles arrived (give WS time)
@@ -296,7 +325,7 @@ export default function VoiceAssistant() {
                     : "";
                   const digits = result.entry > 100 ? 2 : result.entry > 1 ? 4 : 5;
                   addMsg("ai",
-                    `Here's what I see on ${selectedSymbolDisplay} ${tf.label}. ` +
+                    `Here's what I see on ${selectedSymbolDisplayRef.current} ${tf.label}. ` +
                     `I'm reading a ${result.direction} signal with ${result.confidence}% confidence. ` +
                     `RSI is at ${result.rsi?.toFixed(1) || "N/A"}. ` +
                     `Entry at ${result.entry.toFixed(digits)}, ` +
@@ -325,13 +354,13 @@ export default function VoiceAssistant() {
     }
 
     // Stage: presenting — waiting for trade confirmation
-    if (stage === "presenting" || stage === "confirm_trade") {
+    if (stageRef.current === "presenting" || stageRef.current === "confirm_trade") {
       const yes = ["yes", "yeah", "yep", "do it", "execute", "confirmed", "confirm", "go", "let's go", "send it", "place it", "take it"];
       const no = ["no", "nah", "cancel", "stop", "don't", "skip", "never mind"];
 
       if (yes.some(y => lower.includes(y))) {
         setStage("executing");
-        addMsg("ai", `Confirmed! Executing ${analysis?.direction} on ${selectedSymbolDisplay} at ${analysis?.entry.toFixed(analysis.entry > 100 ? 2 : 4)}... Trade placed! Your stop loss is set at ${analysis?.sl.toFixed(analysis.sl > 100 ? 2 : 4)} and take profit at ${analysis?.tp.toFixed(analysis.tp > 100 ? 2 : 4)}. Good luck! Want me to analyse another pair?`);
+        addMsg("ai", `Confirmed! Executing ${analysisRef.current?.direction} on ${selectedSymbolDisplayRef.current} at ${analysisRef.current?.entry.toFixed(analysisRef.current?.entry > 100 ? 2 : 4)}... Trade placed! Your stop loss is set at ${analysisRef.current?.sl.toFixed(analysisRef.current?.sl > 100 ? 2 : 4)} and take profit at ${analysisRef.current?.tp.toFixed(analysisRef.current?.tp > 100 ? 2 : 4)}. Good luck! Want me to analyse another pair?`);
         setStage("done");
         return;
       }
@@ -349,13 +378,16 @@ export default function VoiceAssistant() {
         return;
       }
 
-      addMsg("ai", `Should I execute the ${analysis?.direction} trade on ${selectedSymbolDisplay}? Say "Yes" to confirm or "No" to cancel.`);
+      addMsg("ai", `Should I execute the ${analysisRef.current?.direction} trade on ${selectedSymbolDisplayRef.current}? Say "Yes" to confirm or "No" to cancel.`);
       return;
     }
 
     // Fallback
     addMsg("ai", `I'm here to help you trade! Say "Analyse" followed by a symbol like "Gold" or "EURUSD" to get started.`);
-  }, [stage, selectedSymbol, selectedSymbolDisplay, analysis, addMsg, fetchCandles, analyzeData]);
+  }, [addMsg, fetchCandles, analyzeData]);
+
+  // Keep ref in sync so speech recognition always has latest handler
+  useEffect(() => { handleUserInputRef.current = handleUserInput; }, [handleUserInput]);
 
   // ═══ Symbol matching ═══
   function matchSymbol(text: string): { symbol: string; display: string } | null {
@@ -380,9 +412,9 @@ export default function VoiceAssistant() {
   }
 
   function matchTimeframe(text: string): { value: number; label: string } | null {
-    const lower = text.toLowerCase().trim();
+    const lower = text.toLowerCase().replace(/\b(the|a|an|on|use|do|try|go|let|lets|let's|with|for|me|please|i want|i'd like|how about|what about)\b/g, "").replace(/\s+/g, " ").trim();
     for (const [key, value] of Object.entries(TIMEFRAME_MAP)) {
-      if (lower.includes(key)) {
+      if (lower.includes(key) || lower.replace(/\s/g, "") === key) {
         const labels: Record<number, string> = { 60: "M1", 300: "M5", 900: "M15", 1800: "M30", 3600: "H1", 14400: "H4", 86400: "D1" };
         return { value, label: labels[value] || key.toUpperCase() };
       }
@@ -393,6 +425,7 @@ export default function VoiceAssistant() {
   // ═══ Text input handler ═══
   const handleTextSubmit = () => {
     if (!textInput.trim()) return;
+    unlockSpeech();
     handleUserInput(textInput.trim());
     setTextInput("");
   };
@@ -449,7 +482,7 @@ export default function VoiceAssistant() {
             </div>
             <div className="flex gap-2 justify-center flex-wrap">
               {["Hey, analyse Gold for me", "Check EURUSD H1", "Look at Bitcoin"].map((ex) => (
-                <button key={ex} onClick={() => handleUserInput(ex)}
+                <button key={ex} onClick={() => { unlockSpeech(); handleUserInput(ex); }}
                   className="px-3 py-2 rounded-xl text-[11px] font-mono cursor-pointer transition-all hover:scale-105"
                   style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", color: "rgba(255,255,255,.4)" }}>
                   &ldquo;{ex}&rdquo;
