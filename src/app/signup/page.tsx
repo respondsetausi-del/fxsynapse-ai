@@ -67,7 +67,7 @@ export default function SignupPage() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: "'Outfit',sans-serif" }}>Create your account</h1>
-          <p className="text-sm" style={{ color: "rgba(255,255,255,.5)" }}>Start with 1 free chart scan daily</p>
+          <p className="text-sm" style={{ color: "rgba(255,255,255,.5)" }}>Get your first chart analysis free — no card needed</p>
         </div>
         <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", backdropFilter: "blur(20px)" }}>
           <form onSubmit={handleSignup} className="flex flex-col gap-3">

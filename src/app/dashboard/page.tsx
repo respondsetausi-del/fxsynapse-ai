@@ -47,6 +47,8 @@ export default function Dashboard() {
   const [showBrokerPopup, setShowBrokerPopup] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [scanPaid, setScanPaid] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showScreenshotGuide, setShowScreenshotGuide] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileObjRef = useRef<File | null>(null);
   const supabase = createClient();
@@ -89,6 +91,10 @@ export default function Dashboard() {
         // No hard paywall redirect — all users can access dashboard
         // Paywall shows when they try to scan without credits or view results
         setAuthLoading(false);
+
+        // First-time onboarding
+        const seen = localStorage.getItem("fxs_onboarded");
+        if (!seen) { setTimeout(() => setShowOnboarding(true), 600); }
       } else {
         router.push("/login");
       }
@@ -305,7 +311,7 @@ export default function Dashboard() {
               <span className="text-sm">⚡</span>
               <div>
                 <span className="text-[11px] font-semibold text-white">Unlock full trade setups, confluence grading & unlimited history</span>
-                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Pro from R149/mo</span>
+                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Subscribers only</span>
               </div>
             </div>
             <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
@@ -322,13 +328,13 @@ export default function Dashboard() {
             <div className="max-w-[530px] w-full animate-fadeUp">
               <div className="text-center mb-8">
                 <h1 className="font-extrabold text-white leading-[1.15] mb-2.5" style={{ fontSize: "clamp(24px,5vw,36px)", letterSpacing: "-1.5px" }}>
-                  Scan any chart.<br />
+                  Upload your chart.<br />
                   <span style={{ background: "linear-gradient(135deg,#00e5a0 0%,#4da0ff 40%,#a855f7 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundSize: "200% 200%", animation: "gradientShift 4s ease infinite" }}>
-                    Get annotated intelligence.
+                    AI gives you the trade setup.
                   </span>
                 </h1>
                 <p className="text-[13px] max-w-[400px] mx-auto" style={{ color: "rgba(255,255,255,.4)", lineHeight: 1.7 }}>
-                  Upload a chart screenshot — AI annotates it with key levels, zones, and trade-ready setups in seconds.
+                  Screenshot any chart from your trading app — AI tells you where to enter, take profit, and stop loss.
                 </p>
                 {credits && (
                   <p className="text-[10px] font-mono mt-3 px-3 py-1.5 rounded-full inline-flex items-center gap-2" style={{
@@ -363,7 +369,7 @@ export default function Dashboard() {
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </div>
                   </div>
-                  <p className="text-[17px] font-bold text-white mb-1.5">Drop your chart here</p>
+                  <p className="text-[17px] font-bold text-white mb-1.5">Drop your chart screenshot here</p>
                   <p className="text-[13px] mb-2" style={{ color: "rgba(255,255,255,.45)" }}>or tap to browse • PNG, JPG</p>
                   <p className="text-[10px] font-mono px-3 py-1 rounded-full inline-flex items-center gap-1.5" style={{ background: "rgba(0,229,160,.06)", border: "1px solid rgba(0,229,160,.1)", color: "#00e5a0" }}>
                     <span style={{ animation: "breathe 2s ease infinite" }}>⚡</span> AI analyzes in under 10 seconds
@@ -373,6 +379,61 @@ export default function Dashboard() {
                       <span key={p} className="px-3 py-1 rounded-full text-[10px] font-mono" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)", color: "rgba(255,255,255,.3)" }}>{p}</span>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* ── BEGINNER GUIDANCE — What to upload ── */}
+              <div className="mt-6 rounded-2xl p-5" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)" }}>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "rgba(77,160,255,.1)" }}>
+                    <span className="text-[10px]">💡</span>
+                  </div>
+                  <span className="text-[12px] font-bold text-white">New here? Here&apos;s what to upload:</span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  {/* DO upload */}
+                  <div className="rounded-xl p-3.5" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.08)" }}>
+                    <div className="text-[10px] font-mono font-bold mb-2.5" style={{ color: "#00e5a0" }}>✅ UPLOAD THIS</div>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        "A candlestick chart from your trading app",
+                        "Any pair — XAUUSD, EURUSD, BTCUSD, etc.",
+                        "Any timeframe — M15, H1, H4, Daily",
+                        "Screenshot with candles visible",
+                      ].map((t, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-[9px] mt-0.5" style={{ color: "#00e5a0" }}>●</span>
+                          <span className="text-[11px]" style={{ color: "rgba(255,255,255,.5)" }}>{t}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* DON'T upload */}
+                  <div className="rounded-xl p-3.5" style={{ background: "rgba(255,77,106,.04)", border: "1px solid rgba(255,77,106,.08)" }}>
+                    <div className="text-[10px] font-mono font-bold mb-2.5" style={{ color: "#ff4d6a" }}>❌ NOT THIS</div>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        "Selfies, memes, or random photos",
+                        "Screenshots of text or news articles",
+                        "Blurry or cropped charts",
+                        "Charts without candles (line charts are OK)",
+                      ].map((t, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-[9px] mt-0.5" style={{ color: "#ff4d6a" }}>●</span>
+                          <span className="text-[11px]" style={{ color: "rgba(255,255,255,.5)" }}>{t}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Quick tip */}
+                <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.08)" }}>
+                  <span className="text-[11px]">📱</span>
+                  <span className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>
+                    <strong style={{ color: "rgba(255,255,255,.6)" }}>Pro tip:</strong> Open your chart full screen, then screenshot. The more candles AI can see, the better the analysis.
+                  </span>
                 </div>
               </div>
             </div>
@@ -506,11 +567,15 @@ export default function Dashboard() {
 
                     {/* Unlock banner for free users */}
                     {!showFull && (
-                      <Link href="/pricing" className="no-underline block rounded-xl text-center" style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
+                      <div onClick={() => setShowPaywall(true)} className="block rounded-xl text-center cursor-pointer transition-all hover:scale-[1.01]" style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
                         <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: "#00e5a0" }}>🔒 FULL ANALYSIS LOCKED</div>
-                        <div className="text-xs font-bold text-white">Unlock entry, TP, SL & AI insights</div>
-                        <div className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,.35)" }}>Subscribe from R79/mo to see all trade data</div>
-                      </Link>
+                        <div className="text-xs font-bold text-white">Tap to see plans — Entry, TP, SL & R:R included</div>
+                        <div className="flex gap-3 justify-center mt-2">
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>R79/mo</span>
+                          <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>R149/mo</span>
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>R299/mo</span>
+                        </div>
+                      </div>
                     )}
 
                     <div className="glass overflow-hidden flex-1 relative">
@@ -528,7 +593,7 @@ export default function Dashboard() {
                           </div>
                           <div className="text-xs font-bold text-white mb-1">Subscribe to Unlock</div>
                           <div className="text-[10px] mb-3 text-center px-4" style={{ color: "rgba(255,255,255,.4)" }}>Entry, TP, SL, risk:reward, AI analysis, confluences</div>
-                          <Link href="/pricing" className="px-5 py-2 rounded-xl text-[11px] font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>View Plans</Link>
+                          <button onClick={() => setShowPaywall(true)} className="px-5 py-2 rounded-xl text-[11px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", border: "none" }}>View Plans</button>
                         </div>
                       )}
                       <div style={{ padding: 13 }}>
@@ -753,37 +818,75 @@ export default function Dashboard() {
 
       {/* Paywall */}
       {showPaywall && (
-        <div className="fixed inset-0 z-[9998] flex items-center justify-center" style={{ background: "rgba(0,0,0,.88)", backdropFilter: "blur(20px)" }} onClick={() => showFull ? setShowPaywall(false) : null}>
-          <div className="max-w-sm w-full mx-4 rounded-3xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "rgba(20,21,30,.9)", border: "1px solid rgba(255,255,255,.08)", backdropFilter: "blur(60px) saturate(1.6)", boxShadow: "0 25px 60px rgba(0,0,0,.5)" }}>
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.88)", backdropFilter: "blur(20px)" }} onClick={() => showFull ? setShowPaywall(false) : null}>
+          <div className="max-w-[440px] w-full rounded-3xl p-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "rgba(20,21,30,.95)", border: "1px solid rgba(255,255,255,.08)", backdropFilter: "blur(60px) saturate(1.6)", boxShadow: "0 25px 60px rgba(0,0,0,.5)", maxHeight: "90vh", overflowY: "auto" }}>
             <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
               <span className="text-2xl">{!showFull ? "🔒" : "🚀"}</span>
             </div>
             <h3 className="text-lg font-bold text-white mb-1">
-              {!showFull ? "Unlock Your Full Analysis" : "Scans Used Up"}
+              {!showFull ? "Your Analysis is Ready" : "Scans Used Up"}
             </h3>
             <p className="text-xs mb-1" style={{ color: "rgba(255,255,255,.45)" }}>
               {!showFull
-                ? "Your AI analysis is ready — subscribe to see entry prices, TP, SL, risk:reward, and all trading insights."
+                ? "Subscribe to see your entry price, take profit, stop loss, and risk:reward ratio."
                 : "All monthly scans used. Top up or upgrade to keep scanning."}
             </p>
             {!showFull && (
-              <div className="flex gap-1.5 justify-center mb-3 mt-2">
+              <div className="flex gap-1.5 justify-center mb-3 mt-2 flex-wrap">
                 {["Entry Price", "TP / SL", "R:R Ratio", "AI Insights"].map((f, i) => (
                   <span key={i} className="text-[9px] font-mono px-2 py-0.5 rounded" style={{ background: "rgba(0,229,160,.08)", color: "#00e5a0", border: "1px solid rgba(0,229,160,.1)" }}>{f}</span>
                 ))}
               </div>
             )}
-            <div className="flex flex-col gap-2 mt-3">
-              <Link href="/pricing" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
-                {!showFull ? "Subscribe — From R79/mo" : "Upgrade Plan"}
-              </Link>
-              <Link href="/pricing?topup=1" className="w-full py-3 rounded-xl text-sm font-bold no-underline text-center block" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>Buy Top-up Scans</Link>
-              {/* Only show close if paid user (ran out of monthly scans) */}
+
+            {/* ── INLINE PRICING — All 3 plans visible ── */}
+            <div className="flex flex-col gap-2 mt-4">
+              {[
+                { name: "Starter", price: "R79", scans: "15 scans/mo", href: "/pricing?plan=starter", popular: false },
+                { name: "Pro", price: "R149", scans: "50 scans/mo", href: "/pricing?plan=pro", popular: true },
+                { name: "Premium", price: "R299", scans: "Unlimited", href: "/pricing?plan=premium", popular: false },
+              ].map((plan) => (
+                <Link key={plan.name} href={plan.href} className="w-full no-underline block rounded-2xl px-4 py-3 text-left transition-all hover:scale-[1.02] relative" style={{
+                  background: plan.popular ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)",
+                  border: `1px solid ${plan.popular ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.06)"}`,
+                }}>
+                  {plan.popular && (
+                    <div className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[8px] font-bold font-mono" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>POPULAR</div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-[13px] font-bold text-white">{plan.name}</div>
+                      <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>{plan.scans}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[18px] font-extrabold" style={{ color: plan.popular ? "#00e5a0" : "#fff" }}>{plan.price}</div>
+                      <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>/month</div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Top-up option */}
+            <Link href="/pricing?topup=1" className="w-full mt-2 py-2.5 rounded-xl text-[11px] font-semibold no-underline text-center block" style={{ background: "rgba(77,160,255,.06)", border: "1px solid rgba(77,160,255,.12)", color: "#4da0ff" }}>
+              Or buy a scan pack — from R39
+            </Link>
+
+            {/* FOMO element */}
+            <div className="mt-3 flex items-center justify-center gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.06)" }}>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f0b90b", animation: "pulse 2s infinite" }} />
+              <span className="text-[9px] font-mono" style={{ color: "rgba(240,185,11,.7)" }}>
+                {Math.floor(Math.random() * 8) + 12} traders subscribed today
+              </span>
+            </div>
+
+            {/* Close / dismiss */}
+            <div className="mt-3">
               {showFull && (
                 <button onClick={() => setShowPaywall(false)} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>
               )}
               {!showFull && (
-                <button onClick={() => setShowPaywall(false)} className="w-full py-2 text-[10px] cursor-pointer" style={{ background: "none", border: "none", color: "rgba(255,255,255,.15)" }}>continue with limited view</button>
+                <button onClick={() => setShowPaywall(false)} className="w-full py-2 text-[10px] cursor-pointer" style={{ background: "none", border: "none", color: "rgba(255,255,255,.12)" }}>continue with limited view</button>
               )}
             </div>
           </div>

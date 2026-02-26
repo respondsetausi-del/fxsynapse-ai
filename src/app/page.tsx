@@ -35,12 +35,12 @@ function Counter({ end, suffix = "", duration = 2000 }: { end: number; suffix?: 
 }
 
 const FEATURES = [
-  { icon: "📊", title: "AI Chart Annotations", desc: "Upload any chart — get support, resistance, trendlines, and zones drawn directly on your chart.", color: "#00e5a0" },
-  { icon: "🎯", title: "Trade Setups", desc: "Entry zones, take profit, stop loss, and risk:reward ratios from price action.", color: "#4da0ff" },
-  { icon: "⚡", title: "Instant Analysis", desc: "Results in under 10 seconds. No guesswork — AI reads your chart like a pro.", color: "#f0b90b" },
-  { icon: "📈", title: "Market Structure", desc: "Trend direction, higher highs/lows, breakout patterns, and confluence zones.", color: "#00e5a0" },
-  { icon: "🔍", title: "Multi-Platform", desc: "MT4, MT5, TradingView, cTrader — any chart, any pair, any timeframe.", color: "#4da0ff" },
-  { icon: "🧠", title: "AI Fundamentals", desc: "Get news impact analysis and macro context alongside your technical scan.", color: "#a855f7" },
+  { icon: "📊", title: "Levels Drawn On Your Chart", desc: "AI finds support, resistance, trendlines, and key zones — draws them directly on your screenshot.", color: "#00e5a0" },
+  { icon: "🎯", title: "Entry, TP & Stop Loss", desc: "Know exactly where to enter, where to take profit, and where to set your stop loss for every chart.", color: "#4da0ff" },
+  { icon: "⚡", title: "10-Second Results", desc: "Upload a screenshot, get your analysis back in under 10 seconds. Faster than any mentor or signal group.", color: "#f0b90b" },
+  { icon: "📈", title: "Works On Any Chart", desc: "XAUUSD, EURUSD, BTCUSD, NAS100, indices, crypto — any pair, any timeframe, any platform.", color: "#00e5a0" },
+  { icon: "🔍", title: "Risk:Reward Calculated", desc: "See your risk-to-reward ratio before you enter. Know if the trade is worth taking.", color: "#4da0ff" },
+  { icon: "🧠", title: "Learns From Price Action", desc: "AI reads candlestick patterns, market structure, and confluence — like having a pro trader on speed dial.", color: "#a855f7" },
 ];
 
 const PLANS = [
@@ -60,13 +60,15 @@ export default function LandingPage() {
   const [chartDrawn, setChartDrawn] = useState(false);
   const [heroWord, setHeroWord] = useState(0);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
+  const [activity, setActivity] = useState({ scans_total: 500, scans_today: 24, scans_hour: 7, traders: 120 });
   const BL = "https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/";
 
-  const heroWords = ["intelligence.", "precision.", "confidence.", "edge."];
+  const heroWords = ["buy.", "sell.", "take profit.", "set your stop."];
 
   // Scroll hooks for each section
   const sec1 = useReveal(); const sec2 = useReveal(); const sec3 = useReveal();
   const sec4 = useReveal(); const sec5 = useReveal(); const sec6 = useReveal();
+  const sec7 = useReveal();
 
   const getVisitorId = () => { if (typeof window === "undefined") return null; let v = localStorage.getItem("fxs_vid"); if (!v) { v = crypto.randomUUID(); localStorage.setItem("fxs_vid", v); } return v; };
   const trackEvent = useCallback((t: string, s?: string) => { fetch("/api/tracking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_type: t, source: s, visitor_id: getVisitorId() }) }).catch(() => {}); }, []);
@@ -76,6 +78,8 @@ export default function LandingPage() {
     setTimeout(() => setChartDrawn(true), 800);
     const ref = new URLSearchParams(window.location.search).get("ref");
     if (ref) { localStorage.setItem("fxs_ref", ref); localStorage.setItem("fxs_ref_at", Date.now().toString()); fetch("/api/affiliate/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refCode: ref }) }).catch(() => {}); trackEvent("affiliate_click", ref); }
+    // Fetch live activity for FOMO counters
+    fetch("/api/activity").then(r => r.json()).then(d => setActivity(d)).catch(() => {});
   }, [trackEvent]);
 
   // Rotating hero words
@@ -131,23 +135,26 @@ export default function LandingPage() {
           <div style={{ transition: "all 1.2s cubic-bezier(.16,1,.3,1)", transitionDelay: ".1s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(50px)" }}>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8" style={{ background: "rgba(0,229,160,.06)", border: "1px solid rgba(0,229,160,.1)", backdropFilter: "blur(20px)" }}>
               <div className="w-2 h-2 rounded-full" style={{ background: "#00e5a0", boxShadow: "0 0 12px #00e5a0", animation: "pulse 2s infinite" }} />
-              <span className="text-[11px] font-mono font-semibold tracking-widest" style={{ color: "#00e5a0" }}>CHART INTELLIGENCE ENGINE</span>
+              <span className="text-[11px] font-mono font-semibold tracking-widest" style={{ color: "#00e5a0" }}>AI-POWERED CHART ANALYSIS</span>
             </div>
           </div>
 
           <h1 style={{ transition: "all 1.2s cubic-bezier(.16,1,.3,1)", transitionDelay: ".25s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(50px)" }}>
             <span className="block font-extrabold text-white leading-[1.02] mb-2" style={{ fontSize: "clamp(36px,7vw,68px)", letterSpacing: "-3px" }}>
-              Scan any chart.
+              Upload your chart.
             </span>
             <span className="block font-extrabold leading-[1.02]" style={{ fontSize: "clamp(36px,7vw,68px)", letterSpacing: "-3px" }}>
               <span className="inline-block" style={{ background: "linear-gradient(135deg,#00e5a0 0%,#4da0ff 40%,#a855f7 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundSize: "200% 200%", animation: "gradientShift 4s ease infinite" }}>
-                Get annotated {heroWords[heroWord]}
+                AI tells you where to {heroWords[heroWord]}
               </span>
             </span>
           </h1>
 
-          <p className="text-[16px] max-w-[520px] mx-auto mt-7 mb-10" style={{ color: "rgba(255,255,255,.42)", lineHeight: 1.8, transition: "all 1.2s cubic-bezier(.16,1,.3,1)", transitionDelay: ".4s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)" }}>
-            Upload any forex chart — AI draws support, resistance, trendlines, entry/TP/SL, and gives you a trade-ready annotated chart in seconds.
+          <p className="text-[16px] max-w-[540px] mx-auto mt-7 mb-3" style={{ color: "rgba(255,255,255,.52)", lineHeight: 1.8, transition: "all 1.2s cubic-bezier(.16,1,.3,1)", transitionDelay: ".4s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)" }}>
+            Screenshot any chart from your phone or PC. AI reads the price action and shows you <strong style={{ color: "#00e5a0" }}>where to enter</strong>, <strong style={{ color: "#4da0ff" }}>take profit</strong>, and <strong style={{ color: "#ff4d6a" }}>stop loss</strong> — drawn right on your chart in 10 seconds.
+          </p>
+          <p className="text-[13px] max-w-[440px] mx-auto mb-10" style={{ color: "rgba(255,255,255,.28)", lineHeight: 1.6, transition: "all 1.2s cubic-bezier(.16,1,.3,1)", transitionDelay: ".48s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(20px)" }}>
+            Works with Gold (XAUUSD), EUR/USD, BTC, Indices, Boom/Crash, Volatility — any pair, any timeframe. Even if you&apos;re brand new to trading.
           </p>
 
           <div style={{ transition: "all 1.2s cubic-bezier(.16,1,.3,1)", transitionDelay: ".55s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)" }}>
@@ -265,13 +272,13 @@ export default function LandingPage() {
           </G>
         </section>
 
-        {/* ═══ SOCIAL PROOF — Animated Counters ═══ */}
+        {/* ═══ SOCIAL PROOF — Live FOMO Counters ═══ */}
         <section className="text-center" style={{ padding: "0 24px 80px" }}>
           <G className="max-w-2xl mx-auto px-8 py-8" style={{ background: "rgba(255,255,255,.025)" }}>
             <div className="grid grid-cols-3 gap-6">
               {[
-                { end: 40, suffix: "+", label: "Active Traders", color: "#00e5a0" },
-                { end: 500, suffix: "+", label: "Charts Analyzed", color: "#4da0ff" },
+                { end: activity.traders, suffix: "+", label: "Active Traders", color: "#00e5a0" },
+                { end: activity.scans_total, suffix: "+", label: "Charts Analyzed", color: "#4da0ff" },
                 { end: 10, suffix: "s", label: "Avg Analysis", color: "#f0b90b", prefix: "<" },
               ].map((s, i) => (
                 <div key={i} className="text-center">
@@ -282,23 +289,98 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+            {/* Live activity pulse */}
+            {activity.scans_hour > 0 && (
+              <div className="flex items-center justify-center gap-2 mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,.04)" }}>
+                <div className="w-2 h-2 rounded-full" style={{ background: "#00e5a0", boxShadow: "0 0 8px #00e5a0", animation: "pulse 2s infinite" }} />
+                <span className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>{activity.scans_hour} charts scanned in the last hour</span>
+              </div>
+            )}
           </G>
         </section>
 
+        {/* ═══ BEGINNER EXPLAINER — What problem does this solve? ═══ */}
+        <section ref={sec2.ref} style={{ padding: "0 24px 80px" }}>
+          <div className="max-w-[800px] mx-auto" style={{ transition: "all .8s ease", opacity: sec2.vis ? 1 : 0, transform: sec2.vis ? "translateY(0)" : "translateY(30px)" }}>
+            <div className="text-center mb-10">
+              <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#f0b90b" }}>FOR BEGINNERS & PROS</span>
+              <h2 className="text-[28px] font-extrabold text-white mt-3 mb-3" style={{ letterSpacing: "-1.5px" }}>What does FXSynapse AI actually do?</h2>
+              <p className="text-sm max-w-md mx-auto" style={{ color: "rgba(255,255,255,.4)", lineHeight: 1.7 }}>
+                You know that feeling when you stare at a chart and don&apos;t know if the price will go up or down? FXSynapse fixes that.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              {[
+                { emoji: "😩", title: "The Problem", desc: "You open a chart but don't know where to enter, where to set your stop loss, or where to take profit. You guess — and lose money.", bg: "rgba(255,77,106,.04)", border: "rgba(255,77,106,.1)", color: "#ff4d6a" },
+                { emoji: "📸", title: "What You Do", desc: "Take a screenshot of ANY chart from your phone or PC — MT4, MT5, TradingView, or any trading app. Upload it here.", bg: "rgba(77,160,255,.04)", border: "rgba(77,160,255,.1)", color: "#4da0ff" },
+                { emoji: "🎯", title: "What AI Does", desc: "In 10 seconds, AI draws entry points, take profit, stop loss, support & resistance lines, and tells you if it's a buy or sell — directly on your chart.", bg: "rgba(0,229,160,.04)", border: "rgba(0,229,160,.1)", color: "#00e5a0" },
+              ].map((card, i) => (
+                <G key={i} className="p-6 text-center" style={{ background: card.bg, border: `1px solid ${card.border}` }}>
+                  <div className="text-3xl mb-3">{card.emoji}</div>
+                  <h3 className="text-[15px] font-bold mb-2" style={{ color: card.color }}>{card.title}</h3>
+                  <p className="text-[12px] leading-[1.7]" style={{ color: "rgba(255,255,255,.45)" }}>{card.desc}</p>
+                </G>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ SCREENSHOT GUIDE — What to upload ═══ */}
+        <section style={{ padding: "0 24px 80px" }}>
+          <div className="max-w-[700px] mx-auto">
+            <G className="p-6 md:p-8" glow="rgba(77,160,255,.03)">
+              <div className="text-center mb-6">
+                <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#4da0ff" }}>SCREENSHOT GUIDE</span>
+                <h3 className="text-[20px] font-extrabold text-white mt-2 mb-1" style={{ letterSpacing: "-1px" }}>What should I upload?</h3>
+                <p className="text-[12px]" style={{ color: "rgba(255,255,255,.35)" }}>Any candlestick chart from any trading platform</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {/* DO upload */}
+                <div className="rounded-2xl p-4" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.12)" }}>
+                  <div className="text-[11px] font-bold mb-3" style={{ color: "#00e5a0" }}>✅ Upload these</div>
+                  <div className="flex flex-col gap-2">
+                    {["Candlestick chart from MT4/MT5", "TradingView chart screenshot", "Chart from your broker app", "Any timeframe (M5 to Monthly)", "Zoomed in or full chart view"].map((t, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-[10px] mt-0.5" style={{ color: "#00e5a0" }}>✓</span>
+                        <span className="text-[11px]" style={{ color: "rgba(255,255,255,.5)" }}>{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* DON'T upload */}
+                <div className="rounded-2xl p-4" style={{ background: "rgba(255,77,106,.04)", border: "1px solid rgba(255,77,106,.12)" }}>
+                  <div className="text-[11px] font-bold mb-3" style={{ color: "#ff4d6a" }}>❌ Don&apos;t upload</div>
+                  <div className="flex flex-col gap-2">
+                    {["Random photos or selfies", "Blurry or dark screenshots", "News articles or text only", "Account balance screenshots", "Charts without candles (line only)"].map((t, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-[10px] mt-0.5" style={{ color: "#ff4d6a" }}>✗</span>
+                        <span className="text-[11px]" style={{ color: "rgba(255,255,255,.5)" }}>{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="text-center">
+                <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>💡 Pro tip: Include the price axis and timeframe label in your screenshot for best results</p>
+              </div>
+            </G>
+          </div>
+        </section>
+
         {/* ═══ HOW IT WORKS ═══ */}
-        <section ref={sec2.ref} style={{ padding: "40px 24px 80px" }}>
-          <div className="text-center mb-14" style={{ transition: "all .8s ease", opacity: sec2.vis ? 1 : 0, transform: sec2.vis ? "translateY(0)" : "translateY(30px)" }}>
+        <section ref={sec3.ref} style={{ padding: "40px 24px 80px" }}>
+          <div className="text-center mb-14" style={{ transition: "all .8s ease", opacity: sec3.vis ? 1 : 0, transform: sec3.vis ? "translateY(0)" : "translateY(30px)" }}>
             <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#4da0ff" }}>HOW IT WORKS</span>
             <h2 className="text-[32px] font-extrabold text-white mt-3 mb-2" style={{ letterSpacing: "-2px" }}>Three steps. Ten seconds.</h2>
             <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>From chart screenshot to trade-ready analysis</p>
           </div>
           <div className="max-w-3xl mx-auto grid md:grid-cols-3 gap-6">
             {[
-              { n: "01", title: "Upload", desc: "Drop any forex chart — PNG or JPG from MT4, MT5, TradingView, or cTrader.", icon: "📤" },
-              { n: "02", title: "AI Analyzes", desc: "Neural engine reads price action, detects patterns, maps structure & levels.", icon: "🧠" },
-              { n: "03", title: "Trade", desc: "Get annotated chart with entry, TP, SL, zones, confluence grading, and bias.", icon: "🎯" },
+              { n: "01", title: "Screenshot", desc: "Open your trading app (MT4, MT5, TradingView) and screenshot any chart — any pair, any timeframe.", icon: "📱" },
+              { n: "02", title: "AI Reads It", desc: "Our AI scans the price action, finds support & resistance, detects patterns, and identifies the trade setup.", icon: "🧠" },
+              { n: "03", title: "Get Your Levels", desc: "See exactly where to enter, where to take profit, and where to set your stop loss — drawn on your chart.", icon: "🎯" },
             ].map((s, i) => (
-              <div key={s.n} style={{ transition: "all .8s cubic-bezier(.16,1,.3,1)", transitionDelay: `${i * 150}ms`, opacity: sec2.vis ? 1 : 0, transform: sec2.vis ? "translateY(0)" : "translateY(40px)" }}>
+              <div key={s.n} style={{ transition: "all .8s cubic-bezier(.16,1,.3,1)", transitionDelay: `${i * 150}ms`, opacity: sec3.vis ? 1 : 0, transform: sec3.vis ? "translateY(0)" : "translateY(40px)" }}>
                 <G className="p-7 text-center relative overflow-hidden group cursor-default mag-lift glass-shimmer">
                   {/* Hover glow */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: "radial-gradient(circle at 50% 0%, rgba(0,229,160,.06) 0%, transparent 60%)" }} />
@@ -315,15 +397,15 @@ export default function LandingPage() {
         </section>
 
         {/* ═══ FEATURES ═══ */}
-        <section ref={sec3.ref} style={{ padding: "40px 24px 80px" }}>
-          <div className="text-center mb-14" style={{ transition: "all .8s ease", opacity: sec3.vis ? 1 : 0, transform: sec3.vis ? "translateY(0)" : "translateY(30px)" }}>
+        <section ref={sec4.ref} style={{ padding: "40px 24px 80px" }}>
+          <div className="text-center mb-14" style={{ transition: "all .8s ease", opacity: sec4.vis ? 1 : 0, transform: sec4.vis ? "translateY(0)" : "translateY(30px)" }}>
             <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#a855f7" }}>FEATURES</span>
-            <h2 className="text-[32px] font-extrabold text-white mt-3 mb-2" style={{ letterSpacing: "-2px" }}>Built for serious traders</h2>
-            <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>Professional-grade analysis, instant delivery</p>
+            <h2 className="text-[32px] font-extrabold text-white mt-3 mb-2" style={{ letterSpacing: "-2px" }}>Built for beginners &amp; pros</h2>
+            <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>Professional-grade analysis anyone can understand</p>
           </div>
           <div className="max-w-4xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {FEATURES.map((f, i) => (
-              <div key={i} style={{ transition: "all .7s cubic-bezier(.16,1,.3,1)", transitionDelay: `${i * 80}ms`, opacity: sec3.vis ? 1 : 0, transform: sec3.vis ? "translateY(0)" : "translateY(30px)" }}>
+              <div key={i} style={{ transition: "all .7s cubic-bezier(.16,1,.3,1)", transitionDelay: `${i * 80}ms`, opacity: sec4.vis ? 1 : 0, transform: sec4.vis ? "translateY(0)" : "translateY(30px)" }}>
                 <G className="p-6 group cursor-default relative overflow-hidden h-full mag-lift glass-shimmer">
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: `radial-gradient(circle at 30% 0%, ${f.color}08 0%, transparent 60%)` }} />
                   <div className="relative">
@@ -337,16 +419,16 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ═══ PRICING ═══ */}
-        <section ref={sec4.ref} style={{ padding: "40px 24px 80px" }}>
-          <div className="text-center mb-14" style={{ transition: "all .8s ease", opacity: sec4.vis ? 1 : 0, transform: sec4.vis ? "translateY(0)" : "translateY(30px)" }}>
+        {/* ═══ PRICING — All plans visible, no clicks needed ═══ */}
+        <section ref={sec5.ref} style={{ padding: "40px 24px 80px" }}>
+          <div className="text-center mb-14" style={{ transition: "all .8s ease", opacity: sec5.vis ? 1 : 0, transform: sec5.vis ? "translateY(0)" : "translateY(30px)" }}>
             <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#00e5a0" }}>PRICING</span>
             <h2 className="text-[32px] font-extrabold text-white mt-3 mb-2" style={{ letterSpacing: "-2px" }}>Start free. Scale when ready.</h2>
-            <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>Each scan costs less than a cup of coffee</p>
+            <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>1 free scan to try — then pick a plan that fits your trading</p>
           </div>
           <div className="max-w-[900px] mx-auto grid md:grid-cols-3 gap-6">
             {PLANS.map((plan, i) => (
-              <div key={plan.name} style={{ transition: "all .8s cubic-bezier(.16,1,.3,1)", transitionDelay: `${i * 120}ms`, opacity: sec4.vis ? 1 : 0, transform: sec4.vis ? "translateY(0) scale(1)" : "translateY(40px) scale(.95)" }}>
+              <div key={plan.name} style={{ transition: "all .8s cubic-bezier(.16,1,.3,1)", transitionDelay: `${i * 120}ms`, opacity: sec5.vis ? 1 : 0, transform: sec5.vis ? "translateY(0) scale(1)" : "translateY(40px) scale(.95)" }}>
                 <G className={`p-7 relative group cursor-default mag-lift glass-shimmer ${plan.popular ? "ring-1 ring-[rgba(0,229,160,.2)]" : ""}`}
                   glow={plan.popular ? "rgba(0,229,160,.08)" : ""}
                   style={{ background: plan.popular ? "rgba(0,229,160,.03)" : undefined, transform: plan.popular ? "scale(1.03)" : undefined }}>
@@ -382,14 +464,14 @@ export default function LandingPage() {
         </section>
 
         {/* ═══ CTA ═══ */}
-        <section ref={sec5.ref} className="text-center" style={{ padding: "20px 24px 60px" }}>
-          <div style={{ transition: "all 1s cubic-bezier(.16,1,.3,1)", opacity: sec5.vis ? 1 : 0, transform: sec5.vis ? "translateY(0) scale(1)" : "translateY(40px) scale(.97)" }}>
+        <section ref={sec6.ref} className="text-center" style={{ padding: "20px 24px 60px" }}>
+          <div style={{ transition: "all 1s cubic-bezier(.16,1,.3,1)", opacity: sec6.vis ? 1 : 0, transform: sec6.vis ? "translateY(0) scale(1)" : "translateY(40px) scale(.97)" }}>
             <G className="max-w-lg mx-auto px-8 py-10 text-center relative overflow-hidden" glow="rgba(0,229,160,.06)">
               <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 0%, rgba(0,229,160,.08) 0%, transparent 60%)" }} />
               <div className="relative">
                 <div className="text-4xl mb-4">⚡</div>
                 <h2 className="text-[26px] font-extrabold text-white mb-3" style={{ letterSpacing: "-1.5px" }}>See what AI sees in your chart</h2>
-                <p className="text-[14px] mb-8" style={{ color: "rgba(255,255,255,.38)", lineHeight: 1.7 }}>Upload any chart. Get annotated intelligence in 10 seconds. No card required.</p>
+                <p className="text-[14px] mb-8" style={{ color: "rgba(255,255,255,.38)", lineHeight: 1.7 }}>Upload any chart. Get your entry, TP & SL in 10 seconds. No card required.</p>
                 <Link href="/login" onClick={() => sc("cta")} className="inline-block no-underline px-10 py-4.5 rounded-2xl text-[15px] font-bold transition-all hover:scale-[1.03]" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 8px 40px rgba(0,229,160,.35), inset 0 1px 0 rgba(255,255,255,.2)", padding: "18px 40px" }}>
                   Get Your Free Scan →
                 </Link>
@@ -401,13 +483,20 @@ export default function LandingPage() {
                   </div>
                   <span className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Trusted by traders across Africa</span>
                 </div>
+                {/* FOMO counter */}
+                <div className="flex items-center justify-center gap-2 mt-4 px-4 py-2 rounded-full mx-auto" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.06)", width: "fit-content" }}>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f0b90b", animation: "pulse 2s infinite" }} />
+                  <span className="text-[10px] font-mono" style={{ color: "rgba(240,185,11,.6)" }}>
+                    {activity.traders > 0 ? `${activity.traders}+ traders already using FXSynapse AI` : "Join traders already using FXSynapse AI"}
+                  </span>
+                </div>
               </div>
             </G>
           </div>
         </section>
 
         {/* ═══ BROKER + AFFILIATE ═══ */}
-        <section ref={sec6.ref} className="space-y-4" style={{ padding: "0 24px 60px", transition: "all .8s ease", opacity: sec6.vis ? 1 : 0, transform: sec6.vis ? "translateY(0)" : "translateY(30px)" }}>
+        <section ref={sec7.ref} className="space-y-4" style={{ padding: "0 24px 60px", transition: "all .8s ease", opacity: sec7.vis ? 1 : 0, transform: sec7.vis ? "translateY(0)" : "translateY(30px)" }}>
           <a href={BL} target="_blank" rel="noopener noreferrer" onClick={() => bc("banner")} className="block no-underline max-w-2xl mx-auto transition-all hover:scale-[1.01]">
             <G className="overflow-hidden" glow="rgba(240,185,11,.03)">
               <div className="flex items-center justify-between px-6 py-5 gap-4 flex-wrap">
