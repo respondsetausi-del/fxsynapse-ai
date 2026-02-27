@@ -13,10 +13,6 @@
     {
       "path": "/api/cron/fundamentals",
       "schedule": "0 16 * * *"
-    },
-    {
-      "path": "/api/cron/payments",
-      "schedule": "*/5 * * * *"
     }
   ]
 }
