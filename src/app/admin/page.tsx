@@ -8,6 +8,7 @@ const SymbolMonitor = dynamic(() => import("@/components/SymbolMonitor"), { ssr:
 const VoiceAssistant = dynamic(() => import("@/components/VoiceAssistant"), { ssr: false });
 const TradingTerminal = dynamic(() => import("@/components/TradingTerminal"), { ssr: false });
 const MT5TradeExecutor = dynamic(() => import("@/components/MT5TradeExecutor"), { ssr: false });
+const AISignalEngine = dynamic(() => import("@/components/AISignalEngine"), { ssr: false });
 
 /* ─── Types ─── */
 interface Stats {
@@ -1845,6 +1846,9 @@ export default function AdminDashboard() {
         {/* ═══ TESTS TAB — Trading Terminal ═══ */}
         {tab === "tests" && (
           <div className="space-y-4">
+            {/* ── AI Signal Engine — Claude-Powered Signals ── */}
+            <AISignalEngine />
+
             {/* ── MT5 Trade Executor — Headless Execution ── */}
             <MT5TradeExecutor />
 
