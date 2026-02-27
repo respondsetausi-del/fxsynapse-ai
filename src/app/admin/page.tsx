@@ -937,18 +937,32 @@ export default function AdminDashboard() {
                       const res = await fetch("/api/admin/verify-payments", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ force: true }),
+                        body: JSON.stringify({ force: false }),
                       });
                       const data = await res.json();
                       setVerifyResult(data);
                       if (data.activated > 0) { fetchPayments(); fetchUsers(); fetchStats(); }
-                      showToast(`Force: ${data.activated} activated, ${data.expired || 0} expired out of ${data.total}`);
+                      showToast(`Verified: ${data.activated} activated out of ${data.checked}`);
                     } catch { showToast("Verification failed", "error"); }
                     setVerifyingPayments(false);
                   }} disabled={verifyingPayments}
                     className="px-4 py-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
                     style={{ background: "linear-gradient(135deg,#f0b90b,#d4a00a)", color: "#0a0b0f", opacity: verifyingPayments ? 0.5 : 1 }}>
-                    {verifyingPayments ? "Activating..." : "⚡ Force Activate Pending"}
+                    {verifyingPayments ? "Checking..." : "⚡ Verify Pending"}
+                  </button>
+                  <button onClick={async () => {
+                    if (!confirm("⚠️ This will revert ALL force-activated payments and downgrade those users to free. Continue?")) return;
+                    try {
+                      const res = await fetch("/api/admin/revert-false-activations", { method: "POST" });
+                      const data = await res.json();
+                      showToast(data.message);
+                      fetchPayments(); fetchUsers(); fetchStats();
+                    } catch { showToast("Revert failed", "error"); }
+                  }}
+                    className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                    style={{ background: "rgba(255,77,106,.1)", border: "1px solid rgba(255,77,106,.2)", color: "#ff4d6a" }}>
+                    🔄 Revert False
+                  </button>
                   </button>
                   <button onClick={async () => {
                     const email = prompt("Enter user email to activate:");
