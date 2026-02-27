@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 const SymbolMonitor = dynamic(() => import("@/components/SymbolMonitor"), { ssr: false });
 const VoiceAssistant = dynamic(() => import("@/components/VoiceAssistant"), { ssr: false });
 const TradingTerminal = dynamic(() => import("@/components/TradingTerminal"), { ssr: false });
+const MT5TradeExecutor = dynamic(() => import("@/components/MT5TradeExecutor"), { ssr: false });
 
 /* ─── Types ─── */
 interface Stats {
@@ -1844,6 +1845,9 @@ export default function AdminDashboard() {
         {/* ═══ TESTS TAB — Trading Terminal ═══ */}
         {tab === "tests" && (
           <div className="space-y-4">
+            {/* ── MT5 Trade Executor — Headless Execution ── */}
+            <MT5TradeExecutor />
+
             {/* ── Trading Terminal — Charts, Account, Watchlist ── */}
             <TradingTerminal />
 
