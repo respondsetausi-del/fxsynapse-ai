@@ -112,10 +112,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Strategy B: Auto-activate from success page ───
-    // If user has been polling for 6+ seconds (attempt >= 3) and payment
-    // is recent (< 10 min), they ARE on the success page — Yoco confirmed it.
-    // The webhook just didn't arrive. Activate now.
-    if (attempt >= 3 && paymentAge < 10 * 60 * 1000) {
+    // User is on /payment/success = Yoco redirected them = they paid.
+    // Don't wait — activate immediately on first poll.
+    if (paymentAge < 30 * 60 * 1000) {
       console.log(`[ACTIVATE] Auto-activating payment ${pendingPayment.id} — user on success page, attempt ${attempt}, age ${Math.round(paymentAge / 1000)}s`);
 
       const result = await activatePayment(pendingPayment.id, "success_page");

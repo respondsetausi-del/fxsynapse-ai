@@ -934,23 +934,27 @@ export default function AdminDashboard() {
                   <button onClick={async () => {
                     setVerifyingPayments(true); setVerifyResult(null);
                     try {
-                      const res = await fetch("/api/admin/verify-payments", { method: "POST" });
+                      const res = await fetch("/api/admin/verify-payments", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ force: true }),
+                      });
                       const data = await res.json();
                       setVerifyResult(data);
                       if (data.activated > 0) { fetchPayments(); fetchUsers(); fetchStats(); }
-                      showToast(`Verified: ${data.activated} activated, ${data.total - data.activated} not paid`);
+                      showToast(`Force: ${data.activated} activated, ${data.expired || 0} expired out of ${data.total}`);
                     } catch { showToast("Verification failed", "error"); }
                     setVerifyingPayments(false);
                   }} disabled={verifyingPayments}
                     className="px-4 py-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
                     style={{ background: "linear-gradient(135deg,#f0b90b,#d4a00a)", color: "#0a0b0f", opacity: verifyingPayments ? 0.5 : 1 }}>
-                    {verifyingPayments ? "Verifying..." : "⚡ Verify Pending"}
+                    {verifyingPayments ? "Activating..." : "⚡ Force Activate Pending"}
                   </button>
                   <button onClick={async () => {
                     const email = prompt("Enter user email to activate:");
                     if (!email) return;
-                    const planId = prompt("Enter plan (starter/pro/premium):");
-                    if (!planId || !["starter","pro","premium"].includes(planId)) { showToast("Invalid plan", "error"); return; }
+                    const planId = prompt("Enter plan (basic/starter/pro/unlimited):");
+                    if (!planId || !["basic","starter","pro","unlimited"].includes(planId)) { showToast("Invalid plan", "error"); return; }
                     if (!confirm(`Activate ${planId} plan for ${email}?`)) return;
                     try {
                       const res = await fetch("/api/admin/manual-activate", {
