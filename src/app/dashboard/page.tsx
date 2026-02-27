@@ -295,20 +295,80 @@ export default function Dashboard() {
         {/* ── AI SIGNALS VIEW ── */}
         {dashView === "signals" && (
           <div className="px-4 py-4">
-            <SignalFeed userTier={userTier} />
+            {isPaidUser ? (
+              <SignalFeed userTier={userTier} />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(77,160,255,.08)", border: "1px solid rgba(77,160,255,.12)" }}>
+                  <span className="text-3xl">📡</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1">AI Signal Scanner</h3>
+                <p className="text-[12px] text-center mb-4" style={{ color: "rgba(255,255,255,.4)", maxWidth: 280 }}>
+                  Scan any pair with AI-powered technical analysis. Get entry, SL, TP, and smart money insights.
+                </p>
+                <button onClick={() => setShowPaywall(true)} className="px-6 py-3 rounded-xl text-[13px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
+                  Unlock from R79/mo
+                </button>
+                <div className="mt-6 px-4 py-3 rounded-xl text-center" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)", maxWidth: 300 }}>
+                  <div className="text-[11px] font-bold mb-0.5" style={{ color: "#f0b90b" }}>💰 Become an Affiliate</div>
+                  <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Share FXSynapse &amp; earn 20% recurring commission on every referral</div>
+                  <a href="/affiliate" className="text-[10px] font-bold mt-1 inline-block no-underline" style={{ color: "#00e5a0" }}>Learn more →</a>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ── AI FUNDAMENTALS VIEW ── */}
         {dashView === "fundamentals" && (
           <div className="px-4 py-4">
-            <AIFundamentals userPlan={user?.plan_id || "free"} userRole={user?.role || ""} />
+            {isPaidUser ? (
+              <AIFundamentals userPlan={user?.plan_id || "free"} userRole={user?.role || ""} />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(240,185,11,.08)", border: "1px solid rgba(240,185,11,.12)" }}>
+                  <span className="text-3xl">📊</span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1">AI Fundamentals</h3>
+                <p className="text-[12px] text-center mb-4" style={{ color: "rgba(255,255,255,.4)", maxWidth: 280 }}>
+                  AI-powered economic calendar, currency strength analysis, and market briefings.
+                </p>
+                <button onClick={() => setShowPaywall(true)} className="px-6 py-3 rounded-xl text-[13px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
+                  Unlock from R79/mo
+                </button>
+                <div className="mt-6 px-4 py-3 rounded-xl text-center" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)", maxWidth: 300 }}>
+                  <div className="text-[11px] font-bold mb-0.5" style={{ color: "#f0b90b" }}>💰 Become an Affiliate</div>
+                  <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Share FXSynapse &amp; earn 20% recurring commission on every referral</div>
+                  <a href="/affiliate" className="text-[10px] font-bold mt-1 inline-block no-underline" style={{ color: "#00e5a0" }}>Learn more →</a>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ── AI CHAT VIEW ── */}
         {dashView === "chat" && (
-          <AIChat userTier={userTier} />
+          isPaidUser ? (
+            <AIChat userTier={userTier} />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 px-4">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(168,85,247,.08)", border: "1px solid rgba(168,85,247,.12)" }}>
+                <span className="text-3xl">🧠</span>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-1">AI Trading Assistant</h3>
+              <p className="text-[12px] text-center mb-4" style={{ color: "rgba(255,255,255,.4)", maxWidth: 280 }}>
+                Ask anything about trading — analysis, strategy, risk management, smart money concepts.
+              </p>
+              <button onClick={() => setShowPaywall(true)} className="px-6 py-3 rounded-xl text-[13px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
+                Unlock from R79/mo
+              </button>
+              <div className="mt-6 px-4 py-3 rounded-xl text-center" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)", maxWidth: 300 }}>
+                <div className="text-[11px] font-bold mb-0.5" style={{ color: "#f0b90b" }}>💰 Become an Affiliate</div>
+                <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Share FXSynapse &amp; earn 20% recurring commission on every referral</div>
+                <a href="/affiliate" className="text-[10px] font-bold mt-1 inline-block no-underline" style={{ color: "#00e5a0" }}>Learn more →</a>
+              </div>
+            </div>
+          )
         )}
 
         {/* ── LIVE MARKETS VIEW ── */}
@@ -584,15 +644,22 @@ export default function Dashboard() {
 
                     {/* Unlock banner for free users */}
                     {!showFull && (
-                      <div onClick={() => setShowPaywall(true)} className="block rounded-xl text-center cursor-pointer transition-all hover:scale-[1.01]" style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
-                        <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: "#00e5a0" }}>🔒 FULL ANALYSIS LOCKED</div>
-                        <div className="text-xs font-bold text-white">Tap to unlock — Entry, TP, SL, R:R & AI insights</div>
-                        <div className="flex gap-3 justify-center mt-2">
-                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>5/day R79</span>
-                          <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>15/day R199</span>
-                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>50/day R349</span>
+                      <>
+                        <div onClick={() => setShowPaywall(true)} className="block rounded-xl text-center cursor-pointer transition-all hover:scale-[1.01]" style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
+                          <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: "#00e5a0" }}>🔒 FULL ANALYSIS LOCKED</div>
+                          <div className="text-xs font-bold text-white">Tap to unlock — Entry, TP, SL, R:R & AI insights</div>
+                          <div className="flex gap-3 justify-center mt-2">
+                            <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>5/day R79</span>
+                            <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>15/day R199</span>
+                            <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>50/day R349</span>
+                          </div>
                         </div>
-                      </div>
+                        {/* Affiliate banner */}
+                        <a href="/affiliate" className="block rounded-xl text-center no-underline transition-all hover:scale-[1.01]" style={{ padding: "10px 16px", background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)" }}>
+                          <div className="text-[11px] font-bold mb-0.5" style={{ color: "#f0b90b" }}>💰 Become an Affiliate — Earn 20% Recurring</div>
+                          <div className="text-[10px]" style={{ color: "rgba(255,255,255,.35)" }}>Share FXSynapse with your network &amp; earn on every subscription</div>
+                        </a>
+                      </>
                     )}
 
                     <div className="glass overflow-hidden flex-1 relative">

@@ -22,7 +22,7 @@ export interface TierConfig {
   limits: {
     chartScansPerDay: number;     // -1 = unlimited
     aiChatPerDay: number;         // -1 = unlimited
-    signalAccess: "blurred" | "grade_bc" | "grade_bc_a_delayed" | "all" | "all_priority";
+    signalAccess: "none" | "blurred" | "grade_bc" | "grade_bc_a_delayed" | "all" | "all_priority";
     signalDelay: number;          // minutes delay for signals (0 = instant)
     smartMoney: "locked" | "basic" | "full";
     voiceAssistant: boolean;
@@ -56,12 +56,12 @@ export const TIERS: Record<TierId, TierConfig> = {
     badge: null,
     limits: {
       chartScansPerDay: 1,
-      aiChatPerDay: 3,
-      signalAccess: "blurred",
-      signalDelay: 30,
+      aiChatPerDay: 0,
+      signalAccess: "none",
+      signalDelay: 0,
       smartMoney: "locked",
       voiceAssistant: false,
-      morningBriefing: "headline",
+      morningBriefing: "none",
       fundamentals: false,
       signalTrackRecord: false,
       watchlistPairs: 0,
@@ -73,8 +73,8 @@ export const TIERS: Record<TierId, TierConfig> = {
     },
     features: [
       { text: "1 AI chart scan per day", included: true },
-      { text: "Signal feed (direction + confidence only)", included: true },
-      { text: "AI chat (3 messages/day)", included: true },
+      { text: "AI Chat", included: false },
+      { text: "AI Signal Scanner", included: false },
       { text: "Full signal details (Entry/SL/TP)", included: false },
       { text: "Smart money analysis", included: false },
       { text: "Voice assistant", included: false },

@@ -202,8 +202,8 @@ function emptyUsage(userId: string): UsageInfo {
   return {
     userId, planId: "free", tierName: "Free",
     scansUsed: 0, scansLimit: 1, scansRemaining: 1,
-    chatsUsed: 0, chatsLimit: 3, chatsRemaining: 3,
-    canScan: true, canChat: true,
+    chatsUsed: 0, chatsLimit: 0, chatsRemaining: 0,
+    canScan: true, canChat: false,
     topupBalance: 0, canScanViaTopup: false,
   };
 }

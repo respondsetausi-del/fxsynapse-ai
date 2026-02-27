@@ -14,6 +14,15 @@ export async function POST(req: NextRequest) {
 
     // 2. Usage check
     const usage = await getUserUsage(userId);
+    
+    // Signal scans are paid-only — free users cannot scan
+    if (usage.planId === "free") {
+      return NextResponse.json({
+        error: "Signal scanning requires a paid plan. Upgrade from R79/mo.",
+        upgrade: true,
+      }, { status: 403 });
+    }
+    
     if (!usage.canScan) {
       return NextResponse.json({
         error: usage.scanReason || "Scan limit reached. Upgrade for more.",
