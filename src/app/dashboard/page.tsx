@@ -602,11 +602,11 @@ export default function Dashboard() {
                         ))}
                       </div>
 
-                      {/* Blur overlay for non-paid users — HEAVY blur, nothing readable */}
+                      {/* Blur overlay for non-paid users — TOTAL blackout, nothing readable */}
                       {!showFull && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center" style={{ top: 38, backdropFilter: "blur(18px) saturate(0.3)", WebkitBackdropFilter: "blur(18px) saturate(0.3)", background: "rgba(10,11,16,.75)" }}>
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center" style={{ top: 0, backdropFilter: "blur(28px) saturate(0.1) brightness(0.3)", WebkitBackdropFilter: "blur(28px) saturate(0.1) brightness(0.3)", background: "rgba(10,11,16,.92)" }}>
                           {/* Extra noise layer to kill any remaining readability */}
-                          <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(0deg, rgba(10,11,16,.15) 0px, transparent 1px, transparent 2px)", opacity: 0.6 }} />
+                          <div className="absolute inset-0" style={{ background: "repeating-linear-gradient(0deg, rgba(10,11,16,.3) 0px, transparent 1px, transparent 2px)", opacity: 0.8 }} />
                           <div className="relative z-10 flex flex-col items-center">
                             <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)", boxShadow: "0 0 30px rgba(0,229,160,.1)" }}>
                               <span className="text-xl">🔒</span>
