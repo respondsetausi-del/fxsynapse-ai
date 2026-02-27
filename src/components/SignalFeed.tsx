@@ -1,220 +1,334 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
 /* ─── Types ─── */
-interface FeedSignal {
+interface Signal {
   id: string; symbol: string; displaySymbol: string; timeframe: string;
   direction: "BUY" | "SELL" | "NEUTRAL"; confidence: number; grade: string;
-  status: string; createdAt: string; expiresAt: string;
-  visibility: "full" | "delayed" | "blurred";
-  delayRemaining?: number;
-  entryPrice: number | null; stopLoss: number | null;
-  takeProfit1: number | null; takeProfit2: number | null;
-  riskReward: string | null;
-  trend: string | null; structure: string | null;
-  smartMoney: any; confluences: string[] | null;
-  reasoning: string | null; indicators: any;
-  keyLevels: any; newsRisk: string | null;
-  pipsResult?: number | null;
+  entryPrice: number; stopLoss: number; takeProfit1: number; takeProfit2?: number;
+  riskReward: string; trend: string; structure: string;
+  smartMoney: { orderBlocks: any[]; liquidityLevels: any[]; fvgs: any[]; supplyDemand: any[] };
+  confluences: string[]; reasoning: string;
+  indicators: { rsi: number | null; rsiSignal: string; ema20: number | null; ema50: number | null; sma200: number | null; emaCross: string; atr: number | null };
+  keyLevels: any[]; newsRisk: string; createdAt: string; expiresAt: string;
 }
 
-interface TrackEntry {
-  display_symbol: string; timeframe: string; grade: string;
-  total_signals: number; wins: number; losses: number;
-  win_rate: number; avg_pips: number;
+interface ScanResult {
+  signals: Signal[]; scannedPairs: number; signalsGenerated: number; scanDuration: number; errors: string[];
 }
 
-const GRADE_COLORS: Record<string, string> = { A: "#00e5a0", B: "#4da0ff", C: "#f59e0b", D: "rgba(255,255,255,.25)" };
-const DIR_COLORS: Record<string, string> = { BUY: "#00e5a0", SELL: "#ff4d6a", NEUTRAL: "rgba(255,255,255,.3)" };
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  active: { label: "ACTIVE", color: "#00e5a0" },
-  hit_tp1: { label: "TP1 HIT ✓", color: "#00e5a0" },
-  hit_tp2: { label: "TP2 HIT ✓✓", color: "#4da0ff" },
-  hit_sl: { label: "SL HIT ✕", color: "#ff4d6a" },
-  expired: { label: "EXPIRED", color: "rgba(255,255,255,.2)" },
-  cancelled: { label: "CANCELLED", color: "rgba(255,255,255,.2)" },
+const QUICK_PAIRS = [
+  { symbol: "OANDA:EUR_USD", display: "EUR/USD" },
+  { symbol: "OANDA:GBP_USD", display: "GBP/USD" },
+  { symbol: "OANDA:USD_JPY", display: "USD/JPY" },
+  { symbol: "OANDA:GBP_JPY", display: "GBP/JPY" },
+  { symbol: "OANDA:EUR_JPY", display: "EUR/JPY" },
+  { symbol: "OANDA:AUD_USD", display: "AUD/USD" },
+  { symbol: "OANDA:USD_CAD", display: "USD/CAD" },
+  { symbol: "OANDA:NZD_USD", display: "NZD/USD" },
+  { symbol: "OANDA:USD_ZAR", display: "USD/ZAR" },
+  { symbol: "OANDA:EUR_GBP", display: "EUR/GBP" },
+  { symbol: "OANDA:USD_CHF", display: "USD/CHF" },
+  { symbol: "OANDA:GBP_AUD", display: "GBP/AUD" },
+  { symbol: "OANDA:XAU_USD", display: "XAU/USD" },
+  { symbol: "OANDA:BTC_USD", display: "BTC/USD" },
+  { symbol: "OANDA:US30_USD", display: "US30" },
+];
+
+/* ─── Tier Limits (mirrors tier-config.ts) ─── */
+const TIER_LIMITS: Record<string, { scansPerDay: number; showEntry: boolean; showSmartMoney: "full" | "basic" | "locked"; showReasoning: boolean; fullScan: boolean }> = {
+  free:      { scansPerDay: 1,  showEntry: false, showSmartMoney: "locked", showReasoning: false, fullScan: false },
+  basic:     { scansPerDay: 5,  showEntry: true,  showSmartMoney: "basic",  showReasoning: false, fullScan: false },
+  starter:   { scansPerDay: 15, showEntry: true,  showSmartMoney: "basic",  showReasoning: true,  fullScan: false },
+  pro:       { scansPerDay: 50, showEntry: true,  showSmartMoney: "full",   showReasoning: true,  fullScan: true },
+  unlimited: { scansPerDay: -1, showEntry: true,  showSmartMoney: "full",   showReasoning: true,  fullScan: true },
 };
 
+const GRADE_COLORS: Record<string, string> = { A: "#00e5a0", B: "#4da0ff", C: "#f59e0b", D: "rgba(255,255,255,.25)" };
+
 export default function SignalFeed({ userTier = "free" }: { userTier?: string }) {
-  const [signals, setSignals] = useState<FeedSignal[]>([]);
-  const [trackRecord, setTrackRecord] = useState<TrackEntry[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "A" | "B" | "C">("all");
-  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [quickScanning, setQuickScanning] = useState<string | null>(null);
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
+  const [quickPair, setQuickPair] = useState(QUICK_PAIRS[0]);
+  const [quickTf, setQuickTf] = useState("1h");
+  const [scanMode, setScanMode] = useState<"quick" | "full">("quick");
+  const [scansUsedToday, setScansUsedToday] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
-  const fetchFeed = useCallback(async () => {
-    setLoading(true);
+  const limits = TIER_LIMITS[userTier] || TIER_LIMITS.free;
+  const canScan = limits.scansPerDay === -1 || scansUsedToday < limits.scansPerDay;
+  const scansRemaining = limits.scansPerDay === -1 ? "∞" : `${limits.scansPerDay - scansUsedToday}`;
+
+  /* ─── Quick Scan ─── */
+  const runQuickScan = async () => {
+    if (!canScan) { setShowPaywall(true); return; }
+    setQuickScanning(quickPair.display);
     try {
-      const params = new URLSearchParams({ limit: "50" });
-      if (filter !== "all") params.set("grade", filter);
-      const res = await fetch(`/api/signals/feed?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch");
+      const res = await fetch("/api/signals/scan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: quickPair.symbol, displaySymbol: quickPair.display, timeframe: quickTf }),
+      });
       const data = await res.json();
-      setSignals(data.signals || []);
-      setTrackRecord(data.trackRecord || null);
-      setError(null);
-    } catch {
-      setError("Failed to load signals");
+      if (data.signal) {
+        setSignals(prev => [data.signal, ...prev.filter(s => s.id !== data.signal.id)]);
+        setExpandedSignal(data.signal.id);
+        setScansUsedToday(prev => prev + 1);
+      }
+    } catch { /* ignore */ }
+    setQuickScanning(null);
+  };
+
+  /* ─── Full Market Scan ─── */
+  const runFullScan = async () => {
+    if (!canScan) { setShowPaywall(true); return; }
+    if (!limits.fullScan) { setShowPaywall(true); return; }
+    setScanning(true); setScanResult(null);
+    try {
+      const res = await fetch("/api/signals/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const data = await res.json();
+      setScanResult(data);
+      if (data.signals) {
+        setSignals(prev => {
+          const ids = new Set(prev.map(s => s.id));
+          return [...data.signals.filter((s: Signal) => !ids.has(s.id)), ...prev];
+        });
+        setScansUsedToday(prev => prev + (data.signalsGenerated || 0));
+      }
+    } catch (err: any) {
+      setScanResult({ signals: [], scannedPairs: 0, signalsGenerated: 0, scanDuration: 0, errors: [err.message] });
     }
-    setLoading(false);
-  }, [filter]);
+    setScanning(false);
+  };
 
-  useEffect(() => { fetchFeed(); }, [fetchFeed]);
-
-  // Auto-refresh every 2 minutes
-  useEffect(() => {
-    const iv = setInterval(fetchFeed, 120000);
-    return () => clearInterval(iv);
-  }, [fetchFeed]);
-
-  const activeSignals = signals.filter(s => s.status === "active");
-  const closedSignals = signals.filter(s => s.status !== "active");
-  const gradeACount = signals.filter(s => s.grade === "A" && s.status === "active").length;
+  const sortedSignals = [...signals].sort((a, b) => b.confidence - a.confidence);
 
   return (
     <div className="flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.15)" }}>
-              <span className="text-sm">📡</span>
-            </span>
-            AI Signal Feed
-          </h2>
-          <p className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>
-            Claude AI scans 15 pairs × 2 timeframes • Updated every 30 min
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Live dot */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(0,229,160,.06)", border: "1px solid rgba(0,229,160,.1)" }}>
-            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#00e5a0", boxShadow: "0 0 6px #00e5a0", animation: "pulse 2s infinite" }} />
-            <span className="text-[9px] font-mono font-bold" style={{ color: "#00e5a0" }}>{activeSignals.length} ACTIVE</span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.15), rgba(77,160,255,.1))", border: "1px solid rgba(0,229,160,.2)" }}>📡</div>
+          <div>
+            <h2 className="text-[15px] font-extrabold text-white">AI Signal Scanner</h2>
+            <p className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>Claude AI • candles + indicators + smart money</p>
           </div>
-          <button onClick={fetchFeed} disabled={loading} className="px-2.5 py-1 rounded-lg text-[9px] font-mono cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)", opacity: loading ? 0.5 : 1 }}>
-            {loading ? "⟳" : "↻"} Refresh
-          </button>
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: canScan ? "rgba(0,229,160,.06)" : "rgba(255,77,106,.06)", border: `1px solid ${canScan ? "rgba(0,229,160,.1)" : "rgba(255,77,106,.1)"}` }}>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: canScan ? "#00e5a0" : "#ff4d6a", boxShadow: `0 0 6px ${canScan ? "#00e5a0" : "#ff4d6a"}` }} />
+          <span className="text-[9px] font-mono font-bold" style={{ color: canScan ? "#00e5a0" : "#ff4d6a" }}>
+            {scansRemaining} scan{scansRemaining === "1" ? "" : "s"} left
+          </span>
         </div>
       </div>
 
-      {/* Grade A Banner for free users */}
-      {userTier === "free" && gradeACount > 0 && (
-        <div className="rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-2" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.05))", border: "1px solid rgba(0,229,160,.15)" }}>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🔥</span>
-            <div>
-              <div className="text-xs font-bold text-white">{gradeACount} Grade A signal{gradeACount > 1 ? "s" : ""} detected right now</div>
-              <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>Entry, SL, TP details locked — upgrade to see</div>
-            </div>
-          </div>
-          <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
-            Unlock — R79/mo
-          </Link>
-        </div>
-      )}
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)" }}>
-        {(["all", "A", "B", "C"] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)} className="flex-1 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all" style={{
-            background: filter === f ? (f === "all" ? "rgba(255,255,255,.06)" : `${GRADE_COLORS[f]}10`) : "transparent",
-            border: filter === f ? `1px solid ${f === "all" ? "rgba(255,255,255,.1)" : GRADE_COLORS[f] + "25"}` : "1px solid transparent",
-            color: filter === f ? (f === "all" ? "#fff" : GRADE_COLORS[f]) : "rgba(255,255,255,.25)",
-          }}>
-            {f === "all" ? "All Signals" : `Grade ${f}`}
+      {/* Mode Toggle */}
+      <div className="flex gap-1.5">
+        {([
+          { id: "quick" as const, label: "⚡ Quick Scan", desc: "Single pair" },
+          { id: "full" as const, label: "🌐 Full Scan", desc: limits.fullScan ? "All pairs" : "Pro+" },
+        ]).map(m => (
+          <button key={m.id} onClick={() => setScanMode(m.id)} className="flex-1 py-2 rounded-xl text-[11px] font-bold cursor-pointer transition-all"
+            style={{
+              background: scanMode === m.id ? (m.id === "quick" ? "rgba(0,229,160,.08)" : "rgba(168,85,247,.08)") : "rgba(255,255,255,.02)",
+              border: `1px solid ${scanMode === m.id ? (m.id === "quick" ? "rgba(0,229,160,.2)" : "rgba(168,85,247,.2)") : "rgba(255,255,255,.05)"}`,
+              color: scanMode === m.id ? (m.id === "quick" ? "#00e5a0" : "#a855f7") : "rgba(255,255,255,.25)",
+            }}>
+            {m.label}
+            <span className="block text-[8px] font-normal" style={{ opacity: 0.5 }}>{m.desc}</span>
           </button>
         ))}
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="rounded-xl px-4 py-3 text-xs font-mono" style={{ background: "rgba(255,77,106,.06)", border: "1px solid rgba(255,77,106,.12)", color: "#ff4d6a" }}>
-          ⚠ {error}
-        </div>
-      )}
-
-      {/* Loading */}
-      {loading && signals.length === 0 && (
-        <div className="flex flex-col items-center py-12">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ border: "2px solid rgba(0,229,160,.2)", borderTopColor: "#00e5a0", animation: "spin 1s linear infinite" }}>
-            <span className="text-sm">📡</span>
-          </div>
-          <span className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Loading signals...</span>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && signals.length === 0 && (
-        <div className="flex flex-col items-center py-12 rounded-2xl" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)" }}>
-          <span className="text-3xl mb-3">📡</span>
-          <div className="text-sm font-bold text-white mb-1">No signals yet</div>
-          <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Signals are generated every 30 minutes during market hours</div>
-        </div>
-      )}
-
-      {/* Active Signals */}
-      {activeSignals.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="text-[9px] font-mono tracking-widest font-bold px-1" style={{ color: "rgba(0,229,160,.5)" }}>
-            ACTIVE SIGNALS
-          </div>
-          {activeSignals.map(s => (
-            <SignalCard key={s.id} signal={s} expanded={expanded === s.id} onToggle={() => setExpanded(expanded === s.id ? null : s.id)} userTier={userTier} />
-          ))}
-        </div>
-      )}
-
-      {/* Closed Signals */}
-      {closedSignals.length > 0 && (
-        <div className="flex flex-col gap-2 mt-2">
-          <div className="text-[9px] font-mono tracking-widest font-bold px-1" style={{ color: "rgba(255,255,255,.2)" }}>
-            RECENT HISTORY
-          </div>
-          {closedSignals.slice(0, 10).map(s => (
-            <SignalCard key={s.id} signal={s} expanded={expanded === s.id} onToggle={() => setExpanded(expanded === s.id ? null : s.id)} userTier={userTier} />
-          ))}
-        </div>
-      )}
-
-      {/* Track Record */}
-      {trackRecord && trackRecord.length > 0 && (
-        <div className="mt-3 rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)" }}>
-          <div className="text-[9px] font-mono tracking-widest font-bold mb-3" style={{ color: "rgba(77,160,255,.5)" }}>
-            📊 30-DAY TRACK RECORD
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {trackRecord.map((t, i) => (
-              <div key={i} className="rounded-xl p-3" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-bold text-white">{t.display_symbol}</span>
-                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full" style={{ background: `${GRADE_COLORS[t.grade]}10`, color: GRADE_COLORS[t.grade] }}>Grade {t.grade}</span>
-                </div>
-                <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{t.timeframe}</div>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <div>
-                    <div className="text-lg font-black" style={{ color: t.win_rate >= 60 ? "#00e5a0" : t.win_rate >= 40 ? "#f59e0b" : "#ff4d6a" }}>{t.win_rate}%</div>
-                    <div className="text-[7px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>WIN RATE</div>
-                  </div>
-                  <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{t.wins}W / {t.losses}L</div>
-                </div>
-              </div>
+      {/* ═══ QUICK SCAN ═══ */}
+      {scanMode === "quick" && (
+        <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)" }}>
+          <label className="block text-[9px] font-mono tracking-widest mb-2" style={{ color: "rgba(255,255,255,.25)" }}>SELECT PAIR</label>
+          <div className="grid grid-cols-5 gap-1.5 mb-3">
+            {QUICK_PAIRS.map(p => (
+              <button key={p.symbol} onClick={() => setQuickPair(p)} className="py-2 rounded-lg text-[9px] font-mono font-bold cursor-pointer transition-all"
+                style={{
+                  background: quickPair.symbol === p.symbol ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.02)",
+                  border: `1px solid ${quickPair.symbol === p.symbol ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.04)"}`,
+                  color: quickPair.symbol === p.symbol ? "#00e5a0" : "rgba(255,255,255,.3)",
+                }}>{p.display}</button>
             ))}
           </div>
+
+          <label className="block text-[9px] font-mono tracking-widest mb-2" style={{ color: "rgba(255,255,255,.25)" }}>TIMEFRAME</label>
+          <div className="flex gap-1.5 mb-4">
+            {["15min", "1h", "4h", "D"].map(tf => (
+              <button key={tf} onClick={() => setQuickTf(tf)} className="flex-1 py-2 rounded-lg text-[10px] font-mono font-bold cursor-pointer"
+                style={{
+                  background: quickTf === tf ? "rgba(77,160,255,.08)" : "rgba(255,255,255,.02)",
+                  border: `1px solid ${quickTf === tf ? "rgba(77,160,255,.2)" : "rgba(255,255,255,.04)"}`,
+                  color: quickTf === tf ? "#4da0ff" : "rgba(255,255,255,.3)",
+                }}>{tf.toUpperCase()}</button>
+            ))}
+          </div>
+
+          <button onClick={runQuickScan} disabled={!!quickScanning} className="w-full py-3.5 rounded-xl text-sm font-bold cursor-pointer transition-all"
+            style={{
+              background: quickScanning ? "rgba(255,255,255,.04)" : !canScan ? "rgba(255,77,106,.08)" : "linear-gradient(135deg, #00e5a0, #00b87d)",
+              color: quickScanning ? "rgba(255,255,255,.3)" : !canScan ? "#ff4d6a" : "#0a0b0f",
+              border: !canScan ? "1px solid rgba(255,77,106,.15)" : "none",
+            }}>
+            {quickScanning ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full border-2 border-white/20 border-t-white/60" style={{ animation: "spin 1s linear infinite" }} />
+                Analyzing {quickScanning} with Claude AI...
+              </span>
+            ) : !canScan ? "🔒 No scans remaining — Upgrade" : `⚡ Scan ${quickPair.display} ${quickTf.toUpperCase()}`}
+          </button>
+          {!quickScanning && signals.length === 0 && (
+            <p className="text-[9px] font-mono text-center mt-2" style={{ color: "rgba(255,255,255,.15)" }}>
+              Pick a pair + timeframe → Claude analyzes 200 candles + indicators + smart money
+            </p>
+          )}
         </div>
       )}
 
-      {/* Track record gate for non-Pro */}
-      {!trackRecord && userTier !== "free" && (
-        <div className="mt-2 rounded-xl p-4 text-center" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)" }}>
-          <span className="text-lg">📊</span>
-          <div className="text-xs font-bold text-white mt-1">Signal Track Record</div>
-          <div className="text-[9px] font-mono mb-2" style={{ color: "rgba(255,255,255,.3)" }}>See win rates and pip history for all signals</div>
-          <Link href="/pricing" className="inline-block px-4 py-1.5 rounded-lg text-[9px] font-bold no-underline" style={{ background: "rgba(245,158,11,.1)", border: "1px solid rgba(245,158,11,.15)", color: "#f59e0b" }}>
-            Upgrade to Pro — R349/mo
-          </Link>
+      {/* ═══ FULL SCAN ═══ */}
+      {scanMode === "full" && (
+        <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.05)" }}>
+          {!limits.fullScan ? (
+            <div className="text-center py-6">
+              <span className="text-3xl">🔒</span>
+              <div className="text-sm font-bold text-white mt-2 mb-1">Full Market Scan</div>
+              <div className="text-[10px] mb-3" style={{ color: "rgba(255,255,255,.35)" }}>Scans 15 pairs × 2 timeframes = 30 analyses in one click</div>
+              <div className="flex gap-1.5 justify-center mb-3 flex-wrap">
+                {["All 15 pairs", "H1 + H4", "Ranked by grade", "Smart money"].map(f => (
+                  <span key={f} className="text-[8px] font-mono px-2 py-0.5 rounded" style={{ background: "rgba(168,85,247,.06)", border: "1px solid rgba(168,85,247,.1)", color: "#a855f7" }}>{f}</span>
+                ))}
+              </div>
+              <Link href="/pricing" className="inline-block px-6 py-2.5 rounded-xl text-[11px] font-bold no-underline" style={{ background: "linear-gradient(135deg, #a855f7, #7c3aed)", color: "#fff" }}>
+                Unlock with Pro — R349/mo
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl p-3 mb-3" style={{ background: "rgba(168,85,247,.04)", border: "1px solid rgba(168,85,247,.08)" }}>
+                <p className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>
+                  🌐 Scans <strong className="text-white">15 pairs × 2 timeframes (H1 + H4)</strong> = 30 analyses. Takes 2-5 min.
+                </p>
+              </div>
+              <button onClick={runFullScan} disabled={scanning} className="w-full py-3.5 rounded-xl text-sm font-bold cursor-pointer"
+                style={{ background: scanning ? "rgba(255,255,255,.04)" : "linear-gradient(135deg, #a855f7, #7c3aed)", color: "#fff" }}>
+                {scanning ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-white/20 border-t-white/60" style={{ animation: "spin 1s linear infinite" }} />
+                    Full market scan in progress...
+                  </span>
+                ) : "🧠 Run Full Market Scan"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Scan Stats */}
+      {scanResult && (
+        <div className="grid grid-cols-4 gap-1.5">
+          {[
+            { label: "SCANNED", value: scanResult.scannedPairs, color: "#fff", icon: "📊" },
+            { label: "SIGNALS", value: scanResult.signalsGenerated, color: "#00e5a0", icon: "🎯" },
+            { label: "DURATION", value: `${(scanResult.scanDuration / 1000).toFixed(1)}s`, color: "#4da0ff", icon: "⏱" },
+            { label: "ERRORS", value: scanResult.errors.length, color: scanResult.errors.length > 0 ? "#ff4d6a" : "#00e5a0", icon: "⚠️" },
+          ].map((s, i) => (
+            <div key={i} className="rounded-xl p-2.5 text-center" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+              <div className="text-[10px] mb-0.5">{s.icon}</div>
+              <div className="text-sm font-bold font-mono" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-[7px] font-mono tracking-widest" style={{ color: "rgba(255,255,255,.15)" }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Errors */}
+      {scanResult && scanResult.errors.length > 0 && (
+        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,77,106,.1)" }}>
+          <button onClick={() => setShowErrors(!showErrors)} className="w-full flex items-center justify-between px-4 py-2 cursor-pointer" style={{ background: "rgba(255,77,106,.04)", border: "none" }}>
+            <span className="text-[10px] font-mono" style={{ color: "#ff4d6a" }}>⚠️ {scanResult.errors.length} errors</span>
+            <span className="text-[10px]" style={{ color: "rgba(255,255,255,.2)" }}>{showErrors ? "▼" : "▶"}</span>
+          </button>
+          {showErrors && (
+            <div className="p-3 space-y-1 max-h-32 overflow-auto" style={{ background: "rgba(0,0,0,.2)" }}>
+              {scanResult.errors.map((e, i) => (
+                <div key={i} className="text-[9px] font-mono" style={{ color: "rgba(255,77,106,.5)" }}>• {e}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ SIGNAL CARDS ═══ */}
+      {sortedSignals.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[9px] font-mono tracking-widest font-bold" style={{ color: "rgba(0,229,160,.4)" }}>🎯 SIGNALS ({sortedSignals.length})</span>
+            <div className="flex gap-1">
+              {["A", "B", "C"].map(g => {
+                const count = sortedSignals.filter(s => s.grade === g).length;
+                return count > 0 ? (
+                  <span key={g} className="text-[8px] font-mono px-1.5 py-0.5 rounded-full" style={{ background: `${GRADE_COLORS[g]}10`, color: GRADE_COLORS[g] }}>{g}: {count}</span>
+                ) : null;
+              })}
+            </div>
+          </div>
+          {sortedSignals.map(signal => (
+            <GatedSignalCard key={signal.id} signal={signal} expanded={expandedSignal === signal.id}
+              onToggle={() => setExpandedSignal(expandedSignal === signal.id ? null : signal.id)}
+              limits={limits} userTier={userTier} />
+          ))}
+        </div>
+      )}
+
+      {/* Empty */}
+      {sortedSignals.length === 0 && !scanning && !quickScanning && (
+        <div className="rounded-2xl p-8 text-center" style={{ background: "rgba(255,255,255,.01)", border: "1px dashed rgba(255,255,255,.05)" }}>
+          <div className="text-3xl mb-3">📡</div>
+          <div className="text-sm font-bold text-white mb-1">No signals yet</div>
+          <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>Select a pair and timeframe above, then hit scan</div>
+        </div>
+      )}
+
+      {/* ═══ PAYWALL ═══ */}
+      {showPaywall && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.85)", backdropFilter: "blur(20px)" }} onClick={() => setShowPaywall(false)}>
+          <div className="max-w-[400px] w-full rounded-3xl p-6 text-center" onClick={e => e.stopPropagation()} style={{ background: "rgba(20,21,30,.95)", border: "1px solid rgba(255,255,255,.08)", boxShadow: "0 25px 60px rgba(0,0,0,.5)" }}>
+            <div className="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(0,229,160,.1)", border: "2px solid rgba(0,229,160,.2)" }}>
+              <span className="text-2xl">🔒</span>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-1">Scan Limit Reached</h3>
+            <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,.4)" }}>
+              You&apos;ve used all {limits.scansPerDay} signal scan{limits.scansPerDay === 1 ? "" : "s"} for today.
+            </p>
+            <div className="flex flex-col gap-2">
+              {[
+                { name: "Basic", price: "R79/mo", scans: "5 scans/day", color: "#4da0ff", tier: "basic" },
+                { name: "Starter", price: "R199/mo", scans: "15 scans/day", color: "#00e5a0", tier: "starter" },
+                { name: "Pro", price: "R349/mo", scans: "50 + Full Scan", color: "#f59e0b", tier: "pro" },
+                { name: "Unlimited", price: "R499/mo", scans: "∞ Unlimited", color: "#a855f7", tier: "unlimited" },
+              ].filter(p => {
+                const order = ["free", "basic", "starter", "pro", "unlimited"];
+                return order.indexOf(p.tier) > order.indexOf(userTier);
+              }).map(plan => (
+                <Link key={plan.name} href="/pricing" className="flex items-center justify-between px-4 py-3 rounded-xl no-underline transition-all hover:scale-[1.02]" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
+                  <div className="text-left">
+                    <div className="text-xs font-bold text-white">{plan.name}</div>
+                    <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{plan.scans}</div>
+                  </div>
+                  <div className="text-sm font-bold font-mono" style={{ color: plan.color }}>{plan.price}</div>
+                </Link>
+              ))}
+            </div>
+            <div className="text-[8px] font-mono mt-3" style={{ color: "rgba(255,255,255,.15)" }}>R79 is less than one bad trade</div>
+            <button onClick={() => setShowPaywall(false)} className="mt-2 text-[10px] cursor-pointer" style={{ background: "none", border: "none", color: "rgba(255,255,255,.15)" }}>dismiss</button>
+          </div>
         </div>
       )}
     </div>
@@ -222,292 +336,225 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
 }
 
 /* ════════════════════════════════════════════════════ */
-/*  SIGNAL CARD                                        */
+/*  GATED SIGNAL CARD                                  */
 /* ════════════════════════════════════════════════════ */
 
-function SignalCard({ signal: s, expanded, onToggle, userTier }: {
-  signal: FeedSignal; expanded: boolean; onToggle: () => void; userTier: string;
+function GatedSignalCard({ signal, expanded, onToggle, limits, userTier }: {
+  signal: Signal; expanded: boolean; onToggle: () => void;
+  limits: { showEntry: boolean; showSmartMoney: "full" | "basic" | "locked"; showReasoning: boolean };
+  userTier: string;
 }) {
-  const dirColor = DIR_COLORS[s.direction] || DIR_COLORS.NEUTRAL;
-  const gradeColor = GRADE_COLORS[s.grade] || GRADE_COLORS.D;
-  const statusInfo = STATUS_LABELS[s.status] || STATUS_LABELS.active;
-  const isBlurred = s.visibility === "blurred";
-  const isDelayed = s.visibility === "delayed";
-  const ago = timeAgo(s.createdAt);
+  const isBuy = signal.direction === "BUY";
+  const dirColor = isBuy ? "#00e5a0" : signal.direction === "SELL" ? "#ff4d6a" : "rgba(255,255,255,.3)";
+  const gradeColor = GRADE_COLORS[signal.grade] || GRADE_COLORS.D;
 
   return (
-    <div className="rounded-2xl overflow-hidden transition-all" style={{ border: `1px solid ${dirColor}15`, background: "rgba(255,255,255,.015)" }}>
+    <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${dirColor}15`, background: "rgba(255,255,255,.015)" }}>
       {/* Header — always visible */}
-      <button onClick={onToggle} className="w-full p-3.5 flex items-center justify-between cursor-pointer transition-all hover:bg-white/[.02]" style={{ background: "transparent", border: "none" }}>
+      <button onClick={onToggle} className="w-full p-3.5 flex items-center justify-between cursor-pointer transition-all" style={{ background: `${dirColor}04`, border: "none" }}>
         <div className="flex items-center gap-3">
-          {/* Direction badge */}
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0" style={{ background: `${dirColor}12`, color: dirColor, border: `1px solid ${dirColor}20` }}>
-            {s.direction === "BUY" ? "↑" : s.direction === "SELL" ? "↓" : "→"}
+            {signal.direction === "BUY" ? "↑" : signal.direction === "SELL" ? "↓" : "→"}
           </div>
           <div className="text-left">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-sm font-bold text-white">{s.displaySymbol}</span>
-              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${dirColor}12`, color: dirColor }}>{s.direction}</span>
-              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${gradeColor}12`, color: gradeColor }}>Grade {s.grade}</span>
-              <span className="text-[7px] font-mono px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,.04)", color: "rgba(255,255,255,.25)" }}>{s.timeframe}</span>
-              {/* Status badge for closed */}
-              {s.status !== "active" && (
-                <span className="text-[7px] font-mono px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${statusInfo.color}10`, color: statusInfo.color }}>{statusInfo.label}</span>
-              )}
+              <span className="text-sm font-bold text-white">{signal.displaySymbol}</span>
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${dirColor}12`, color: dirColor }}>{signal.direction}</span>
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${gradeColor}12`, color: gradeColor }}>Grade {signal.grade}</span>
+              <span className="text-[7px] font-mono px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,.04)", color: "rgba(255,255,255,.2)" }}>{signal.timeframe}</span>
             </div>
-            {/* Trend teaser — always visible */}
-            {s.trend && (
-              <div className="text-[9px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.25)" }}>
-                Trend: {s.trend} • {ago}
-              </div>
-            )}
+            <div className="text-[9px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.2)" }}>
+              Trend: {signal.trend} • {new Date(signal.createdAt).toLocaleTimeString()}
+            </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-2.5 flex-shrink-0">
-          {/* Confidence */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           <div className="text-right">
-            <div className="text-base font-black font-mono" style={{ color: dirColor }}>{s.confidence}%</div>
+            <div className="text-base font-black font-mono" style={{ color: dirColor }}>{signal.confidence}%</div>
             <div className="text-[7px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>CONF</div>
           </div>
-          {/* Delayed badge */}
-          {isDelayed && s.delayRemaining && (
-            <div className="px-2 py-1 rounded-lg" style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.12)" }}>
-              <div className="text-[8px] font-mono font-bold" style={{ color: "#f59e0b" }}>⏱ {s.delayRemaining}m</div>
-            </div>
-          )}
-          {/* Lock icon for blurred */}
-          {isBlurred && (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)" }}>
-              <span className="text-[10px]">🔒</span>
-            </div>
-          )}
           <span className="text-[10px]" style={{ color: "rgba(255,255,255,.15)" }}>{expanded ? "▼" : "▶"}</span>
         </div>
       </button>
 
-      {/* Expanded Details */}
       {expanded && (
-        <div className="relative" style={{ borderTop: `1px solid ${dirColor}10` }}>
-          {/* ─── BLURRED STATE ─── */}
-          {isBlurred && (
-            <div className="relative">
-              {/* Fake blurred content */}
-              <div className="p-4 select-none pointer-events-none" style={{ filter: "blur(14px)", opacity: 0.2 }}>
-                <div className="grid grid-cols-4 gap-2 mb-3">
-                  {["ENTRY", "STOP LOSS", "TP 1", "R:R"].map(l => (
-                    <div key={l} className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,.03)" }}>
-                      <div className="text-[8px] font-mono">{l}</div>
-                      <div className="text-sm font-bold font-mono text-white">1.08542</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="rounded-lg p-3" style={{ background: "rgba(0,229,160,.04)" }}>
-                  <div className="text-xs text-white">Price is approaching a bullish order block at 1.0850 with FVG confluence. RSI divergence on H4 supports reversal...</div>
-                </div>
-              </div>
-              {/* Upgrade overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-10" style={{ background: "rgba(10,11,16,.8)", backdropFilter: "blur(4px)" }}>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2.5" style={{ background: "rgba(0,229,160,.08)", border: "2px solid rgba(0,229,160,.15)" }}>
-                  <span className="text-xl">🔒</span>
-                </div>
-                <div className="text-sm font-bold text-white mb-0.5">Signal Details Locked</div>
-                <div className="text-[9px] mb-3" style={{ color: "rgba(255,255,255,.35)" }}>See entry, SL, TP and full smart money analysis</div>
-                <div className="flex gap-1.5 mb-3 flex-wrap justify-center">
-                  {["Entry Price", "SL / TP", "R:R Ratio", "Smart Money", "AI Reasoning"].map(f => (
-                    <span key={f} className="text-[7px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,229,160,.06)", border: "1px solid rgba(0,229,160,.08)", color: "#00e5a0" }}>{f}</span>
-                  ))}
-                </div>
-                <Link href="/pricing" className="px-5 py-2 rounded-xl text-[10px] font-bold no-underline transition-all hover:scale-105" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", boxShadow: "0 4px 15px rgba(0,229,160,.25)" }}>
-                  Unlock from R79/mo
-                </Link>
-                <div className="text-[8px] font-mono mt-1.5" style={{ color: "rgba(255,255,255,.15)" }}>R{userTier === "free" ? "79" : "199"} is less than one bad trade</div>
-              </div>
-            </div>
-          )}
+        <div className="p-4 space-y-3" style={{ background: `${dirColor}03`, borderTop: `1px solid ${dirColor}08` }}>
 
-          {/* ─── DELAYED STATE ─── */}
-          {isDelayed && s.delayRemaining && (
-            <div className="p-4">
-              <div className="rounded-xl p-4 text-center" style={{ background: "rgba(245,158,11,.05)", border: "1px solid rgba(245,158,11,.1)" }}>
-                <div className="text-2xl mb-2">⏱</div>
-                <div className="text-sm font-bold text-white mb-0.5">Grade A Signal — {s.delayRemaining} min delay</div>
-                <div className="text-[10px] mb-3" style={{ color: "rgba(255,255,255,.35)" }}>Pro users already have this signal. Upgrade for instant access.</div>
-                <Link href="/pricing" className="inline-block px-5 py-2 rounded-xl text-[10px] font-bold no-underline" style={{ background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.2)", color: "#f59e0b" }}>
-                  Get Instant Access — Pro R349/mo
-                </Link>
-              </div>
-              {/* Show what IS available */}
-              {s.confluences && s.confluences.length > 0 && (
-                <div className="mt-3 rounded-lg p-3" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
-                  <div className="text-[8px] font-mono tracking-widest mb-1.5" style={{ color: "rgba(245,158,11,.4)" }}>CONFLUENCES</div>
-                  <div className="flex flex-wrap gap-1">
-                    {s.confluences.map((c, i) => (
-                      <span key={i} className="text-[9px] font-mono px-2 py-0.5 rounded" style={{ background: "rgba(245,158,11,.06)", color: "#f59e0b" }}>✓ {c}</span>
-                    ))}
+          {/* Entry / SL / TP / RR */}
+          {limits.showEntry ? (
+            <div className="grid grid-cols-4 gap-1.5">
+              {[
+                { label: "ENTRY", value: signal.entryPrice, color: "#fff" },
+                { label: "STOP LOSS", value: signal.stopLoss, color: "#ff4d6a" },
+                { label: "TP 1", value: signal.takeProfit1, color: "#00e5a0" },
+                { label: "R:R", value: signal.riskReward, color: "#4da0ff", isText: true },
+              ].map((item, i) => (
+                <div key={i} className="rounded-xl p-2.5 text-center" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+                  <div className="text-[7px] font-mono tracking-widest mb-0.5" style={{ color: "rgba(255,255,255,.2)" }}>{item.label}</div>
+                  <div className="text-[11px] font-bold font-mono" style={{ color: item.color }}>
+                    {"isText" in item ? item.value : typeof item.value === "number" ? fmtPrice(item.value) : item.value}
                   </div>
                 </div>
-              )}
+              ))}
             </div>
-          )}
-
-          {/* ─── FULL STATE ─── */}
-          {!isBlurred && !(isDelayed && s.delayRemaining) && (
-            <div className="p-4 space-y-3" style={{ background: `${dirColor}03` }}>
-              {/* Entry / SL / TP / RR */}
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { label: "ENTRY", value: s.entryPrice, color: "#fff" },
-                  { label: "STOP LOSS", value: s.stopLoss, color: "#ff4d6a" },
-                  { label: "TP 1", value: s.takeProfit1, color: "#00e5a0" },
-                  { label: "R:R", value: s.riskReward, color: "#4da0ff", isText: true },
-                ].map((item, i) => (
-                  <div key={i} className="rounded-xl p-2.5 text-center" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
-                    <div className="text-[7px] font-mono tracking-widest mb-0.5" style={{ color: "rgba(255,255,255,.2)" }}>{item.label}</div>
-                    <div className="text-[11px] font-bold font-mono" style={{ color: item.color }}>
-                      {item.value !== null && item.value !== undefined
-                        ? (item.isText ? item.value : typeof item.value === "number" ? formatPrice(item.value) : item.value)
-                        : "—"}
-                    </div>
+          ) : (
+            /* BLURRED — Free tier */
+            <div className="relative">
+              <div className="grid grid-cols-4 gap-1.5 select-none pointer-events-none" style={{ filter: "blur(14px)", opacity: 0.25 }}>
+                {["ENTRY", "STOP LOSS", "TP 1", "R:R"].map(l => (
+                  <div key={l} className="rounded-xl p-2.5 text-center" style={{ background: "rgba(255,255,255,.02)" }}>
+                    <div className="text-[7px] font-mono">{l}</div>
+                    <div className="text-[11px] font-bold font-mono text-white">1.08542</div>
                   </div>
                 ))}
               </div>
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl" style={{ background: "rgba(10,11,16,.7)", backdropFilter: "blur(4px)" }}>
+                <Link href="/pricing" className="flex flex-col items-center gap-1 no-underline group">
+                  <span className="text-lg">🔒</span>
+                  <span className="text-[10px] font-bold transition-all group-hover:scale-105" style={{ color: "#4da0ff" }}>Unlock Entry/SL/TP — R79/mo</span>
+                </Link>
+              </div>
+            </div>
+          )}
 
-              {/* TP2 if exists */}
-              {s.takeProfit2 && (
-                <div className="rounded-lg px-3 py-2 flex justify-between items-center" style={{ background: "rgba(77,160,255,.04)", border: "1px solid rgba(77,160,255,.08)" }}>
-                  <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>TP 2 (EXTENDED)</span>
-                  <span className="text-[11px] font-bold font-mono" style={{ color: "#4da0ff" }}>{formatPrice(s.takeProfit2)}</span>
-                </div>
-              )}
+          {limits.showEntry && signal.takeProfit2 && (
+            <div className="rounded-lg px-3 py-2 flex justify-between items-center" style={{ background: "rgba(0,229,160,.03)", border: "1px solid rgba(0,229,160,.06)" }}>
+              <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>TP 2</span>
+              <span className="text-[11px] font-bold font-mono" style={{ color: "#00e5a0" }}>{fmtPrice(signal.takeProfit2)}</span>
+            </div>
+          )}
 
-              {/* Structure */}
-              {s.structure && (
-                <div className="rounded-lg px-3 py-2 flex justify-between items-center" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
-                  <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>STRUCTURE</span>
-                  <span className="text-[10px] font-bold" style={{ color: "#4da0ff" }}>{s.structure}</span>
-                </div>
-              )}
+          {/* Trend + Structure */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.03)" }}>
+              <div className="text-[7px] font-mono tracking-widest mb-0.5" style={{ color: "rgba(255,255,255,.15)" }}>TREND</div>
+              <div className="text-[10px] font-bold" style={{ color: signal.trend === "Bullish" ? "#00e5a0" : signal.trend === "Bearish" ? "#ff4d6a" : "#f59e0b" }}>{signal.trend}</div>
+            </div>
+            <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.03)" }}>
+              <div className="text-[7px] font-mono tracking-widest mb-0.5" style={{ color: "rgba(255,255,255,.15)" }}>STRUCTURE</div>
+              <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{signal.structure}</div>
+            </div>
+          </div>
 
-              {/* Confluences */}
-              {s.confluences && s.confluences.length > 0 && (
-                <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,.03)", border: "1px solid rgba(245,158,11,.08)" }}>
-                  <div className="text-[8px] font-mono tracking-widest mb-1.5" style={{ color: "rgba(245,158,11,.4)" }}>⚡ CONFLUENCES ({s.confluences.length})</div>
-                  <div className="flex flex-wrap gap-1">
-                    {s.confluences.map((c, i) => (
-                      <span key={i} className="text-[9px] font-mono px-2 py-0.5 rounded" style={{ background: "rgba(245,158,11,.06)", color: "#f59e0b", border: "1px solid rgba(245,158,11,.1)" }}>✓ {c}</span>
+          {/* Confluences */}
+          {signal.confluences.length > 0 && (
+            <div className="rounded-lg p-2.5" style={{ background: "rgba(245,158,11,.03)", border: "1px solid rgba(245,158,11,.06)" }}>
+              <div className="text-[7px] font-mono tracking-widest mb-1" style={{ color: "rgba(245,158,11,.35)" }}>⚡ CONFLUENCES ({signal.confluences.length})</div>
+              <div className="flex flex-wrap gap-1">
+                {signal.confluences.map((c, i) => (
+                  <span key={i} className="text-[8px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(245,158,11,.06)", border: "1px solid rgba(245,158,11,.1)", color: "#f59e0b" }}>✓ {c}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Smart Money */}
+          {limits.showSmartMoney !== "locked" ? (
+            <div className="rounded-lg p-2.5" style={{ background: "rgba(168,85,247,.03)", border: "1px solid rgba(168,85,247,.06)" }}>
+              <div className="text-[7px] font-mono tracking-widest mb-1.5" style={{ color: "rgba(168,85,247,.35)" }}>🧠 SMART MONEY</div>
+              <div className="grid grid-cols-2 gap-2">
+                {signal.smartMoney.orderBlocks.length > 0 && (
+                  <div>
+                    <div className="text-[7px] font-mono mb-0.5" style={{ color: "rgba(255,255,255,.2)" }}>ORDER BLOCKS</div>
+                    {signal.smartMoney.orderBlocks.map((ob: any, i: number) => (
+                      <div key={i} className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{ob.type}: {ob.high}-{ob.low}</div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Smart Money */}
-              {s.smartMoney && (
-                <div className="space-y-1.5">
-                  {s.smartMoney.orderBlocks?.length > 0 && (
-                    <div className="rounded-lg p-2.5" style={{ background: "rgba(240,185,11,.03)", border: "1px solid rgba(240,185,11,.06)" }}>
-                      <div className="text-[7px] font-mono tracking-widest mb-1" style={{ color: "rgba(240,185,11,.35)" }}>📦 ORDER BLOCKS</div>
-                      {s.smartMoney.orderBlocks.map((ob: any, i: number) => (
-                        <div key={i} className="flex justify-between text-[9px] font-mono">
-                          <span style={{ color: ob.type?.includes("bull") ? "#00e5a0" : "#ff4d6a" }}>{ob.type?.includes("bull") ? "▲ Bullish" : "▼ Bearish"}</span>
-                          <span style={{ color: "rgba(255,255,255,.3)" }}>{ob.high || ob.price} — {ob.low || ""}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {s.smartMoney.fvgs?.length > 0 && (
-                    <div className="rounded-lg p-2.5" style={{ background: "rgba(77,160,255,.03)", border: "1px solid rgba(77,160,255,.06)" }}>
-                      <div className="text-[7px] font-mono tracking-widest mb-1" style={{ color: "rgba(77,160,255,.35)" }}>⚡ FVGs</div>
-                      {s.smartMoney.fvgs.map((fvg: any, i: number) => (
-                        <div key={i} className="flex justify-between text-[9px] font-mono">
-                          <span style={{ color: fvg.type === "bullish" ? "#00e5a0" : "#ff4d6a" }}>{fvg.type === "bullish" ? "▲" : "▼"} {fvg.type}</span>
-                          <span style={{ color: "rgba(255,255,255,.3)" }}>{fvg.high} — {fvg.low}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {s.smartMoney.liquidityLevels?.length > 0 && (
-                    <div className="rounded-lg p-2.5" style={{ background: "rgba(168,85,247,.03)", border: "1px solid rgba(168,85,247,.06)" }}>
-                      <div className="text-[7px] font-mono tracking-widest mb-1" style={{ color: "rgba(168,85,247,.35)" }}>💧 LIQUIDITY</div>
-                      {s.smartMoney.liquidityLevels.map((liq: any, i: number) => (
-                        <div key={i} className="flex justify-between text-[9px] font-mono">
-                          <span style={{ color: liq.type === "buy_side" ? "#ff4d6a" : "#00e5a0" }}>{liq.type === "buy_side" ? "🔺" : "🔻"} {liq.type?.replace("_", " ")}</span>
-                          <span style={{ color: "rgba(255,255,255,.3)" }}>@ {liq.price}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SMC Gate for free/basic users seeing partial */}
-              {!s.smartMoney && userTier !== "free" && (
-                <div className="rounded-lg p-3 text-center" style={{ background: "rgba(245,158,11,.03)", border: "1px solid rgba(245,158,11,.08)" }}>
-                  <span className="text-sm">🔒</span>
-                  <div className="text-[10px] font-bold text-white mt-1">Full Smart Money Analysis</div>
-                  <div className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>FVGs, liquidity pools, supply/demand — Pro R349/mo</div>
-                </div>
-              )}
-
-              {/* AI Reasoning */}
-              {s.reasoning && (
-                <div className="rounded-lg p-3" style={{ background: "rgba(0,229,160,.03)", border: "1px solid rgba(0,229,160,.06)" }}>
-                  <div className="text-[8px] font-mono tracking-widest mb-1" style={{ color: "rgba(0,229,160,.35)" }}>🧠 AI REASONING</div>
-                  <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,.5)" }}>{s.reasoning}</p>
-                </div>
-              )}
-              {!s.reasoning && userTier !== "free" && (
-                <div className="rounded-lg p-2.5 text-center" style={{ background: "rgba(0,229,160,.02)", border: "1px solid rgba(0,229,160,.05)" }}>
-                  <span className="text-[9px] font-mono" style={{ color: "rgba(0,229,160,.3)" }}>🧠 AI Reasoning — available on Starter+</span>
-                </div>
-              )}
-
-              {/* Indicators */}
-              {s.indicators && (
-                <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,.015)", border: "1px solid rgba(255,255,255,.03)" }}>
-                  <div className="text-[7px] font-mono tracking-widest mb-1.5" style={{ color: "rgba(255,255,255,.15)" }}>INDICATORS</div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {s.indicators.rsi !== null && (
-                      <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>RSI: <strong style={{ color: s.indicators.rsi > 70 ? "#ff4d6a" : s.indicators.rsi < 30 ? "#00e5a0" : "#f59e0b" }}>{s.indicators.rsi?.toFixed(1)}</strong></span>
-                    )}
-                    {s.indicators.emaCross && (
-                      <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>EMA: <strong style={{ color: s.indicators.emaCross.includes("bull") ? "#00e5a0" : s.indicators.emaCross.includes("bear") ? "#ff4d6a" : "rgba(255,255,255,.4)" }}>{s.indicators.emaCross}</strong></span>
-                    )}
-                    {s.indicators.atr !== null && (
-                      <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>ATR: {s.indicators.atr?.toFixed(5)}</span>
-                    )}
+                )}
+                {limits.showSmartMoney === "full" && signal.smartMoney.fvgs.length > 0 && (
+                  <div>
+                    <div className="text-[7px] font-mono mb-0.5" style={{ color: "rgba(255,255,255,.2)" }}>FVGs</div>
+                    {signal.smartMoney.fvgs.map((fvg: any, i: number) => (
+                      <div key={i} className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{fvg.type}: {fvg.high}-{fvg.low}</div>
+                    ))}
                   </div>
-                </div>
-              )}
-
-              {/* Pips result for closed signals */}
-              {s.pipsResult !== null && s.pipsResult !== undefined && (
-                <div className="rounded-lg px-3 py-2 flex justify-between items-center" style={{ background: s.pipsResult >= 0 ? "rgba(0,229,160,.04)" : "rgba(255,77,106,.04)", border: `1px solid ${s.pipsResult >= 0 ? "rgba(0,229,160,.1)" : "rgba(255,77,106,.1)"}` }}>
-                  <span className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>RESULT</span>
-                  <span className="text-sm font-bold font-mono" style={{ color: s.pipsResult >= 0 ? "#00e5a0" : "#ff4d6a" }}>{s.pipsResult >= 0 ? "+" : ""}{s.pipsResult} pips</span>
+                )}
+                {limits.showSmartMoney === "full" && signal.smartMoney.liquidityLevels.length > 0 && (
+                  <div>
+                    <div className="text-[7px] font-mono mb-0.5" style={{ color: "rgba(255,255,255,.2)" }}>LIQUIDITY</div>
+                    {signal.smartMoney.liquidityLevels.map((liq: any, i: number) => (
+                      <div key={i} className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{liq.type}: {liq.price}</div>
+                    ))}
+                  </div>
+                )}
+                {limits.showSmartMoney === "full" && signal.smartMoney.supplyDemand.length > 0 && (
+                  <div>
+                    <div className="text-[7px] font-mono mb-0.5" style={{ color: "rgba(255,255,255,.2)" }}>SUPPLY/DEMAND</div>
+                    {signal.smartMoney.supplyDemand.map((sd: any, i: number) => (
+                      <div key={i} className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{sd.type} ({sd.strength}): {sd.high}-{sd.low}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {limits.showSmartMoney === "basic" && (
+                <div className="mt-2 text-center">
+                  <Link href="/pricing" className="text-[8px] font-mono no-underline" style={{ color: "rgba(168,85,247,.4)" }}>🔒 FVGs, Liquidity, S/D — Pro R349/mo</Link>
                 </div>
               )}
             </div>
+          ) : (
+            <div className="relative rounded-lg overflow-hidden">
+              <div className="p-2.5 select-none pointer-events-none" style={{ filter: "blur(10px)", opacity: 0.2 }}>
+                <div className="text-[7px] font-mono">SMART MONEY</div>
+                <div className="text-[8px] font-mono text-white">Bullish OB: 1.0850-1.0842 • FVG: 1.0860-1.0872</div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(10,11,16,.65)" }}>
+                <Link href="/pricing" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg no-underline" style={{ background: "rgba(168,85,247,.08)", border: "1px solid rgba(168,85,247,.12)" }}>
+                  <span className="text-[9px]">🔒</span>
+                  <span className="text-[9px] font-bold" style={{ color: "#a855f7" }}>Smart Money — Basic R79/mo</span>
+                </Link>
+              </div>
+            </div>
           )}
+
+          {/* Indicators */}
+          <div className="grid grid-cols-4 gap-1.5">
+            {[
+              { label: "RSI", value: signal.indicators.rsi?.toFixed(1) || "—", color: signal.indicators.rsiSignal === "overbought" ? "#ff4d6a" : signal.indicators.rsiSignal === "oversold" ? "#00e5a0" : "#fff" },
+              { label: "EMA", value: signal.indicators.emaCross.replace("_", " "), color: signal.indicators.emaCross.includes("golden") || signal.indicators.emaCross === "bullish" ? "#00e5a0" : signal.indicators.emaCross.includes("death") || signal.indicators.emaCross === "bearish" ? "#ff4d6a" : "#fff" },
+              { label: "ATR", value: signal.indicators.atr?.toFixed(5) || "—", color: "rgba(255,255,255,.4)" },
+              { label: "NEWS", value: signal.newsRisk.split("—")[0].trim(), color: signal.newsRisk.toLowerCase().includes("high") ? "#ff4d6a" : "#00e5a0" },
+            ].map((item, i) => (
+              <div key={i} className="rounded-lg p-2 text-center" style={{ background: "rgba(255,255,255,.015)", border: "1px solid rgba(255,255,255,.03)" }}>
+                <div className="text-[6px] font-mono tracking-widest" style={{ color: "rgba(255,255,255,.15)" }}>{item.label}</div>
+                <div className="text-[9px] font-bold font-mono capitalize" style={{ color: item.color }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* AI Reasoning */}
+          {limits.showReasoning ? (
+            <div className="rounded-lg p-2.5" style={{ background: "rgba(77,160,255,.03)", border: "1px solid rgba(77,160,255,.06)" }}>
+              <div className="text-[7px] font-mono tracking-widest mb-1" style={{ color: "rgba(77,160,255,.3)" }}>💡 AI REASONING</div>
+              <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,.5)" }}>{signal.reasoning}</p>
+            </div>
+          ) : (
+            <div className="relative rounded-lg overflow-hidden">
+              <div className="p-2.5 select-none pointer-events-none" style={{ filter: "blur(10px)", opacity: 0.2 }}>
+                <div className="text-[10px] text-white">Price approaching bullish order block at support with RSI divergence on H4 timeframe...</div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(10,11,16,.6)" }}>
+                <Link href="/pricing" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg no-underline" style={{ background: "rgba(77,160,255,.08)", border: "1px solid rgba(77,160,255,.12)" }}>
+                  <span className="text-[9px]">🧠</span>
+                  <span className="text-[9px] font-bold" style={{ color: "#4da0ff" }}>AI Reasoning — Starter R199/mo</span>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Meta */}
+          <div className="flex items-center justify-between text-[7px] font-mono" style={{ color: "rgba(255,255,255,.1)" }}>
+            <span>ID: {signal.id.slice(0, 12)}</span>
+            <span>Expires: {new Date(signal.expiresAt).toLocaleTimeString()}</span>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/* ─── Helpers ─── */
-function formatPrice(val: number): string {
+function fmtPrice(val: number): string {
   if (val >= 100) return val.toFixed(2);
   if (val >= 1) return val.toFixed(4);
   return val.toFixed(5);
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
 }
