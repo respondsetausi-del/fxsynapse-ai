@@ -8,6 +8,7 @@ import FullscreenModal from "@/components/FullscreenModal";
 import Sidebar from "@/components/Sidebar";
 import AIFundamentals from "@/components/AIFundamentals";
 import LiveMarketEngine from "@/components/LiveMarketEngine";
+import SignalFeed from "@/components/SignalFeed";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -32,7 +33,7 @@ export default function Dashboard() {
   const [progress, setProgress] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "indicators">("overview");
-  const [dashView, setDashView] = useState<"scanner" | "fundamentals" | "markets">("scanner");
+  const [dashView, setDashView] = useState<"scanner" | "signals" | "fundamentals" | "markets">("scanner");
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [fullscreen, setFullscreen] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -269,8 +270,9 @@ export default function Dashboard() {
         {/* ── Dashboard View Toggle ── */}
         <div className="flex items-center gap-1 mx-4 mt-3 p-1 rounded-2xl" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", backdropFilter: "blur(20px)" }}>
           {([
-            { id: "scanner", label: "📸 Chart Scanner", color: "#00e5a0" },
-            { id: "fundamentals", label: "📊 AI Fundamentals", color: "#f0b90b" },
+            { id: "scanner", label: "📸 Scanner", color: "#00e5a0" },
+            { id: "signals", label: "📡 Signals", color: "#4da0ff" },
+            { id: "fundamentals", label: "📊 Fundamentals", color: "#f0b90b" },
             // { id: "markets", label: "📈 Live Markets", color: "#3b82f6" }, // Phase 2 — ready but hidden
           ] as const).map(v => (
             <button
@@ -287,6 +289,13 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
+
+        {/* ── AI SIGNALS VIEW ── */}
+        {dashView === "signals" && (
+          <div className="px-4 py-4">
+            <SignalFeed userTier={userTier} />
+          </div>
+        )}
 
         {/* ── AI FUNDAMENTALS VIEW ── */}
         {dashView === "fundamentals" && (
@@ -908,7 +917,6 @@ export default function Dashboard() {
                   </div>
                 </Link>
               ))}
-            </div>
             </div>
 
             {/* Top-up option */}

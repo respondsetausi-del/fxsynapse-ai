@@ -420,6 +420,11 @@ export async function runSignalScan(
   // Sort by confidence (highest first)
   signals.sort((a, b) => b.confidence - a.confidence);
 
+  // ─── Save to Supabase ───
+  if (signals.length > 0) {
+    await saveSignalsToDb(signals).catch(err => console.error("[SIGNALS] DB save error:", err));
+  }
+
   return {
     signals,
     scannedPairs: pairs.length * timeframes.length,
@@ -446,5 +451,59 @@ export async function scanSinglePair(
   const indicators = analyzeIndicators(candles);
   if (!indicators) return null;
 
-  return generateSignalWithClaude(symbol, displaySymbol, timeframe, indicators, key);
+  const signal = await generateSignalWithClaude(symbol, displaySymbol, timeframe, indicators, key);
+
+  // Save single scan too
+  if (signal) {
+    await saveSignalsToDb([signal]).catch(err => console.error("[SIGNALS] DB save error:", err));
+  }
+
+  return signal;
+}
+
+/* ─── Save Signals to Supabase ─── */
+async function saveSignalsToDb(signals: Signal[]): Promise<void> {
+  // Dynamic import to avoid issues in edge runtime
+  const { createClient } = await import("@supabase/supabase-js");
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const rows = signals.map(s => ({
+    id: s.id,
+    symbol: s.symbol,
+    display_symbol: s.displaySymbol,
+    timeframe: s.timeframe,
+    direction: s.direction,
+    confidence: s.confidence,
+    grade: s.grade,
+    entry_price: s.entryPrice,
+    stop_loss: s.stopLoss,
+    take_profit_1: s.takeProfit1,
+    take_profit_2: s.takeProfit2 || null,
+    risk_reward: s.riskReward,
+    trend: s.trend,
+    structure: s.structure,
+    smart_money: s.smartMoney,
+    confluences: s.confluences,
+    reasoning: s.reasoning,
+    indicators: s.indicators,
+    key_levels: s.keyLevels,
+    news_risk: s.newsRisk,
+    status: "active",
+    created_at: s.createdAt,
+    expires_at: s.expiresAt,
+    is_public: true,
+  }));
+
+  const { error } = await supabase
+    .from("ai_signals")
+    .upsert(rows, { onConflict: "id" });
+
+  if (error) {
+    console.error("[SIGNALS] Supabase upsert error:", error);
+  } else {
+    console.log(`[SIGNALS] ✅ Saved ${rows.length} signals to DB`);
+  }
 }
