@@ -114,14 +114,17 @@ export async function POST(req: NextRequest) {
 
     if (effectiveType === "subscription") {
       const planId = payment.plan_id || metadata.planId;
+      const period = metadata.period || "monthly";
+      const months = parseInt(metadata.months || "1");
       const expiry = new Date();
-      expiry.setMonth(expiry.getMonth() + 1);
+      expiry.setMonth(expiry.getMonth() + months);
 
       const { error } = await supabase.from("profiles").update({
         plan_id: planId,
         subscription_status: "active",
         subscription_expires_at: expiry.toISOString(),
         billing_cycle_start: new Date().toISOString(),
+        billing_period: period,
         monthly_scans_used: 0,
         monthly_scans_reset_at: new Date().toISOString(),
       }).eq("id", effectiveUserId);
@@ -129,14 +132,14 @@ export async function POST(req: NextRequest) {
       if (error) {
         console.error("[WEBHOOK] Failed to update profile:", error);
       } else {
-        console.log(`[WEBHOOK] ✅ Subscription activated: user=${effectiveUserId}, plan=${planId}`);
+        console.log(`[WEBHOOK] ✅ Subscription activated: user=${effectiveUserId}, plan=${planId}, period=${period}, months=${months}`);
         // Send emails
         const { data: userProfile } = await supabase.from("profiles").select("email").eq("id", effectiveUserId).single();
         if (userProfile?.email) {
-          const planNames: Record<string, string> = { starter: "Starter", pro: "Pro", premium: "Premium" };
-          const planPrices: Record<string, string> = { starter: "R79", pro: "R149", premium: "R299" };
+          const planNames: Record<string, string> = { basic: "Basic", starter: "Starter", pro: "Pro", unlimited: "Unlimited" };
+          const planPrices: Record<string, string> = { basic: "R79", starter: "R199", pro: "R349", unlimited: "R499" };
           const pName = planNames[planId] || planId;
-          const pPrice = planPrices[planId] || `R${(payment.amount || 0) / 100}`;
+          const pPrice = period === "yearly" ? `${planPrices[planId]}/mo (yearly)` : `${planPrices[planId]}/mo`;
           sendPaymentSuccessToUser(userProfile.email, pName, pPrice).catch(console.error);
           sendPaymentNotificationToAdmin(userProfile.email, pName, pPrice).catch(console.error);
         }

@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-
-const TOPUP_PACKS = [
-  { id: "topup_5", credits: 5, price_cents: 3900, label: "5 Scans" },
-  { id: "topup_10", credits: 10, price_cents: 6900, label: "10 Scans" },
-  { id: "topup_20", credits: 20, price_cents: 12900, label: "20 Scans" },
-];
-
-const PLANS: Record<string, { price_cents: number; name: string; monthly_scans: number }> = {
-  starter: { price_cents: 7900, name: "Starter Plan", monthly_scans: 15 },
-  pro: { price_cents: 14900, name: "Pro Plan", monthly_scans: 50 },
-  premium: { price_cents: 29900, name: "Premium Plan", monthly_scans: -1 },
-};
+import { TIERS, CREDIT_PACKS, getPlanPriceCents, getSubscriptionMonths, type BillingPeriod } from "@/lib/tier-config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,22 +21,30 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { type, planId, packId } = body;
+    const { type, planId, packId, period = "monthly" } = body;
 
     let amountCents: number;
     let description: string;
     let metadata: Record<string, string>;
 
-    if (type === "subscription" && planId && planId in PLANS) {
-      const plan = PLANS[planId];
-      amountCents = plan.price_cents;
-      description = `FXSynapse AI — ${plan.name} Monthly`;
-      metadata = { type: "subscription", planId, userId: user.id, monthlyScans: String(plan.monthly_scans) };
+    if (type === "subscription" && planId && planId in TIERS) {
+      const tier = TIERS[planId as keyof typeof TIERS];
+      const billingPeriod = period as BillingPeriod;
+      amountCents = getPlanPriceCents(planId, billingPeriod);
+      const periodLabel = billingPeriod === "yearly" ? "Yearly" : "Monthly";
+      description = `FXSynapse AI — ${tier.name} Plan (${periodLabel})`;
+      metadata = {
+        type: "subscription",
+        planId,
+        period: billingPeriod,
+        userId: user.id,
+        months: String(getSubscriptionMonths(billingPeriod)),
+      };
     } else if (type === "topup" && packId) {
-      const pack = TOPUP_PACKS.find((p) => p.id === packId);
-      if (!pack) return NextResponse.json({ error: "Invalid top-up pack" }, { status: 400 });
-      amountCents = pack.price_cents;
-      description = `FXSynapse AI — ${pack.label} Top-up`;
+      const pack = CREDIT_PACKS.find((p) => p.id === packId);
+      if (!pack) return NextResponse.json({ error: "Invalid credit pack" }, { status: 400 });
+      amountCents = pack.priceCents;
+      description = `FXSynapse AI — ${pack.credits} Scans Credit Pack`;
       metadata = { type: "topup", packId: pack.id, credits: String(pack.credits), userId: user.id };
     } else {
       return NextResponse.json({ error: "Invalid payment type" }, { status: 400 });
@@ -83,7 +80,6 @@ export async function POST(req: NextRequest) {
 
     const checkout = await yocoRes.json();
 
-    // Record pending payment using service role (bypass RLS)
     const { createClient } = await import("@supabase/supabase-js");
     const service = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -97,7 +93,7 @@ export async function POST(req: NextRequest) {
       currency: "ZAR",
       type,
       plan_id: planId || null,
-      credits_amount: type === "topup" ? TOPUP_PACKS.find((p) => p.id === packId)?.credits : null,
+      credits_amount: type === "topup" ? CREDIT_PACKS.find((p) => p.id === packId)?.credits : null,
       status: "pending",
       metadata,
     });
