@@ -7,11 +7,12 @@ import { activatePayment, verifyAndActivate } from "@/lib/payment-activate";
 /**
  * Payment Activation — Layer 2 (success page polling)
  * 
- * SAFE auto-activation rules:
- * 1. If webhook already processed → return activated (always safe)
- * 2. If payment < 5 min old → try Yoco API, then auto-activate (user just paid)
- * 3. If payment > 5 min old → only activate if Yoco API confirms "completed"
- * 4. Never activate abandoned/old payments
+ * SAFE approach:
+ * 1. Check if webhook already activated it → return "activated"
+ * 2. Try Yoco API verification → activate ONLY if Yoco says "completed"
+ * 3. Otherwise keep polling — webhook will handle it
+ * 
+ * We do NOT blindly auto-activate. Users can type /payment/success in URL bar.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ─── Check 3: Pending payment ───
+    // ─── Check 3: Pending payment — try Yoco API verification ───
     const { data: pendingPayment } = await service
       .from("payments")
       .select("*")
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
     const paymentAge = Date.now() - new Date(pendingPayment.created_at).getTime();
     const checkoutId = pendingPayment.yoco_checkout_id;
 
-    // ─── Strategy A: Yoco API verify ───
+    // Try Yoco API — only activate if Yoco confirms "completed"
     if (checkoutId) {
       const verified = await verifyAndActivate(pendingPayment.id, checkoutId);
       if (verified) {
@@ -105,27 +106,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Strategy B: Auto-activate ONLY if payment is very recent ───
-    // Payment must be < 5 min old AND user has polled 3+ times
-    // This means user JUST went through Yoco checkout and landed here
-    if (attempt >= 3 && paymentAge < 5 * 60 * 1000) {
-      console.log(`[ACTIVATE] Auto-activating RECENT payment ${pendingPayment.id} — age ${Math.round(paymentAge / 1000)}s, attempt ${attempt}`);
-      
-      const result = await activatePayment(pendingPayment.id, "success_page");
-      if (result.success) {
-        return NextResponse.json({
-          status: "activated",
-          plan: pendingPayment.plan_id,
-          type: pendingPayment.type,
-          method: "success_page",
-        });
-      }
-    }
-
-    // ─── Still processing ───
+    // Not verified yet — tell client to keep polling (webhook will handle it)
     return NextResponse.json({
       status: paymentAge > 5 * 60 * 1000 ? "processing_delayed" : "processing",
-      message: attempt < 3 ? "Confirming payment..." : "Almost there...",
+      message: attempt < 5
+        ? "Confirming payment with Yoco..."
+        : "Still confirming — your plan will activate automatically once payment is verified.",
     });
 
   } catch (error) {

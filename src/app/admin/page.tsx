@@ -953,7 +953,7 @@ export default function AdminDashboard() {
                   <button onClick={async () => {
                     if (!confirm("⚠️ This will revert ALL force-activated payments and downgrade those users to free. Continue?")) return;
                     try {
-                      const res = await fetch("/api/admin/revert-false-activations", { method: "POST" });
+                      const res = await fetch("/api/admin/revert-payments", { method: "POST" });
                       const data = await res.json();
                       showToast(data.message);
                       fetchPayments(); fetchUsers(); fetchStats();
@@ -962,7 +962,6 @@ export default function AdminDashboard() {
                     className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
                     style={{ background: "rgba(255,77,106,.1)", border: "1px solid rgba(255,77,106,.2)", color: "#ff4d6a" }}>
                     🔄 Revert False
-                  </button>
                   </button>
                   <button onClick={async () => {
                     const email = prompt("Enter user email to activate:");
