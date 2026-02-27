@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthUserId, getUserUsage, incrementChatUsage } from "@/lib/usage";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -40,6 +41,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "API key not configured" }, { status: 500 });
     }
 
+    // Auth check
+    const userId = await getAuthUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Sign in to chat." }, { status: 401 });
+    }
+
+    // Usage check
+    const usage = await getUserUsage(userId);
+    if (!usage.canChat) {
+      return NextResponse.json({
+        error: usage.chatReason || "Chat limit reached. Upgrade for more.",
+        usage,
+        upgrade: true,
+      }, { status: 429 });
+    }
+
     const { messages, analysis } = await request.json();
 
     // Build messages array for Claude
@@ -79,6 +96,9 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     const aiText = data.content?.[0]?.text || "Sorry, I didn't catch that. Could you try again?";
+
+    // Increment chat usage after successful response
+    await incrementChatUsage(userId);
 
     return NextResponse.json({ text: aiText });
   } catch (error) {

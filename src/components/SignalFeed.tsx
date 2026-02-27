@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
 /* ─── Types ─── */
@@ -56,30 +56,67 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
   const [quickPair, setQuickPair] = useState(QUICK_PAIRS[0]);
   const [quickTf, setQuickTf] = useState("1h");
   const [scanMode, setScanMode] = useState<"quick" | "full">("quick");
-  const [scansUsedToday, setScansUsedToday] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
-  const limits = TIER_LIMITS[userTier] || TIER_LIMITS.free;
-  const canScan = limits.scansPerDay === -1 || scansUsedToday < limits.scansPerDay;
-  const scansRemaining = limits.scansPerDay === -1 ? "∞" : `${limits.scansPerDay - scansUsedToday}`;
+  // Server-side usage
+  const [usage, setUsage] = useState<{ scansUsed: number; scansLimit: number; scansRemaining: number; topupBalance: number; planId: string } | null>(null);
+
+  const fetchUsage = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/usage");
+      if (res.ok) {
+        const data = await res.json();
+        setUsage({ scansUsed: data.scansUsed, scansLimit: data.scansLimit, scansRemaining: data.scansRemaining, topupBalance: data.topupBalance, planId: data.planId });
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { fetchUsage(); }, [fetchUsage]);
+
+  const effectiveTier = usage?.planId || userTier;
+  const limits = TIER_LIMITS[effectiveTier] || TIER_LIMITS.free;
+  const canScan = usage ? (usage.scansRemaining > 0 || usage.scansRemaining === -1 || usage.topupBalance > 0) : true;
+  const scansRemaining = usage ? (usage.scansLimit === -1 ? "∞" : `${usage.scansRemaining}`) : "...";
 
   /* ─── Quick Scan ─── */
   const runQuickScan = async () => {
     if (!canScan) { setShowPaywall(true); return; }
     setQuickScanning(quickPair.display);
+    setScanError(null);
     try {
       const res = await fetch("/api/signals/scan", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbol: quickPair.symbol, displaySymbol: quickPair.display, timeframe: quickTf }),
       });
       const data = await res.json();
+
+      if (res.status === 429) {
+        // Server says limit reached
+        setShowPaywall(true);
+        if (data.usage) setUsage(data.usage);
+        setQuickScanning(null);
+        return;
+      }
+      if (res.status === 401) {
+        setScanError("Please sign in to scan.");
+        setQuickScanning(null);
+        return;
+      }
+      if (!res.ok) {
+        setScanError(data.error || "Scan failed.");
+        setQuickScanning(null);
+        return;
+      }
+
       if (data.signal) {
         setSignals(prev => [data.signal, ...prev.filter(s => s.id !== data.signal.id)]);
         setExpandedSignal(data.signal.id);
-        setScansUsedToday(prev => prev + 1);
       }
-    } catch { /* ignore */ }
+      // Update usage from server response
+      if (data.usage) setUsage(data.usage);
+    } catch { setScanError("Network error. Try again."); }
     setQuickScanning(null);
   };
 
@@ -87,18 +124,31 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
   const runFullScan = async () => {
     if (!canScan) { setShowPaywall(true); return; }
     if (!limits.fullScan) { setShowPaywall(true); return; }
-    setScanning(true); setScanResult(null);
+    setScanning(true); setScanResult(null); setScanError(null);
     try {
       const res = await fetch("/api/signals/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
       const data = await res.json();
+
+      if (res.status === 429 || res.status === 403) {
+        setShowPaywall(true);
+        if (data.usage) setUsage(data.usage);
+        setScanning(false);
+        return;
+      }
+      if (!res.ok) {
+        setScanResult({ signals: [], scannedPairs: 0, signalsGenerated: 0, scanDuration: 0, errors: [data.error || "Scan failed"] });
+        setScanning(false);
+        return;
+      }
+
       setScanResult(data);
       if (data.signals) {
         setSignals(prev => {
           const ids = new Set(prev.map(s => s.id));
           return [...data.signals.filter((s: Signal) => !ids.has(s.id)), ...prev];
         });
-        setScansUsedToday(prev => prev + (data.signalsGenerated || 0));
       }
+      if (data.usage) setUsage(data.usage);
     } catch (err: any) {
       setScanResult({ signals: [], scannedPairs: 0, signalsGenerated: 0, scanDuration: 0, errors: [err.message] });
     }
@@ -184,10 +234,15 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
               </span>
             ) : !canScan ? "🔒 No scans remaining — Upgrade" : `⚡ Scan ${quickPair.display} ${quickTf.toUpperCase()}`}
           </button>
-          {!quickScanning && signals.length === 0 && (
+          {!quickScanning && signals.length === 0 && !scanError && (
             <p className="text-[9px] font-mono text-center mt-2" style={{ color: "rgba(255,255,255,.15)" }}>
               Pick a pair + timeframe → AI analyzes 200 candles + indicators + smart money
             </p>
+          )}
+          {scanError && (
+            <div className="mt-2 text-center text-[10px] font-mono px-3 py-2 rounded-lg" style={{ background: "rgba(255,77,106,.06)", border: "1px solid rgba(255,77,106,.1)", color: "#ff4d6a" }}>
+              {scanError}
+            </div>
           )}
         </div>
       )}
@@ -305,7 +360,7 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
             </div>
             <h3 className="text-lg font-bold text-white mb-1">Scan Limit Reached</h3>
             <p className="text-xs mb-4" style={{ color: "rgba(255,255,255,.4)" }}>
-              You&apos;ve used all {limits.scansPerDay} signal scan{limits.scansPerDay === 1 ? "" : "s"} for today.
+              You&apos;ve used {usage?.scansUsed || 0} of {usage?.scansLimit === -1 ? "∞" : usage?.scansLimit || limits.scansPerDay} scans today. Upgrade for more.
             </p>
             <div className="flex flex-col gap-2">
               {[
@@ -315,7 +370,7 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
                 { name: "Unlimited", price: "R499/mo", scans: "∞ Unlimited", color: "#a855f7", tier: "unlimited" },
               ].filter(p => {
                 const order = ["free", "basic", "starter", "pro", "unlimited"];
-                return order.indexOf(p.tier) > order.indexOf(userTier);
+                return order.indexOf(p.tier) > order.indexOf(effectiveTier);
               }).map(plan => (
                 <Link key={plan.name} href="/pricing" className="flex items-center justify-between px-4 py-3 rounded-xl no-underline transition-all hover:scale-[1.02]" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
                   <div className="text-left">
