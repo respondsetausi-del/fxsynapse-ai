@@ -13,13 +13,18 @@ function SuccessContent() {
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
-    const maxAttempts = 15; // Poll for up to ~30 seconds
+    let localAttempt = 0;
+    const maxAttempts = 15;
 
     async function checkPayment() {
       if (!mounted) return;
       
       try {
-        const res = await fetch("/api/payments/activate", { method: "POST" });
+        const res = await fetch("/api/payments/activate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ attempt: localAttempt }),
+        });
         const data = await res.json();
 
         if (!mounted) return;
@@ -31,34 +36,32 @@ function SuccessContent() {
         }
 
         if (data.status === "processing" || data.status === "processing_delayed") {
-          setAttempt(prev => prev + 1);
-          if (attempt < maxAttempts) {
-            // Poll every 2 seconds
+          localAttempt++;
+          setAttempt(localAttempt);
+          if (localAttempt < maxAttempts) {
             timeoutId = setTimeout(checkPayment, 2000);
           } else {
-            // After 30s of polling, show delayed message but still show success
             setStatus("delayed");
           }
           return;
         }
 
         if (data.status === "no_pending_payment") {
-          if (attempt < 3) {
-            // Might just be slow — retry
-            setAttempt(prev => prev + 1);
+          if (localAttempt < 3) {
+            localAttempt++;
+            setAttempt(localAttempt);
             timeoutId = setTimeout(checkPayment, 2000);
           } else {
-            // Show success anyway — webhook will catch it
             setStatus("done");
           }
           return;
         }
 
-        // Unknown status — show success
         setStatus("done");
       } catch {
-        if (mounted && attempt < maxAttempts) {
-          setAttempt(prev => prev + 1);
+        if (mounted && localAttempt < maxAttempts) {
+          localAttempt++;
+          setAttempt(localAttempt);
           timeoutId = setTimeout(checkPayment, 2000);
         } else {
           setStatus("done");

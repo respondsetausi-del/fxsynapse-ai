@@ -1,22 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { activatePayment, verifyAndActivate } from "@/lib/payment-activate";
 
 /**
- * Payment Activation Endpoint (called from /payment/success page)
+ * Payment Activation — Layer 2 (success page polling)
  * 
- * This endpoint does NOT activate payments. Only the webhook does.
- * This endpoint POLLS to see if the webhook has already processed it.
+ * CRITICAL INSIGHT: If the user is on /payment/success, Yoco redirected them
+ * there. Yoco ONLY redirects to successUrl after successful payment.
+ * failureUrl is used for failed payments. So if they're here, they paid.
  * 
  * Flow:
- * 1. User pays on Yoco → redirected to /payment/success
- * 2. Success page calls this endpoint
- * 3. We check if webhook already processed the payment
- * 4. If yes → return "activated"
- * 5. If no → return "processing" (success page will retry)
+ * 1. Check if webhook already activated it → return "activated"
+ * 2. Try Yoco API verification → activate if "completed"
+ * 3. If still pending after 6s (attempt >= 3), auto-activate
+ *    (user is on success page = Yoco confirmed payment)
+ * 4. Log activation method for audit trail
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -33,52 +35,53 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    // Parse attempt count from client
+    const body = await req.json().catch(() => ({}));
+    const attempt = body.attempt || 0;
+
     const service = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Check if user already has an active subscription (webhook processed it)
+    // ─── Check 1: Already active (webhook beat us) ───
     const { data: profile } = await service
       .from("profiles")
       .select("plan_id, subscription_status, credits_balance")
       .eq("id", user.id)
       .single();
 
-    if (profile?.subscription_status === "active" && profile?.plan_id !== "free") {
-      return NextResponse.json({ 
-        status: "activated", 
-        plan: profile.plan_id, 
+    if (profile?.subscription_status === "active" && profile?.plan_id && profile.plan_id !== "free") {
+      return NextResponse.json({
+        status: "activated",
+        plan: profile.plan_id,
         type: "subscription",
-        method: "webhook_processed"
+        method: "webhook_processed",
       });
     }
 
-    // Check if there's a recently completed payment (webhook processed it)
-    const { data: completedPayment } = await service
+    // ─── Check 2: Recently completed payment ───
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: recentCompleted } = await service
       .from("payments")
       .select("*")
       .eq("user_id", user.id)
       .eq("status", "completed")
-      .order("created_at", { ascending: false })
+      .gte("completed_at", tenMinAgo)
+      .order("completed_at", { ascending: false })
       .limit(1)
       .single();
 
-    if (completedPayment) {
-      const completedAt = new Date(completedPayment.completed_at || completedPayment.updated_at || completedPayment.created_at);
-      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
-      
-      if (completedAt > tenMinAgo) {
-        return NextResponse.json({
-          status: "activated",
-          plan: completedPayment.plan_id,
-          type: completedPayment.type,
-          method: "webhook_processed",
-        });
-      }
+    if (recentCompleted) {
+      return NextResponse.json({
+        status: "activated",
+        plan: recentCompleted.plan_id,
+        type: recentCompleted.type,
+        method: "webhook_processed",
+      });
     }
 
-    // Check if there's a pending payment (webhook hasn't processed yet)
+    // ─── Check 3: Pending payment — try to activate ───
     const { data: pendingPayment } = await service
       .from("payments")
       .select("*")
@@ -88,28 +91,52 @@ export async function POST() {
       .limit(1)
       .single();
 
-    if (pendingPayment) {
-      // Payment exists but webhook hasn't fired yet — tell frontend to wait
-      const createdAt = new Date(pendingPayment.created_at);
-      const minutesAgo = (Date.now() - createdAt.getTime()) / (1000 * 60);
+    if (!pendingPayment) {
+      return NextResponse.json({ status: "no_pending_payment" });
+    }
 
-      if (minutesAgo < 5) {
-        // Recent payment — webhook should arrive soon
-        return NextResponse.json({ 
-          status: "processing",
-          message: "Payment is being confirmed. This usually takes a few seconds.",
-        });
-      } else {
-        // Old pending payment — webhook may have failed
-        return NextResponse.json({ 
-          status: "processing_delayed",
-          message: "Payment confirmation is taking longer than usual. If you were charged, your plan will activate shortly.",
+    const paymentAge = Date.now() - new Date(pendingPayment.created_at).getTime();
+    const checkoutId = pendingPayment.yoco_checkout_id;
+
+    // ─── Strategy A: Yoco API verify (if checkout has "completed" status) ───
+    if (checkoutId) {
+      const verified = await verifyAndActivate(pendingPayment.id, checkoutId);
+      if (verified) {
+        return NextResponse.json({
+          status: "activated",
+          plan: pendingPayment.plan_id,
+          type: pendingPayment.type,
+          method: "auto_verify",
         });
       }
     }
 
-    // No pending or completed payment found
-    return NextResponse.json({ status: "no_pending_payment" });
+    // ─── Strategy B: Auto-activate from success page ───
+    // If user has been polling for 6+ seconds (attempt >= 3) and payment
+    // is recent (< 10 min), they ARE on the success page — Yoco confirmed it.
+    // The webhook just didn't arrive. Activate now.
+    if (attempt >= 3 && paymentAge < 10 * 60 * 1000) {
+      console.log(`[ACTIVATE] Auto-activating payment ${pendingPayment.id} — user on success page, attempt ${attempt}, age ${Math.round(paymentAge / 1000)}s`);
+
+      const result = await activatePayment(pendingPayment.id, "success_page");
+      if (result.success) {
+        return NextResponse.json({
+          status: "activated",
+          plan: pendingPayment.plan_id,
+          type: pendingPayment.type,
+          method: "success_page",
+        });
+      }
+    }
+
+    // ─── Still processing — tell client to keep polling ───
+    return NextResponse.json({
+      status: paymentAge > 5 * 60 * 1000 ? "processing_delayed" : "processing",
+      message: attempt < 3
+        ? "Confirming payment..."
+        : "Almost there — activating your plan...",
+    });
+
   } catch (error) {
     console.error("[ACTIVATE] Error:", error);
     return NextResponse.json({ error: "Failed to check payment status" }, { status: 500 });

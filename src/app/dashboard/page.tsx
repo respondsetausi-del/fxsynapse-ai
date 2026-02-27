@@ -9,6 +9,7 @@ import Sidebar from "@/components/Sidebar";
 import AIFundamentals from "@/components/AIFundamentals";
 import LiveMarketEngine from "@/components/LiveMarketEngine";
 import SignalFeed from "@/components/SignalFeed";
+import AIChat from "@/components/AIChat";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -33,7 +34,7 @@ export default function Dashboard() {
   const [progress, setProgress] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "indicators">("overview");
-  const [dashView, setDashView] = useState<"scanner" | "signals" | "fundamentals" | "markets">("scanner");
+  const [dashView, setDashView] = useState<"scanner" | "signals" | "fundamentals" | "markets" | "chat">("scanner");
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [fullscreen, setFullscreen] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -273,6 +274,7 @@ export default function Dashboard() {
             { id: "scanner", label: "📸 Scanner", color: "#00e5a0" },
             { id: "signals", label: "📡 Signals", color: "#4da0ff" },
             { id: "fundamentals", label: "📊 Fundamentals", color: "#f0b90b" },
+            { id: "chat", label: "💬 AI Chat", color: "#a855f7" },
             // { id: "markets", label: "📈 Live Markets", color: "#3b82f6" }, // Phase 2 — ready but hidden
           ] as const).map(v => (
             <button
@@ -302,6 +304,11 @@ export default function Dashboard() {
           <div className="px-4 py-4">
             <AIFundamentals userPlan={user?.plan_id || "free"} userRole={user?.role || ""} />
           </div>
+        )}
+
+        {/* ── AI CHAT VIEW ── */}
+        {dashView === "chat" && (
+          <AIChat userTier={userTier} />
         )}
 
         {/* ── LIVE MARKETS VIEW ── */}
