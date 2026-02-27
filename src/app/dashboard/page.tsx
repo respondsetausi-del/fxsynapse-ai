@@ -54,7 +54,8 @@ export default function Dashboard() {
   const supabase = createClient();
   const router = useRouter();
   const isPaidUser = user?.subscription_status === "active" && user?.plan_id && user.plan_id !== "free" && user.plan_id !== "none";
-  const showFull = isPaidUser || false; // Only paid subscribers see full data — free scans get teaser
+  const showFull = isPaidUser || false;
+  const userTier = user?.plan_id || "free";
 
   useEffect(() => {
     (async () => {
@@ -571,9 +572,9 @@ export default function Dashboard() {
                         <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: "#00e5a0" }}>🔒 FULL ANALYSIS LOCKED</div>
                         <div className="text-xs font-bold text-white">Tap to unlock — Entry, TP, SL, R:R & AI insights</div>
                         <div className="flex gap-3 justify-center mt-2">
-                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>50 scans R79</span>
-                          <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>100 scans R149</span>
-                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>Unlimited R299</span>
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>5/day R79</span>
+                          <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>15/day R199</span>
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>50/day R349</span>
                         </div>
                       </div>
                     )}
@@ -848,26 +849,36 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* ── INLINE PRICING — All 3 plans with value props ── */}
+            {/* ── INLINE PRICING — New 5-tier plans ── */}
             <div className="flex flex-col gap-2.5 mt-4">
               {[
                 {
-                  name: "Starter", price: "R79", scans: "50 scans/mo",
-                  href: "/pricing?plan=starter", popular: false,
-                  tagline: "Perfect for learning",
-                  perks: ["50 AI chart scans", "Entry, TP, SL & R:R on every scan", "Annotated charts with key levels"],
+                  name: "Basic", price: "R79", scans: "5 scans/day",
+                  href: "/pricing?plan=basic", popular: false,
+                  tagline: "Get started",
+                  perks: ["5 AI chart scans/day", "Grade B & C signal details", "15 AI chat messages/day"],
+                  color: "#4da0ff",
                 },
                 {
-                  name: "Pro", price: "R149", scans: "100 scans/mo",
-                  href: "/pricing?plan=pro", popular: true,
-                  tagline: "For active traders",
-                  perks: ["100 AI chart scans", "Everything in Starter +", "Confluence grading & AI Fundamentals"],
+                  name: "Starter", price: "R199", scans: "15 scans/day",
+                  href: "/pricing?plan=starter", popular: true,
+                  tagline: "Serious trader",
+                  perks: ["15 AI chart scans/day", "All signals + Grade A (15m delay)", "AI reasoning on signals"],
+                  color: "#00e5a0",
                 },
                 {
-                  name: "Premium", price: "R299", scans: "Unlimited",
-                  href: "/pricing?plan=premium", popular: false,
-                  tagline: "Scan every chart, every day",
-                  perks: ["Unlimited scans", "Everything in Pro +", "Priority processing & support"],
+                  name: "Pro", price: "R349", scans: "50 scans/day",
+                  href: "/pricing?plan=pro", popular: false,
+                  tagline: "Active trader",
+                  perks: ["50 scans + All signals instant", "Full smart money + Voice assistant", "AI Fundamentals + Track record"],
+                  color: "#f59e0b",
+                },
+                {
+                  name: "Unlimited", price: "R499", scans: "Unlimited",
+                  href: "/pricing?plan=unlimited", popular: false,
+                  tagline: "Full power",
+                  perks: ["Unlimited everything", "Priority signal delivery", "Trade journal + Early access"],
+                  color: "#a855f7",
                 },
               ].map((plan) => (
                 <Link key={plan.name} href={plan.href} className="w-full no-underline block rounded-2xl px-4 py-3.5 text-left transition-all hover:scale-[1.02] relative" style={{
@@ -883,14 +894,14 @@ export default function Dashboard() {
                       <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{plan.tagline}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[18px] font-extrabold" style={{ color: plan.popular ? "#00e5a0" : "#fff" }}>{plan.price}</div>
+                      <div className="text-[18px] font-extrabold" style={{ color: plan.color }}>{plan.price}</div>
                       <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>/month</div>
                     </div>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     {plan.perks.map((perk, pi) => (
                       <div key={pi} className="flex items-center gap-1.5">
-                        <span className="text-[8px]" style={{ color: "#00e5a0" }}>✓</span>
+                        <span className="text-[8px]" style={{ color: plan.color }}>✓</span>
                         <span className="text-[9px]" style={{ color: "rgba(255,255,255,.45)" }}>{perk}</span>
                       </div>
                     ))}
@@ -898,10 +909,11 @@ export default function Dashboard() {
                 </Link>
               ))}
             </div>
+            </div>
 
             {/* Top-up option */}
             <Link href="/pricing?topup=1" className="w-full mt-2 py-2.5 rounded-xl text-[11px] font-semibold no-underline text-center block" style={{ background: "rgba(77,160,255,.06)", border: "1px solid rgba(77,160,255,.12)", color: "#4da0ff" }}>
-              Or buy a scan pack — from R39
+              Or buy a scan pack — from R49
             </Link>
 
             {/* FOMO element */}
