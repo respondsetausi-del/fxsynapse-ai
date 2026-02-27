@@ -115,7 +115,7 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style={{ background: "linear-gradient(135deg, rgba(0,229,160,.15), rgba(77,160,255,.1))", border: "1px solid rgba(0,229,160,.2)" }}>📡</div>
           <div>
             <h2 className="text-[15px] font-extrabold text-white">AI Signal Scanner</h2>
-            <p className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>Claude AI • candles + indicators + smart money</p>
+            <p className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>AI-powered • candles + indicators + smart money</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg" style={{ background: canScan ? "rgba(0,229,160,.06)" : "rgba(255,77,106,.06)", border: `1px solid ${canScan ? "rgba(0,229,160,.1)" : "rgba(255,77,106,.1)"}` }}>
@@ -180,13 +180,13 @@ export default function SignalFeed({ userTier = "free" }: { userTier?: string })
             {quickScanning ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="inline-block w-3 h-3 rounded-full border-2 border-white/20 border-t-white/60" style={{ animation: "spin 1s linear infinite" }} />
-                Analyzing {quickScanning} with Claude AI...
+                Analyzing {quickScanning} with AI...
               </span>
             ) : !canScan ? "🔒 No scans remaining — Upgrade" : `⚡ Scan ${quickPair.display} ${quickTf.toUpperCase()}`}
           </button>
           {!quickScanning && signals.length === 0 && (
             <p className="text-[9px] font-mono text-center mt-2" style={{ color: "rgba(255,255,255,.15)" }}>
-              Pick a pair + timeframe → Claude analyzes 200 candles + indicators + smart money
+              Pick a pair + timeframe → AI analyzes 200 candles + indicators + smart money
             </p>
           )}
         </div>

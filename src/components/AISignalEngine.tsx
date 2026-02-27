@@ -240,7 +240,7 @@ export default function AISignalEngine() {
           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style={{ background: "linear-gradient(135deg, #a855f7, #7c3aed)" }}>🧠</div>
           <div>
             <h2 className="text-sm font-bold text-white" style={{ fontFamily: "'Outfit',sans-serif" }}>AI Signal Engine</h2>
-            <p className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>CLAUDE-POWERED • SMART MONEY • REAL-TIME ANALYSIS</p>
+            <p className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>AI-POWERED • SMART MONEY • REAL-TIME ANALYSIS</p>
           </div>
         </div>
       </div>
@@ -293,12 +293,12 @@ export default function AISignalEngine() {
             {quickScanning ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="inline-block w-3 h-3 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
-                Analyzing {quickScanning} with Claude...
+                Analyzing {quickScanning}...
               </span>
             ) : `Scan ${quickPair.display} ${quickTf.toUpperCase()}`}
           </button>
           {quickSignal === null && quickScanning === null && (
-            <p className="text-[9px] font-mono text-center mt-2" style={{ color: "rgba(255,255,255,.2)" }}>Select a pair and timeframe, then click scan. Claude will analyze candles + indicators + smart money.</p>
+            <p className="text-[9px] font-mono text-center mt-2" style={{ color: "rgba(255,255,255,.2)" }}>Select a pair and timeframe, then click scan. AI will analyze candles + indicators + smart money.</p>
           )}
           {/* No signal found */}
           {quickScanning === null && quickSignal === null && scanResult === null && (
@@ -312,7 +312,7 @@ export default function AISignalEngine() {
         <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
           <div className="rounded-xl p-3 mb-4" style={{ background: "rgba(168,85,247,.04)", border: "1px solid rgba(168,85,247,.08)" }}>
             <p className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>
-              🌐 Scans <strong className="text-white">12 pairs × 2 timeframes (H1 + H4)</strong> = 24 analyses via Claude.
+              🌐 Scans <strong className="text-white">12 pairs × 2 timeframes (H1 + H4)</strong> = 24 analyses via AI.
               Takes 2-5 minutes. Cost: ~$0.30-0.70 per full scan.
             </p>
           </div>
