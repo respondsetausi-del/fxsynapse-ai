@@ -112,12 +112,6 @@ export async function POST(req: NextRequest) {
 
     const checkout = await yocoRes.json();
 
-    const { createClient } = await import("@supabase/supabase-js");
-    const service = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
     await service.from("payments").insert({
       user_id: user.id,
       yoco_checkout_id: checkout.id,
