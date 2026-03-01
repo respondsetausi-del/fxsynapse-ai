@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
           amount: creditsToGive,
           type: "affiliate_payout",
           description: `Affiliate commission payout: R${(balance / 100).toFixed(2)} → ${creditsToGive} credits`,
-        }).catch(() => {}); // table might not exist
+        });  // ignore if table missing
 
         // Update affiliate paid amount
         await service.from("affiliates").update({
