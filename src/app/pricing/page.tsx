@@ -260,11 +260,10 @@ function PricingContent() {
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,.06)" }}>
             {[
               { feature: "Chart Scans", basic: "5/day", starter: "15/day", pro: "50/day", unlimited: "Unlimited" },
-              { feature: "AI Chat", basic: "15/day", starter: "30/day", pro: "100/day", unlimited: "Unlimited" },
               { feature: "Smart Money", basic: "S/R + OBs", starter: "S/R + OBs", pro: "Full SMC", unlimited: "Full SMC" },
               { feature: "AI Reasoning", basic: "—", starter: "✓", pro: "✓", unlimited: "✓" },
-              { feature: "Voice Assistant", basic: "—", starter: "—", pro: "✓", unlimited: "✓" },
               { feature: "AI Fundamentals", basic: "—", starter: "—", pro: "✓", unlimited: "✓" },
+              { feature: "Entry/SL/TP/R:R", basic: "✓", starter: "✓", pro: "✓", unlimited: "✓" },
             ].map((row, i) => (
               <div key={i} className="flex items-center px-4 py-3 gap-1" style={{ background: i % 2 === 0 ? "rgba(255,255,255,.015)" : "transparent", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
                 <span className="flex-1 text-[11px] font-medium" style={{ color: "rgba(255,255,255,.55)", minWidth: 120 }}>{row.feature}</span>
