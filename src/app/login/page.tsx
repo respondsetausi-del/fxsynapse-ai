@@ -23,8 +23,7 @@ function LoginForm() {
       setError(error.message);
       setLoading(false);
     } else {
-      // Redirect — middleware handles admin routing automatically
-      window.location.href = "/dashboard";
+      window.location.href = redirect;
     }
   };
 
@@ -103,7 +102,7 @@ function LoginForm() {
 
         <p className="text-center mt-5 text-sm" style={{ color: "rgba(255,255,255,.4)" }}>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-semibold" style={{ color: "#00e5a0" }}>
+          <Link href={redirect !== "/dashboard" ? `/signup?redirect=${encodeURIComponent(redirect)}` : "/signup"} className="font-semibold" style={{ color: "#00e5a0" }}>
             Sign up
           </Link>
         </p>

@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default function SignupPage() {
+function SignupContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -11,6 +13,8 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/dashboard";
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,22 +41,21 @@ export default function SignupPage() {
       return;
     }
 
-    // Auto sign-in after signup
+    // Auto sign-in after signup — honor redirect param
     if (data.session) {
-      window.location.href = "/dashboard";
+      window.location.href = redirectTo;
       return;
     }
 
     // If session wasn't returned (email confirmation enabled), try signing in
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
-      // If sign-in fails, email confirmation might be required
       setError("Account created! Please check your email to confirm, then sign in.");
       setLoading(false);
       return;
     }
 
-    window.location.href = "/dashboard";
+    window.location.href = redirectTo;
   };
 
   return (
@@ -97,4 +100,8 @@ export default function SignupPage() {
       </div>
     </div>
   );
+}
+
+export default function SignupPage() {
+  return <Suspense><SignupContent /></Suspense>;
 }

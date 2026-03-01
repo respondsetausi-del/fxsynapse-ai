@@ -72,7 +72,7 @@ export const TIERS: Record<TierId, TierConfig> = {
       watermark: true,
     },
     features: [
-      { text: "1 AI chart scan per day", included: true },
+      { text: "1 free AI chart scan", included: true },
       { text: "AI Chat", included: false },
       { text: "AI Signal Scanner", included: false },
       { text: "Full signal details (Entry/SL/TP)", included: false },

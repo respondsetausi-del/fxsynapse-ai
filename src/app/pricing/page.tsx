@@ -134,7 +134,7 @@ function PricingContent() {
 
           {!user && (
             <Link href="/signup" className="inline-block px-6 py-3 rounded-xl text-sm font-bold no-underline mb-4" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
-              Start Free — 1 Scan/Day
+              Start Free
             </Link>
           )}
 
@@ -246,7 +246,7 @@ function PricingContent() {
           <div className="rounded-xl px-5 py-3" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
             <div className="text-xs font-bold text-white mb-1">Free Plan</div>
             <div className="text-[10px]" style={{ color: "rgba(255,255,255,.35)" }}>
-              1 chart scan per day · Blurred entry/SL/TP details · No card required
+              1 free chart scan to try · Blurred entry/SL/TP details · No card required
             </div>
           </div>
         </div>
@@ -339,7 +339,7 @@ function PricingContent() {
         <div className="text-center mb-8">
           {!user ? (
             <Link href="/signup" className="inline-block px-6 py-3 rounded-xl text-sm font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
-              Start Free — 1 Scan/Day
+              Start Free
             </Link>
           ) : currentPlan === "free" || !currentPlan ? (
             <button onClick={() => handleSubscribe("starter")} className="px-6 py-3 rounded-xl text-sm font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
