@@ -55,6 +55,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Payment system not configured" }, { status: 500 });
     }
 
+    // ─── DEDUP: Reuse existing pending checkout if < 5 min old ───
+    const { createClient: createServiceClient } = await import("@supabase/supabase-js");
+    const service = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: existing } = await service
+      .from("payments")
+      .select("yoco_checkout_id")
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .eq("amount_cents", amountCents)
+      .gte("created_at", fiveMinAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (existing?.yoco_checkout_id) {
+      try {
+        const checkRes = await fetch(
+          `https://payments.yoco.com/api/checkouts/${existing.yoco_checkout_id}`,
+          { headers: { Authorization: `Bearer ${yocoKey}` } }
+        );
+        if (checkRes.ok) {
+          const checkout = await checkRes.json();
+          if (checkout.redirectUrl && !["expired", "completed"].includes(checkout.status)) {
+            console.log(`[YOCO] Reusing checkout ${checkout.id} for user ${user.id}`);
+            return NextResponse.json({ checkoutUrl: checkout.redirectUrl, checkoutId: checkout.id, reused: true });
+          }
+        }
+      } catch {} // If check fails, create new checkout
+    }
+
     const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
     const yocoRes = await fetch("https://payments.yoco.com/api/checkouts", {

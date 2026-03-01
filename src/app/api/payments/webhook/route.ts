@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { activatePayment } from "@/lib/payment-activate";
 
 /**
@@ -20,15 +20,19 @@ function getService() {
 function verifySignature(rawBody: string, signature: string | null): boolean {
   const secret = process.env.YOCO_WEBHOOK_SECRET;
   if (!secret) {
-    console.warn("[WEBHOOK] No YOCO_WEBHOOK_SECRET set — skipping verification");
-    return true;
+    console.error("[WEBHOOK] CRITICAL: YOCO_WEBHOOK_SECRET not set — rejecting");
+    return false; // BLOCK if not configured — never pass silently
   }
   if (!signature) {
     console.warn("[WEBHOOK] No signature header in request");
     return false;
   }
   const expected = createHmac("sha256", secret).update(rawBody).digest("base64");
-  return signature === expected;
+  try {
+    return timingSafeEqual(Buffer.from(signature, "utf8"), Buffer.from(expected, "utf8"));
+  } catch {
+    return false; // Different lengths = not matching
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -77,16 +81,23 @@ export async function POST(req: NextRequest) {
       payment = data;
     }
 
-    // Strategy 2: Match by userId + pending (fallback)
+    // Strategy 2: Match by userId + amount (safer fallback)
     if (!payment && userId) {
-      const { data } = await supabase
+      const payloadAmount = payload.amount || payload.amountInCents;
+      let query = supabase
         .from("payments")
         .select("*")
         .eq("user_id", userId)
         .eq("status", "pending")
         .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
+      
+      // If webhook includes amount, match on it too (prevents wrong plan activation)
+      if (payloadAmount) {
+        query = query.eq("amount_cents", payloadAmount);
+      }
+
+      const { data } = await query.single();
       payment = data;
     }
 
@@ -103,6 +114,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error("[WEBHOOK] Error:", error);
-    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+    // ALWAYS return 200 — prevent Yoco retries that could cause double-activation
+    return NextResponse.json({ received: true, error: "internal_processing_error" });
   }
 }

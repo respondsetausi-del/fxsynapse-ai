@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -13,6 +13,7 @@ function PricingContent() {
   const [subStatus, setSubStatus] = useState<string | null>(null);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const supabase = createClient();
+  const inFlight = useRef(false);
   const searchParams = useSearchParams();
   const isGated = searchParams.get("gate") === "1";
 
@@ -34,8 +35,10 @@ function PricingContent() {
   }, [supabase]);
 
   const handleSubscribe = async (planId: string) => {
+    if (inFlight.current) return; // Block rapid double-clicks
     if (!user) { window.location.href = "/signup?redirect=/pricing"; return; }
     if (planId === currentPlan && subStatus === "active") return;
+    inFlight.current = true;
     setLoading(planId);
     try {
       const res = await fetch("/api/payments/yoco", {
@@ -45,12 +48,15 @@ function PricingContent() {
       });
       const data = await res.json();
       if (data.checkoutUrl) window.location.href = data.checkoutUrl;
-    } catch {}
+      else inFlight.current = false;
+    } catch { inFlight.current = false; }
     setLoading(null);
   };
 
   const handleTopup = async (packId: string) => {
+    if (inFlight.current) return;
     if (!user) { window.location.href = "/signup?redirect=/pricing"; return; }
+    inFlight.current = true;
     setLoading(packId);
     try {
       const res = await fetch("/api/payments/yoco", {
@@ -60,7 +66,8 @@ function PricingContent() {
       });
       const data = await res.json();
       if (data.checkoutUrl) window.location.href = data.checkoutUrl;
-    } catch {}
+      else inFlight.current = false;
+    } catch { inFlight.current = false; }
     setLoading(null);
   };
 

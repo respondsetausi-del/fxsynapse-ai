@@ -204,8 +204,8 @@ export async function sweepPendingPayments(): Promise<{
       continue;
     }
 
-    // Skip very old payments (> 24h) — likely abandoned
-    if (age > 24 * 60 * 60 * 1000) {
+    // Skip very old payments (> 1h) — Yoco checkouts expire in ~30min
+    if (age > 60 * 60 * 1000) {
       await supabase.from("payments").update({ status: "expired" }).eq("id", payment.id);
       results.push({ id: payment.id, status: "expired", reason: "> 24 hours old" });
       continue;

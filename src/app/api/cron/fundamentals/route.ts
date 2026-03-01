@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sweepPendingPayments } from "@/lib/payment-activate";
 
 // Vercel Cron hits this endpoint 2x daily
 // Configured in vercel.json
@@ -22,19 +23,28 @@ export async function GET(req: NextRequest) {
 
     await fetch(`${baseUrl}/api/fundamentals/calendar?refresh=true&range=week`);
 
-    // 2. AI Brief generation DISABLED to save API costs
+    // 2. Sweep pending payments — Layer 3 recovery (no Anthropic API, just Yoco verify)
+    let sweepResult = { checked: 0, activated: 0 };
+    try {
+      sweepResult = await sweepPendingPayments();
+      console.log(`[CRON] Payment sweep: ${sweepResult.checked} checked, ${sweepResult.activated} activated`);
+    } catch (err) {
+      console.error("[CRON] Payment sweep error:", err);
+    }
+
+    // 3. AI Brief generation DISABLED to save API costs
     // Uncomment when ready to re-enable:
     // const briefRes = await fetch(`${baseUrl}/api/fundamentals/brief`, {
     //   method: "POST",
     //   headers: { "Content-Type": "application/json" },
     //   body: JSON.stringify({ session, adminKey: cronSecret || "admin" }),
     // });
-    // const result = await briefRes.json();
 
     return NextResponse.json({
       success: true,
       session,
       brief: "disabled — admin can generate manually",
+      payments: sweepResult,
     });
   } catch (error) {
     console.error("Cron error:", error);
