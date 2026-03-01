@@ -44,6 +44,7 @@ export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVi
   useEffect(() => {
     if (!dataUrl || !boxRef.current) return;
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       const maxW = boxRef.current!.clientWidth;
       const ratio = img.height / img.width;

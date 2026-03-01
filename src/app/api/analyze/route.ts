@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SYSTEM_PROMPT, USER_PROMPT } from "@/lib/prompts";
 import { createServerClient } from "@supabase/ssr";
+import { createServiceSupabase } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { checkCredits, deductCredit, recordScan } from "@/lib/credits";
 
@@ -343,8 +344,25 @@ export async function POST(req: NextRequest) {
     // 7. Deduct credit AFTER successful analysis
     await deductCredit(user.id, creditCheck.source);
 
-    // 8. Record scan + update last_seen_at
-    const scanResult = await recordScan(user.id, creditCheck.source, analysis);
+    // 8. Upload raw chart to Supabase Storage for shareable scan pages
+    let chartImageUrl: string | undefined;
+    try {
+      const supabaseService = createServiceSupabase();
+      const ext = file.type.split("/")[1] || "png";
+      const fileName = `charts/${user.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabaseService.storage
+        .from("scans")
+        .upload(fileName, Buffer.from(bytes), { contentType: file.type, upsert: false });
+      if (uploadError) {
+        console.error("Chart storage upload error:", uploadError);
+      } else {
+        const { data: urlData } = supabaseService.storage.from("scans").getPublicUrl(fileName);
+        chartImageUrl = urlData?.publicUrl;
+      }
+    } catch (e) { console.error("Chart upload failed:", e); }
+
+    // 9. Record scan + update last_seen_at
+    const scanResult = await recordScan(user.id, creditCheck.source, analysis, chartImageUrl);
 
     // 9. Return with updated credit info
     const updatedCredits = await checkCredits(user.id);

@@ -37,6 +37,7 @@ export function useAnnotatedCanvas(
   useEffect(() => {
     if (!dataUrl) return;
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => { imgRef.current = img; };
     img.src = dataUrl;
   }, [dataUrl]);

@@ -622,15 +622,7 @@ export default function Dashboard() {
               <div className="result-layout flex gap-3" style={{ flexDirection: viewMode === "analysis" ? "column" : "row" }}>
                 {viewMode !== "analysis" && (
                   <div className="result-chart glass overflow-hidden animate-fadeUp relative" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
-                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => showFull ? setFullscreen(true) : setShowPaywall(true)} onCapture={(capturedUrl) => {
-                      if (shareId && capturedUrl) {
-                        fetch("/api/scan/upload-image", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ shareId, imageBase64: capturedUrl }),
-                        }).catch(() => {});
-                      }
-                    }} />
+                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => showFull ? setFullscreen(true) : setShowPaywall(true)} />
                     {/* Fullscreen locked badge for free users */}
                     {!showFull && (
                       <div className="absolute bottom-12 right-3 px-2 py-1 rounded-md cursor-pointer" onClick={() => setShowPaywall(true)} style={{ background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.08)" }}>

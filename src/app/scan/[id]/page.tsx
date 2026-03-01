@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import AnnotatedChart from "@/components/AnnotatedChart";
 
 export default function PublicScanPage() {
   const params = useParams();
@@ -107,14 +108,14 @@ export default function PublicScanPage() {
           </div>
         </div>
 
-        {/* Chart Screenshot */}
-        {scan.chartImageUrl && (
+        {/* Annotated Chart */}
+        {scan.chartImageUrl && A.annotations && (
           <div className="rounded-2xl overflow-hidden mb-4" style={{ border: "1px solid rgba(255,255,255,.08)" }}>
-            <img
-              src={scan.chartImageUrl}
-              alt={`${scan.pair || "Chart"} ${scan.timeframe || ""} analysis`}
-              className="w-full h-auto block"
-              style={{ maxHeight: 500, objectFit: "contain", background: "#111" }}
+            <AnnotatedChart
+              dataUrl={scan.chartImageUrl}
+              annotations={A.annotations || []}
+              chartBounds={A.chart_bounds}
+              isVisible={true}
             />
             <div className="flex items-center justify-between px-3 py-2" style={{ background: "rgba(255,255,255,.02)", borderTop: "1px solid rgba(255,255,255,.04)" }}>
               <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>
@@ -124,6 +125,18 @@ export default function PublicScanPage() {
                 fxsynapse.co.za
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Fallback: raw image if no annotations */}
+        {scan.chartImageUrl && (!A.annotations || A.annotations.length === 0) && (
+          <div className="rounded-2xl overflow-hidden mb-4" style={{ border: "1px solid rgba(255,255,255,.08)" }}>
+            <img
+              src={scan.chartImageUrl}
+              alt={`${scan.pair || "Chart"} analysis`}
+              className="w-full h-auto block"
+              style={{ maxHeight: 500, objectFit: "contain", background: "#111" }}
+            />
           </div>
         )}
 
