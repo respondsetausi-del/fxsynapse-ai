@@ -381,12 +381,12 @@ export default function Dashboard() {
               <span className="text-sm">⚡</span>
               <div>
                 <span className="text-[11px] font-semibold text-white">Unlock full trade setups — Entry, TP, SL, R:R & confluences</span>
-                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>From R79/mo</span>
+                <span className="text-[10px] ml-2 font-mono" style={{ color: "rgba(255,255,255,.35)" }}>From R49 · No subscription needed</span>
               </div>
             </div>
-            <Link href="/pricing" className="px-3 py-1.5 rounded-lg text-[10px] font-bold no-underline whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
-              Upgrade Now
-            </Link>
+            <button onClick={() => setShowPaywall(true)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer whitespace-nowrap" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", border: "none" }}>
+              Unlock Scans
+            </button>
           </div>
         )}
 
@@ -641,10 +641,10 @@ export default function Dashboard() {
                         <div onClick={() => setShowPaywall(true)} className="block rounded-xl text-center cursor-pointer transition-all hover:scale-[1.01]" style={{ padding: "12px 16px", background: "linear-gradient(135deg, rgba(0,229,160,.08), rgba(77,160,255,.06))", border: "1px solid rgba(0,229,160,.15)" }}>
                           <div className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: "#00e5a0" }}>🔒 FULL ANALYSIS LOCKED</div>
                           <div className="text-xs font-bold text-white">Tap to unlock — Entry, TP, SL, R:R & AI insights</div>
-                          <div className="flex gap-3 justify-center mt-2">
-                            <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>5/day R79</span>
-                            <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>15/day R199</span>
-                            <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>50/day R349</span>
+                          <div className="flex gap-2 justify-center mt-2">
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded" style={{ color: "#4da0ff", background: "rgba(77,160,255,.08)" }}>5 scans R49</span>
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded" style={{ color: "#00e5a0", background: "rgba(0,229,160,.08)" }}>12 scans R99</span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ color: "rgba(255,255,255,.35)", background: "rgba(255,255,255,.03)" }}>No subscription</span>
                           </div>
                         </div>
                         {/* Affiliate banner */}
@@ -678,7 +678,7 @@ export default function Dashboard() {
                                 <span key={f} className="text-[8px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(0,229,160,.06)", color: "#00e5a0", border: "1px solid rgba(0,229,160,.08)" }}>{f}</span>
                               ))}
                             </div>
-                            <button onClick={() => setShowPaywall(true)} className="px-6 py-2.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all hover:scale-105" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", border: "none", boxShadow: "0 4px 20px rgba(0,229,160,.3)" }}>View Plans — from R79/mo</button>
+                            <button onClick={() => setShowPaywall(true)} className="px-6 py-2.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all hover:scale-105" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", border: "none", boxShadow: "0 4px 20px rgba(0,229,160,.3)" }}>Unlock — from R49</button>
                           </div>
                         </div>
                       )}
@@ -925,82 +925,80 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* ── DIRECT CHECKOUT — One click to Yoco ── */}
-            <div className="flex flex-col gap-2.5 mt-4">
-              {[
-                {
-                  id: "basic", name: "Basic", price: "R79", scans: "5 scans/day",
-                  perks: ["5 chart scans per day", "Full analysis unblurred", "Entry, SL, TP & R:R"],
-                  color: "#4da0ff", popular: false,
-                },
-                {
-                  id: "starter", name: "Starter", price: "R199", scans: "15 scans/day",
-                  perks: ["15 chart scans per day", "Full analysis unblurred", "AI reasoning on each scan"],
-                  color: "#00e5a0", popular: true,
-                },
-                {
-                  id: "pro", name: "Pro", price: "R349", scans: "50 scans/day",
-                  perks: ["50 chart scans per day", "Full smart money analysis", "AI fundamentals access"],
-                  color: "#f59e0b", popular: false,
-                },
-                {
-                  id: "unlimited", name: "Unlimited", price: "R499", scans: "Unlimited",
-                  perks: ["Unlimited chart scans", "Full smart money analysis", "Everything included"],
-                  color: "#a855f7", popular: false,
-                },
-              ].map((plan) => (
-                <button
-                  key={plan.name}
-                  onClick={() => { track.planClick(plan.id, "paywall"); handleDirectCheckout(plan.id); }}
-                  disabled={checkoutLoading === plan.id}
-                  className="w-full rounded-2xl px-4 py-3.5 text-left transition-all hover:scale-[1.02] relative cursor-pointer"
-                  style={{
-                    background: plan.popular ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)",
-                    border: `1px solid ${plan.popular ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.06)"}`,
-                    opacity: checkoutLoading && checkoutLoading !== plan.id ? 0.4 : 1,
-                  }}
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[8px] font-bold font-mono" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>POPULAR</div>
-                  )}
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div>
-                      <div className="text-[13px] font-bold text-white">{plan.name}</div>
-                      <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{plan.scans}</div>
+            {/* ── PRIMARY: Credit Packs — low commitment, instant value ── */}
+            <div className="mt-4">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-center mb-3" style={{ color: "rgba(255,255,255,.3)" }}>Unlock this analysis</div>
+              <div className="flex gap-2">
+                {[
+                  { id: "pack_5", scans: 5, price: "R49", per: "R9.80/scan", popular: false },
+                  { id: "pack_12", scans: 12, price: "R99", per: "R8.25/scan", popular: true },
+                  { id: "pack_30", scans: 30, price: "R199", per: "R6.63/scan", popular: false },
+                ].map((pack) => (
+                  <button
+                    key={pack.id}
+                    onClick={() => { track.planClick(pack.id, "paywall_pack"); handleDirectTopup(pack.id); }}
+                    disabled={!!checkoutLoading}
+                    className="flex-1 rounded-xl py-3 px-2 text-center cursor-pointer transition-all hover:scale-[1.03] relative"
+                    style={{
+                      background: pack.popular ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)",
+                      border: `1px solid ${pack.popular ? "rgba(0,229,160,.25)" : "rgba(255,255,255,.06)"}`,
+                      opacity: checkoutLoading && checkoutLoading !== pack.id ? 0.4 : 1,
+                    }}
+                  >
+                    {pack.popular && (
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[7px] font-bold font-mono" style={{ background: "#00e5a0", color: "#050507" }}>BEST VALUE</div>
+                    )}
+                    <div className="text-xl font-extrabold text-white">{pack.scans}</div>
+                    <div className="text-[9px] font-mono mb-1" style={{ color: "rgba(255,255,255,.3)" }}>scans</div>
+                    <div className="text-sm font-bold" style={{ color: pack.popular ? "#00e5a0" : "#4da0ff" }}>
+                      {checkoutLoading === pack.id ? "..." : pack.price}
                     </div>
-                    <div className="text-right">
-                      <div className="text-[18px] font-extrabold" style={{ color: plan.color }}>
-                        {checkoutLoading === plan.id ? "..." : plan.price}
-                      </div>
-                      <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>/month</div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    {plan.perks.map((perk, pi) => (
-                      <div key={pi} className="flex items-center gap-1.5">
-                        <span className="text-[8px]" style={{ color: plan.color }}>✓</span>
-                        <span className="text-[9px]" style={{ color: "rgba(255,255,255,.45)" }}>{perk}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {checkoutLoading === plan.id && (
-                    <div className="text-[9px] font-mono mt-1.5" style={{ color: plan.color }}>Redirecting to secure checkout…</div>
-                  )}
-                </button>
-              ))}
+                    <div className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>{pack.per}</div>
+                    {checkoutLoading === pack.id && (
+                      <div className="text-[8px] font-mono mt-1" style={{ color: "#00e5a0" }}>Redirecting…</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-center gap-1.5 mt-2">
+                <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>No subscription · Credits never expire · Pay once</span>
+              </div>
             </div>
 
-            {/* Quick top-up — direct checkout */}
-            <button
-              onClick={() => handleDirectTopup("pack_5")}
-              disabled={!!checkoutLoading}
-              className="w-full mt-2 py-2.5 rounded-xl text-[11px] font-semibold cursor-pointer text-center"
-              style={{ background: "rgba(77,160,255,.06)", border: "1px solid rgba(77,160,255,.12)", color: "#4da0ff", opacity: checkoutLoading ? 0.4 : 1 }}
-            >
-              {checkoutLoading === "pack_5" ? "Redirecting to secure checkout…" : "Or buy 5 scans — R49 (no subscription)"}
-            </button>
+            {/* ── SECONDARY: Subscriptions — for committed traders ── */}
+            <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-center mb-2.5" style={{ color: "rgba(255,255,255,.2)" }}>Or subscribe for daily scans</div>
+              <div className="flex flex-col gap-2">
+                {[
+                  { id: "basic", name: "Basic", price: "R79", scans: "5/day", color: "#4da0ff" },
+                  { id: "starter", name: "Starter", price: "R199", scans: "15/day", color: "#00e5a0", popular: true },
+                  { id: "pro", name: "Pro", price: "R349", scans: "50/day", color: "#f59e0b" },
+                  { id: "unlimited", name: "Unlimited", price: "R499", scans: "Unlimited", color: "#a855f7" },
+                ].map((plan) => (
+                  <button
+                    key={plan.id}
+                    onClick={() => { track.planClick(plan.id, "paywall_sub"); handleDirectCheckout(plan.id); }}
+                    disabled={!!checkoutLoading}
+                    className="w-full rounded-xl px-4 py-2.5 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]"
+                    style={{
+                      background: plan.popular ? "rgba(0,229,160,.05)" : "rgba(255,255,255,.02)",
+                      border: `1px solid ${plan.popular ? "rgba(0,229,160,.15)" : "rgba(255,255,255,.05)"}`,
+                      opacity: checkoutLoading && checkoutLoading !== plan.id ? 0.4 : 1,
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="text-[12px] font-bold text-white">{plan.name}</div>
+                      <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{plan.scans}</div>
+                    </div>
+                    <div className="text-[14px] font-bold" style={{ color: plan.color }}>
+                      {checkoutLoading === plan.id ? "..." : plan.price}<span className="text-[9px] font-normal" style={{ color: "rgba(255,255,255,.2)" }}>/mo</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            {/* Trust line (replaces fake FOMO) */}
+            {/* Trust line */}
             <div className="mt-3 flex items-center justify-center gap-3 px-3 py-1.5">
               {[
                 { icon: "🔒", text: "Secure Yoco checkout" },
