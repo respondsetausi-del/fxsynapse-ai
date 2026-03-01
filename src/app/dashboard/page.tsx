@@ -52,8 +52,10 @@ export default function Dashboard() {
   const [scanPaid, setScanPaid] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showScreenshotGuide, setShowScreenshotGuide] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileObjRef = useRef<File | null>(null);
+  const checkoutInFlight = useRef(false);
   const supabase = createClient();
   const router = useRouter();
   const isPaidUser = user?.subscription_status === "active" && user?.plan_id && user.plan_id !== "free" && user.plan_id !== "none";
@@ -188,6 +190,53 @@ export default function Dashboard() {
       clearInterval(iv);
       setError(err instanceof Error ? err.message : "Analysis failed.");
       setStage("preview");
+    }
+  };
+
+  // ─── Direct checkout from paywall (skip pricing page entirely) ───
+  const handleDirectCheckout = async (planId: string) => {
+    if (checkoutInFlight.current) return;
+    checkoutInFlight.current = true;
+    setCheckoutLoading(planId);
+    try {
+      const res = await fetch("/api/payments/yoco", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "subscription", planId, period: "monthly" }),
+      });
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        checkoutInFlight.current = false;
+        setCheckoutLoading(null);
+      }
+    } catch {
+      checkoutInFlight.current = false;
+      setCheckoutLoading(null);
+    }
+  };
+
+  const handleDirectTopup = async (packId: string) => {
+    if (checkoutInFlight.current) return;
+    checkoutInFlight.current = true;
+    setCheckoutLoading(packId);
+    try {
+      const res = await fetch("/api/payments/yoco", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "topup", packId }),
+      });
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        checkoutInFlight.current = false;
+        setCheckoutLoading(null);
+      }
+    } catch {
+      checkoutInFlight.current = false;
+      setCheckoutLoading(null);
     }
   };
 
@@ -876,52 +925,53 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* ── INLINE PRICING — New 5-tier plans ── */}
+            {/* ── DIRECT CHECKOUT — One click to Yoco ── */}
             <div className="flex flex-col gap-2.5 mt-4">
               {[
                 {
-                  name: "Basic", price: "R79", scans: "5 scans/day",
-                  href: "/pricing?plan=basic", popular: false,
-                  tagline: "Get started",
-                  perks: ["5 AI chart scans/day", "Grade B & C signal details", "15 AI chat messages/day"],
-                  color: "#4da0ff",
+                  id: "basic", name: "Basic", price: "R79", scans: "5 scans/day",
+                  perks: ["5 chart scans per day", "Full analysis unblurred", "Entry, SL, TP & R:R"],
+                  color: "#4da0ff", popular: false,
                 },
                 {
-                  name: "Starter", price: "R199", scans: "15 scans/day",
-                  href: "/pricing?plan=starter", popular: true,
-                  tagline: "Serious trader",
-                  perks: ["15 AI chart scans/day", "All signals + Grade A (15m delay)", "AI reasoning on signals"],
-                  color: "#00e5a0",
+                  id: "starter", name: "Starter", price: "R199", scans: "15 scans/day",
+                  perks: ["15 chart scans per day", "Full analysis unblurred", "AI reasoning on each scan"],
+                  color: "#00e5a0", popular: true,
                 },
                 {
-                  name: "Pro", price: "R349", scans: "50 scans/day",
-                  href: "/pricing?plan=pro", popular: false,
-                  tagline: "Active trader",
-                  perks: ["50 scans + All signals instant", "Full smart money + Voice assistant", "AI Fundamentals + Track record"],
-                  color: "#f59e0b",
+                  id: "pro", name: "Pro", price: "R349", scans: "50 scans/day",
+                  perks: ["50 chart scans per day", "Full smart money analysis", "AI fundamentals access"],
+                  color: "#f59e0b", popular: false,
                 },
                 {
-                  name: "Unlimited", price: "R499", scans: "Unlimited",
-                  href: "/pricing?plan=unlimited", popular: false,
-                  tagline: "Full power",
-                  perks: ["Unlimited everything", "Priority signal delivery", "Trade journal + Early access"],
-                  color: "#a855f7",
+                  id: "unlimited", name: "Unlimited", price: "R499", scans: "Unlimited",
+                  perks: ["Unlimited chart scans", "Full smart money analysis", "Everything included"],
+                  color: "#a855f7", popular: false,
                 },
               ].map((plan) => (
-                <Link key={plan.name} href={plan.href} onClick={() => track.planClick(plan.name.toLowerCase(), "paywall")} className="w-full no-underline block rounded-2xl px-4 py-3.5 text-left transition-all hover:scale-[1.02] relative" style={{
-                  background: plan.popular ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)",
-                  border: `1px solid ${plan.popular ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.06)"}`,
-                }}>
+                <button
+                  key={plan.name}
+                  onClick={() => { track.planClick(plan.id, "paywall"); handleDirectCheckout(plan.id); }}
+                  disabled={checkoutLoading === plan.id}
+                  className="w-full rounded-2xl px-4 py-3.5 text-left transition-all hover:scale-[1.02] relative cursor-pointer"
+                  style={{
+                    background: plan.popular ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)",
+                    border: `1px solid ${plan.popular ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.06)"}`,
+                    opacity: checkoutLoading && checkoutLoading !== plan.id ? 0.4 : 1,
+                  }}
+                >
                   {plan.popular && (
                     <div className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[8px] font-bold font-mono" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>POPULAR</div>
                   )}
                   <div className="flex items-center justify-between mb-1.5">
                     <div>
                       <div className="text-[13px] font-bold text-white">{plan.name}</div>
-                      <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{plan.tagline}</div>
+                      <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{plan.scans}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[18px] font-extrabold" style={{ color: plan.color }}>{plan.price}</div>
+                      <div className="text-[18px] font-extrabold" style={{ color: plan.color }}>
+                        {checkoutLoading === plan.id ? "..." : plan.price}
+                      </div>
                       <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>/month</div>
                     </div>
                   </div>
@@ -933,21 +983,33 @@ export default function Dashboard() {
                       </div>
                     ))}
                   </div>
-                </Link>
+                  {checkoutLoading === plan.id && (
+                    <div className="text-[9px] font-mono mt-1.5" style={{ color: plan.color }}>Redirecting to secure checkout…</div>
+                  )}
+                </button>
               ))}
             </div>
 
-            {/* Top-up option */}
-            <Link href="/pricing?topup=1" className="w-full mt-2 py-2.5 rounded-xl text-[11px] font-semibold no-underline text-center block" style={{ background: "rgba(77,160,255,.06)", border: "1px solid rgba(77,160,255,.12)", color: "#4da0ff" }}>
-              Or buy a scan pack — from R49
-            </Link>
+            {/* Quick top-up — direct checkout */}
+            <button
+              onClick={() => handleDirectTopup("pack_5")}
+              disabled={!!checkoutLoading}
+              className="w-full mt-2 py-2.5 rounded-xl text-[11px] font-semibold cursor-pointer text-center"
+              style={{ background: "rgba(77,160,255,.06)", border: "1px solid rgba(77,160,255,.12)", color: "#4da0ff", opacity: checkoutLoading ? 0.4 : 1 }}
+            >
+              {checkoutLoading === "pack_5" ? "Redirecting to secure checkout…" : "Or buy 5 scans — R49 (no subscription)"}
+            </button>
 
-            {/* FOMO element */}
-            <div className="mt-3 flex items-center justify-center gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.06)" }}>
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f0b90b", animation: "pulse 2s infinite" }} />
-              <span className="text-[9px] font-mono" style={{ color: "rgba(240,185,11,.7)" }}>
-                {Math.floor(Math.random() * 8) + 12} traders subscribed today
-              </span>
+            {/* Trust line (replaces fake FOMO) */}
+            <div className="mt-3 flex items-center justify-center gap-3 px-3 py-1.5">
+              {[
+                { icon: "🔒", text: "Secure Yoco checkout" },
+                { icon: "⚡", text: "Instant activation" },
+              ].map((t) => (
+                <span key={t.text} className="text-[9px] font-mono flex items-center gap-1" style={{ color: "rgba(255,255,255,.25)" }}>
+                  {t.icon} {t.text}
+                </span>
+              ))}
             </div>
 
             {/* Close / dismiss */}
