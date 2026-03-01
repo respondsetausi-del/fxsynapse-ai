@@ -166,7 +166,7 @@ export default function LandingPage() {
               </Link>
               <Link href="/login" className="no-underline px-8 py-4 rounded-2xl text-[15px] font-semibold transition-all hover:bg-white/[.08]" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff", backdropFilter: "blur(20px)" }}>Sign In</Link>
             </div>
-            <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>No card required • 1 free scan • Plans from R79/mo</p>
+            <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>No card required • 1 free scan/day • Plans from R79/mo</p>
           </div>
 
           {/* Platform trust bar */}
@@ -425,7 +425,7 @@ export default function LandingPage() {
           <div className="text-center mb-14" style={{ transition: "all .8s ease", opacity: sec5.vis ? 1 : 0, transform: sec5.vis ? "translateY(0)" : "translateY(30px)" }}>
             <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#00e5a0" }}>PRICING</span>
             <h2 className="text-[32px] font-extrabold text-white mt-3 mb-2" style={{ letterSpacing: "-2px" }}>Start free. Scale when ready.</h2>
-            <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>1 free scan to try — then pick a plan that fits your trading</p>
+            <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>1 free scan every day — then pick a plan that fits your trading</p>
           </div>
           <div className="max-w-[1100px] mx-auto grid md:grid-cols-4 gap-5">
             {PLANS.map((plan, i) => (

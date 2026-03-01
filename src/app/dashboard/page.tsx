@@ -53,6 +53,10 @@ export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showScreenshotGuide, setShowScreenshotGuide] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referralStats, setReferralStats] = useState<{ total: number; earned: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileObjRef = useRef<File | null>(null);
   const checkoutInFlight = useRef(false);
@@ -98,6 +102,14 @@ export default function Dashboard() {
         // No hard paywall redirect — all users can access dashboard
         // Paywall shows when they try to scan without credits or view results
         setAuthLoading(false);
+
+        // Load referral info
+        fetch("/api/referral").then(r => r.ok ? r.json() : null).then(d => {
+          if (d) {
+            setReferralCode(d.referralCode);
+            setReferralStats({ total: d.totalReferred, earned: d.totalCreditsEarned });
+          }
+        }).catch(() => {});
 
         // First-time onboarding
         const seen = localStorage.getItem("fxs_onboarded");
@@ -179,7 +191,7 @@ export default function Dashboard() {
       if (data.credits) setCredits((prev) => prev ? { ...prev, ...data.credits } : prev);
       setScanPaid(true);
       setTimeout(() => {
-        setAnalysis(data.analysis); setStage("result");
+        setAnalysis(data.analysis); setShareId(data.shareId || null); setStage("result");
         setTimeout(() => {
           setShowResult(true);
           // Auto-show paywall for free users after they see the chart (the hook)
@@ -245,7 +257,7 @@ export default function Dashboard() {
     setShowResult(false); setActiveTab("overview"); setViewMode("split");
     setFullscreen(false); setAnalysis(null); setError(null);
     setRating(0); setRatingHover(0); setRatingSubmitted(false);
-    setScanPaid(false);
+    setScanPaid(false); setShareId(null); setCopied(false);
     fileObjRef.current = null;
   };
 
@@ -888,6 +900,127 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </a>
+
+                {/* ═══ SHARE + SCAN AGAIN + REFERRAL ═══ */}
+                
+                {/* Share Buttons */}
+                {shareId && (
+                  <div className="glass" style={{ padding: "14px 18px" }}>
+                    <div className="text-[11px] font-semibold text-white mb-2.5">Share this analysis</div>
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/scan/${shareId}`;
+                          navigator.clipboard.writeText(url);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                          trackEvent("share_copy_link", "result");
+                        }}
+                        className="flex-1 min-w-[80px] py-2.5 rounded-xl text-[10px] font-bold cursor-pointer flex items-center justify-center gap-1.5"
+                        style={{ background: "rgba(77,160,255,.08)", border: "1px solid rgba(77,160,255,.15)", color: "#4da0ff" }}
+                      >
+                        {copied ? "✓ Copied!" : "🔗 Copy Link"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/scan/${shareId}`;
+                          const text = `Check out this AI chart analysis on ${A?.pair || "my chart"} — ${A?.bias?.toUpperCase()} bias, ${A?.confidence}% confidence`;
+                          window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank");
+                          trackEvent("share_twitter", "result");
+                        }}
+                        className="flex-1 min-w-[80px] py-2.5 rounded-xl text-[10px] font-bold cursor-pointer flex items-center justify-center gap-1.5"
+                        style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.5)" }}
+                      >
+                        𝕏 Tweet
+                      </button>
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/scan/${shareId}`;
+                          const text = `AI chart analysis: ${A?.pair || "Chart"} — ${A?.bias?.toUpperCase()} bias, ${A?.confidence}% confidence 📊`;
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text + "\n" + url)}`, "_blank");
+                          trackEvent("share_whatsapp", "result");
+                        }}
+                        className="flex-1 min-w-[80px] py-2.5 rounded-xl text-[10px] font-bold cursor-pointer flex items-center justify-center gap-1.5"
+                        style={{ background: "rgba(37,211,102,.08)", border: "1px solid rgba(37,211,102,.15)", color: "#25d366" }}
+                      >
+                        💬 WhatsApp
+                      </button>
+                      <button
+                        onClick={() => {
+                          const url = `${window.location.origin}/scan/${shareId}`;
+                          const text = `AI chart analysis: ${A?.pair || "Chart"} — ${A?.bias?.toUpperCase()} bias, ${A?.confidence}% confidence 📊`;
+                          window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, "_blank");
+                          trackEvent("share_telegram", "result");
+                        }}
+                        className="flex-1 min-w-[80px] py-2.5 rounded-xl text-[10px] font-bold cursor-pointer flex items-center justify-center gap-1.5"
+                        style={{ background: "rgba(0,136,204,.08)", border: "1px solid rgba(0,136,204,.15)", color: "#0088cc" }}
+                      >
+                        ✈️ Telegram
+                      </button>
+                    </div>
+                    <div className="text-[9px] font-mono mt-2 text-center" style={{ color: "rgba(255,255,255,.2)" }}>
+                      Non-members see blurred entry/SL/TP — drives signups for you
+                    </div>
+                  </div>
+                )}
+
+                {/* Referral Card */}
+                {referralCode && (
+                  <div className="glass" style={{ padding: "14px 18px" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="text-[11px] font-semibold text-white">Refer & Earn Free Scans</div>
+                        <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>
+                          Invite a friend → you both get <span style={{ color: "#00e5a0" }}>5 free scans</span>
+                        </div>
+                      </div>
+                      {referralStats && (
+                        <div className="text-right">
+                          <div className="text-[14px] font-extrabold" style={{ color: "#00e5a0" }}>{referralStats.total}</div>
+                          <div className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>referred</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1 flex items-center rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
+                        <span className="text-[11px] font-mono font-bold" style={{ color: "#00e5a0" }}>
+                          {`${window.location.origin}/signup?ref=${referralCode}`}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/signup?ref=${referralCode}`);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                          trackEvent("referral_copy_link", "result");
+                        }}
+                        className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer"
+                        style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", border: "none" }}
+                      >
+                        {copied ? "✓" : "Copy"}
+                      </button>
+                    </div>
+                    {referralStats && referralStats.earned > 0 && (
+                      <div className="text-[9px] font-mono mt-2" style={{ color: "rgba(255,255,255,.25)" }}>
+                        You&apos;ve earned {referralStats.earned} free scans from referrals
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SCAN AGAIN — Primary action */}
+                <button
+                  onClick={reset}
+                  className="w-full py-4 rounded-2xl text-sm font-bold cursor-pointer transition-all hover:scale-[1.01]"
+                  style={{
+                    background: "linear-gradient(135deg,#00e5a0,#00b87d)",
+                    color: "#050507",
+                    border: "none",
+                    boxShadow: "0 6px 25px rgba(0,229,160,.3)",
+                  }}
+                >
+                  📸 Scan Another Chart
+                </button>
               </div>
 
               <div className="text-center mt-3">
@@ -910,12 +1043,12 @@ export default function Dashboard() {
               <span className="text-2xl">{!showFull ? "🔒" : "🚀"}</span>
             </div>
             <h3 className="text-lg font-bold text-white mb-1">
-              {!showFull ? "Your Analysis is Ready" : "Scans Used Up"}
+              {!showFull ? "Your Analysis is Ready" : "Need More Scans?"}
             </h3>
             <p className="text-xs mb-1" style={{ color: "rgba(255,255,255,.45)" }}>
               {!showFull
-                ? "Your AI analysis is ready — subscribe to see the exact entry, take profit, stop loss, and risk:reward ratio."
-                : "All monthly scans used. Upgrade or grab a top-up pack to keep scanning."}
+                ? "Unlock the full entry, take profit, stop loss and risk:reward ratio below."
+                : "Your daily scans are used. Grab a scan pack or come back tomorrow for your free daily scan."}
             </p>
             {!showFull && (
               <div className="flex gap-1.5 justify-center mb-3 mt-2 flex-wrap">
@@ -1138,7 +1271,7 @@ export default function Dashboard() {
               >
                 Got it — Let me scan! 📸
               </button>
-              <p className="text-center text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.2)" }}>You have 1 free scan to try</p>
+              <p className="text-center text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.2)" }}>You get 1 free scan every day</p>
             </div>
           </div>
         </div>

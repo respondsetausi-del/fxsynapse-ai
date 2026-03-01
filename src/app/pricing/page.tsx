@@ -246,7 +246,7 @@ function PricingContent() {
           <div className="rounded-xl px-5 py-3" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
             <div className="text-xs font-bold text-white mb-1">Free Plan</div>
             <div className="text-[10px]" style={{ color: "rgba(255,255,255,.35)" }}>
-              1 free chart scan to try · Blurred entry/SL/TP details · No card required
+              1 free scan per day · Blurred entry/SL/TP details · No card required
             </div>
           </div>
         </div>

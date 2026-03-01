@@ -205,6 +205,16 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
           </div>
         </div>
 
+        {/* Referral + Affiliate */}
+        <div className="px-3 py-3 flex flex-col gap-2" style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
+          <Link href="/affiliate" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg no-underline text-xs font-semibold transition-all hover:scale-[1.01]" style={{ background: "rgba(0,229,160,.04)", border: "1px solid rgba(0,229,160,.1)", color: "#00e5a0" }}>
+            <span>🎁</span> Refer & Earn Scans
+          </Link>
+          <Link href="/affiliate" onClick={onClose} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg no-underline text-xs font-semibold transition-all hover:scale-[1.01]" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)", color: "#f0b90b" }}>
+            <span>💰</span> Affiliate Program
+          </Link>
+        </div>
+
         {/* Logout */}
         <div className="p-3" style={{ borderTop: "1px solid rgba(255,255,255,.06)" }}>
           <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,77,106,.08)", border: "1px solid rgba(255,77,106,.12)", color: "#ff4d6a" }}>

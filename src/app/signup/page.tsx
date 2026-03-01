@@ -15,6 +15,7 @@ function SignupContent() {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
+  const refCode = searchParams.get("ref") || null;
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +26,7 @@ function SignupContent() {
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, referred_by: refCode || undefined } },
     });
 
     if (signUpError) {
@@ -39,6 +40,15 @@ function SignupContent() {
       setError("An account with this email already exists. Please sign in.");
       setLoading(false);
       return;
+    }
+
+    // Process referral reward in background
+    if (refCode && data.user?.id) {
+      fetch("/api/referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: data.user.id, refCode }),
+      }).catch(() => {});
     }
 
     // Auto sign-in after signup — honor redirect param
@@ -70,7 +80,15 @@ function SignupContent() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: "'Outfit',sans-serif" }}>Create your account</h1>
-          <p className="text-sm" style={{ color: "rgba(255,255,255,.5)" }}>Get your first chart analysis free — no card needed</p>
+          <p className="text-sm" style={{ color: "rgba(255,255,255,.5)" }}>
+            {refCode ? "You've been referred! Get 1 free scan per day" : "Get 1 free chart scan every day — no card needed"}
+          </p>
+          {refCode && (
+            <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(0,229,160,.08)", border: "1px solid rgba(0,229,160,.15)" }}>
+              <span className="text-xs">🎁</span>
+              <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>Referred by a friend</span>
+            </div>
+          )}
         </div>
         <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", backdropFilter: "blur(20px)" }}>
           <form onSubmit={handleSignup} className="flex flex-col gap-3">

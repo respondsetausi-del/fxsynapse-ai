@@ -344,12 +344,13 @@ export async function POST(req: NextRequest) {
     await deductCredit(user.id, creditCheck.source);
 
     // 8. Record scan + update last_seen_at
-    await recordScan(user.id, creditCheck.source, analysis);
+    const scanResult = await recordScan(user.id, creditCheck.source, analysis);
 
     // 9. Return with updated credit info
     const updatedCredits = await checkCredits(user.id);
     return NextResponse.json({
       analysis,
+      shareId: scanResult.shareId,
       credits: {
         canScan: updatedCredits.canScan,
         monthlyUsed: updatedCredits.monthlyUsed,
