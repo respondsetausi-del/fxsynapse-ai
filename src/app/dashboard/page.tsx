@@ -3,6 +3,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Stage, ViewMode, AnalysisResult } from "@/lib/types";
 import { CreditCheck } from "@/lib/credits";
+import { track, setTrackingUserId } from "@/lib/analytics";
 import AnnotatedChart from "@/components/AnnotatedChart";
 import FullscreenModal from "@/components/FullscreenModal";
 import Sidebar from "@/components/Sidebar";
@@ -68,6 +69,7 @@ export default function Dashboard() {
         const data = await res.json();
         setUser(data.profile);
         setCredits(data.credits);
+        if (u.id) { setTrackingUserId(u.id); track.pageView("/dashboard"); }
 
         // ═══ AFFILIATE: Process referral if user signed up via ref link ═══
         if (!data.profile.referred_by) {
@@ -114,6 +116,9 @@ export default function Dashboard() {
     }, 8000);
     return () => clearTimeout(t);
   }, []);
+
+  // Track paywall views
+  useEffect(() => { if (showPaywall) track.paywallShown("dashboard"); }, [showPaywall]);
 
   const BROKER_LINK = "https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/";
 
@@ -278,7 +283,7 @@ export default function Dashboard() {
           ] as const).filter(v => !v.adminOnly || user?.role === "admin").map(v => (
             <button
               key={v.id}
-              onClick={() => setDashView(v.id)}
+              onClick={() => { setDashView(v.id); track.tabSwitch(v.id); }}
               className="flex-1 py-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
               style={{
                 background: dashView === v.id ? `${v.color}12` : "transparent",
@@ -903,7 +908,7 @@ export default function Dashboard() {
                   color: "#a855f7",
                 },
               ].map((plan) => (
-                <Link key={plan.name} href={plan.href} className="w-full no-underline block rounded-2xl px-4 py-3.5 text-left transition-all hover:scale-[1.02] relative" style={{
+                <Link key={plan.name} href={plan.href} onClick={() => track.planClick(plan.name.toLowerCase(), "paywall")} className="w-full no-underline block rounded-2xl px-4 py-3.5 text-left transition-all hover:scale-[1.02] relative" style={{
                   background: plan.popular ? "rgba(0,229,160,.08)" : "rgba(255,255,255,.03)",
                   border: `1px solid ${plan.popular ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.06)"}`,
                 }}>

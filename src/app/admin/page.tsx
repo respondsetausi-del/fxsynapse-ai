@@ -611,6 +611,47 @@ export default function AdminDashboard() {
         {/* ═══════════════════════════════════ OVERVIEW TAB ═══════════════════════════════════ */}
         {tab === "overview" && stats && (
           <div className="space-y-5" style={{ animation: "fadeUp 0.3s ease" }}>
+            {/* Quick Action Buttons */}
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={async () => {
+                showToast("Generating report...");
+                try {
+                  const res = await fetch("/api/admin/stats/report");
+                  const data = await res.json();
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.download = `fxsynapse-report-${new Date().toISOString().split("T")[0]}.json`;
+                  a.click(); URL.revokeObjectURL(url);
+                  showToast("Report downloaded!");
+                } catch { showToast("Failed to download", "error"); }
+              }} className="px-4 py-2 rounded-lg text-[11px] font-bold cursor-pointer" style={{ background: "rgba(77,160,255,.1)", border: "1px solid rgba(77,160,255,.2)", color: "#4da0ff" }}>
+                📊 Download Full Stats
+              </button>
+              <button onClick={async () => {
+                if (!confirm("Send recovery emails to up to 10 users with failed/pending payments?")) return;
+                showToast("Sending recovery emails...");
+                try {
+                  const res = await fetch("/api/admin/recover-payments", { method: "POST" });
+                  const data = await res.json();
+                  showToast(data.message);
+                } catch { showToast("Failed", "error"); }
+              }} className="px-4 py-2 rounded-lg text-[11px] font-bold cursor-pointer" style={{ background: "rgba(240,185,11,.1)", border: "1px solid rgba(240,185,11,.2)", color: "#f0b90b" }}>
+                📧 Send Recovery Emails
+              </button>
+              <button onClick={async () => {
+                if (!confirm("Distribute credits to ALL affiliates with outstanding balance?")) return;
+                showToast("Distributing...");
+                try {
+                  const res = await fetch("/api/admin/affiliates/bulk-payout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: "credit" }) });
+                  const data = await res.json();
+                  showToast(data.message);
+                } catch { showToast("Failed", "error"); }
+              }} className="px-4 py-2 rounded-lg text-[11px] font-bold cursor-pointer" style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.2)", color: "#00e5a0" }}>
+                💰 Bulk Affiliate Payout
+              </button>
+            </div>
+
             {/* Top Stats */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label="TOTAL USERS" value={stats.totalUsers} icon="👥" color="#4da0ff" delta={pctChange(stats.newUsersThisMonth, stats.newUsersLastMonth)} />
@@ -983,6 +1024,19 @@ export default function AdminDashboard() {
                     className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
                     style={{ background: "rgba(0,229,160,.1)", border: "1px solid rgba(0,229,160,.2)", color: "#00e5a0" }}>
                     ✅ Manual Activate
+                  </button>
+                  <button onClick={async () => {
+                    if (!confirm("Send recovery emails to up to 10 users with failed/pending payments?")) return;
+                    showToast("Sending recovery emails...");
+                    try {
+                      const res = await fetch("/api/admin/recover-payments", { method: "POST" });
+                      const data = await res.json();
+                      showToast(data.message);
+                    } catch { showToast("Recovery failed", "error"); }
+                  }}
+                    className="px-3 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                    style={{ background: "rgba(168,85,247,.1)", border: "1px solid rgba(168,85,247,.2)", color: "#a855f7" }}>
+                    📧 Recovery Emails
                   </button>
                 </div>
               </div>
@@ -1586,6 +1640,23 @@ export default function AdminDashboard() {
                 ))}
               </div>
             )}
+
+            {/* Bulk Payout */}
+            <div className="flex gap-2">
+              <button onClick={async () => {
+                if (!confirm("Distribute scan credits to ALL affiliates with outstanding balance?\n\nR1 earned = 1 scan credit")) return;
+                showToast("Distributing credits...");
+                try {
+                  const res = await fetch("/api/admin/affiliates/bulk-payout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method: "credit" }) });
+                  const data = await res.json();
+                  showToast(data.message);
+                } catch { showToast("Payout failed", "error"); }
+              }}
+                className="px-4 py-2 rounded-lg text-[11px] font-bold cursor-pointer"
+                style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
+                💰 Bulk Distribute Credits
+              </button>
+            </div>
 
             {/* Broadcast to All Affiliates */}
             <div className="rounded-xl overflow-hidden" style={{ background: "#12131a", border: "1px solid rgba(77,160,255,.1)" }}>
