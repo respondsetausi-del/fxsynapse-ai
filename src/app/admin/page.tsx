@@ -46,7 +46,7 @@ interface PaymentSummary {
   failed: { count: number; amount: number };
 }
 
-type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel" | "chat" | "affiliates" | "tests";
+type Tab = "overview" | "users" | "revenue" | "retention" | "payments" | "email" | "funnel" | "chat" | "affiliates" | "tests" | "scans" | "clicks";
 type ModalType = "credits" | "plan" | "role" | "trial" | "block" | "email" | "delete";
 type UserFilter = "all" | "starter" | "pro" | "premium" | "blocked" | "unpaid";
 
@@ -201,6 +201,11 @@ export default function AdminDashboard() {
   const [affChatSending, setAffChatSending] = useState(false);
   const [badges, setBadges] = useState<Badges>({ users: 0, payments: 0, paymentsCompleted: 0, chat: 0, affiliates: 0, pendingPayments: 0, failedPayments: 0 });
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
+  const [adminScans, setAdminScans] = useState<any[]>([]);
+  const [adminScansTotal, setAdminScansTotal] = useState(0);
+  const [adminScansPage, setAdminScansPage] = useState(0);
+  const [clicksData, setClicksData] = useState<any>(null);
+  const [clicksDays, setClicksDays] = useState(7);
   const [terminalLogin, setTerminalLogin] = useState("21632565");
   const [terminalServer, setTerminalServer] = useState("DerivBVI-Server");
   const [terminalUrl, setTerminalUrl] = useState("https://mt5-real01-web-bvi.deriv.com/terminal?login=21632565&server=DerivBVI-Server");
@@ -248,6 +253,25 @@ export default function AdminDashboard() {
   // Pre-fetch payment summary for badge accuracy
   useEffect(() => { fetch("/api/admin/payments?page=1").then(r => r.json()).then(d => { if (d.summary) setPaymentSummary(d.summary); }).catch(() => {}); }, []);
   useEffect(() => { if (tab === "email") fetchEmailLogs(); }, [tab, fetchEmailLogs]);
+
+  // Fetch scans for admin
+  useEffect(() => {
+    if (tab === "scans") {
+      fetch(`/api/admin/scans?page=${adminScansPage}`).then(r => r.json()).then(d => {
+        setAdminScans(d.scans || []);
+        setAdminScansTotal(d.total || 0);
+      }).catch(() => {});
+    }
+  }, [tab, adminScansPage]);
+
+  // Fetch click analytics
+  useEffect(() => {
+    if (tab === "clicks") {
+      fetch(`/api/admin/clicks?days=${clicksDays}`).then(r => r.json()).then(d => {
+        setClicksData(d);
+      }).catch(() => {});
+    }
+  }, [tab, clicksDays]);
 
   // ── Badge polling — every 15s ──
   useEffect(() => {
@@ -531,6 +555,8 @@ export default function AdminDashboard() {
     { id: "funnel", label: "Funnel", icon: "◐" },
     { id: "chat", label: "Chat", icon: "◌" },
     { id: "affiliates", label: "Affiliates", icon: "💰" },
+    { id: "scans", label: "Scans", icon: "📸" },
+    { id: "clicks", label: "Clicks", icon: "🖱" },
     { id: "tests", label: "Tests", icon: "⚡" },
   ];
 
@@ -1928,6 +1954,204 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ═══ SCANS TAB — All scan history with charts ═══ */}
+        {tab === "scans" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-lg font-bold text-white">All Scans</div>
+                <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{adminScansTotal} total scans</div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setAdminScansPage(Math.max(0, adminScansPage - 1))} disabled={adminScansPage === 0} className="px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: adminScansPage === 0 ? "rgba(255,255,255,.15)" : "rgba(255,255,255,.5)" }}>← Prev</button>
+                <span className="text-[10px] font-mono self-center" style={{ color: "rgba(255,255,255,.3)" }}>Page {adminScansPage + 1}</span>
+                <button onClick={() => setAdminScansPage(adminScansPage + 1)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.5)" }}>Next →</button>
+              </div>
+            </div>
+
+            {adminScans.length === 0 ? (
+              <div className="text-center py-12 text-sm" style={{ color: "rgba(255,255,255,.3)" }}>No scans found</div>
+            ) : (
+              <div className="grid gap-3">
+                {adminScans.map((scan: any) => (
+                  <div key={scan.id} className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+                    <div className="flex gap-3 p-3">
+                      {/* Chart thumbnail */}
+                      {scan.chart_image_url ? (
+                        <a href={scan.chart_image_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                          <img src={scan.chart_image_url} alt={scan.pair} className="rounded-lg block" style={{ width: 120, height: 80, objectFit: "cover", border: "1px solid rgba(255,255,255,.08)" }} />
+                        </a>
+                      ) : (
+                        <div className="flex-shrink-0 rounded-lg flex items-center justify-center" style={{ width: 120, height: 80, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>No chart</span>
+                        </div>
+                      )}
+
+                      {/* Scan info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-bold text-white">{scan.pair || "—"}</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(255,255,255,.04)", color: "rgba(255,255,255,.4)" }}>{scan.timeframe || "—"}</span>
+                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: scan.bias === "Long" ? "rgba(0,229,160,.1)" : scan.bias === "Short" ? "rgba(255,77,106,.1)" : "rgba(255,255,255,.04)", color: scan.bias === "Long" ? "#00e5a0" : scan.bias === "Short" ? "#ff4d6a" : "rgba(255,255,255,.4)" }}>{scan.bias || "—"}</span>
+                          <span className="text-[9px] font-mono font-bold" style={{ color: (scan.confidence || 0) >= 70 ? "#00e5a0" : (scan.confidence || 0) >= 50 ? "#f0b90b" : "#ff4d6a" }}>{scan.confidence}%</span>
+                        </div>
+
+                        {/* User info */}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>
+                            {(scan.profiles as any)?.full_name || "—"}
+                          </span>
+                          <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>
+                            {(scan.profiles as any)?.email}
+                          </span>
+                          <span className="text-[8px] font-mono px-1.5 py-0.5 rounded" style={{ background: "rgba(255,255,255,.04)", color: "rgba(255,255,255,.25)" }}>
+                            {(scan.profiles as any)?.plan_id} · {scan.credit_source}
+                          </span>
+                        </div>
+
+                        {/* Trend + structure */}
+                        <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>
+                          {scan.trend} · {typeof scan.analysis === "object" && scan.analysis?.structure ? String(scan.analysis.structure).substring(0, 60) : "—"}
+                        </div>
+
+                        {/* Time + share link */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>
+                            {new Date(scan.created_at).toLocaleString("en-ZA")}
+                          </span>
+                          {scan.share_id && (
+                            <a href={`/scan/${scan.share_id}`} target="_blank" rel="noopener noreferrer" className="text-[9px] font-mono no-underline" style={{ color: "#4da0ff" }}>
+                              /scan/{scan.share_id} →
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trade setup row */}
+                    {scan.analysis && typeof scan.analysis === "object" && (
+                      <div className="flex gap-2 px-3 pb-3 flex-wrap">
+                        {[
+                          { l: "Entry", v: scan.analysis.entry_price || scan.analysis.entry_zone, c: "#00e5a0" },
+                          { l: "TP", v: scan.analysis.take_profit, c: "#4da0ff" },
+                          { l: "SL", v: scan.analysis.stop_loss, c: "#ff4d6a" },
+                          { l: "R:R", v: scan.analysis.risk_reward, c: "#f0b90b" },
+                          { l: "S", v: scan.analysis.support, c: "#00e5a0" },
+                          { l: "R", v: scan.analysis.resistance, c: "#ff4d6a" },
+                        ].filter(x => x.v).map((x, i) => (
+                          <span key={i} className="text-[9px] font-mono px-2 py-1 rounded" style={{ background: x.c + "10", color: x.c, border: `1px solid ${x.c}20` }}>
+                            {x.l}: {x.v}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ CLICKS TAB — User interaction analytics ═══ */}
+        {tab === "clicks" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-lg font-bold text-white">Click Analytics</div>
+                <div className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>{clicksData?.totalEvents || 0} events in {clicksDays}d</div>
+              </div>
+              <div className="flex gap-1">
+                {[7, 14, 30].map(d => (
+                  <button key={d} onClick={() => setClicksDays(d)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer" style={{ background: clicksDays === d ? "rgba(0,229,160,.1)" : "rgba(255,255,255,.04)", border: `1px solid ${clicksDays === d ? "rgba(0,229,160,.2)" : "rgba(255,255,255,.08)"}`, color: clicksDays === d ? "#00e5a0" : "rgba(255,255,255,.4)" }}>{d}d</button>
+                ))}
+              </div>
+            </div>
+
+            {!clicksData ? (
+              <div className="text-center py-12 text-sm" style={{ color: "rgba(255,255,255,.3)" }}>Loading...</div>
+            ) : (
+              <>
+                {/* Event totals — ranked bar chart */}
+                <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+                  <div className="text-xs font-bold text-white mb-3">Events by Type (ranked)</div>
+                  <div className="flex flex-col gap-1.5">
+                    {(clicksData.totals || []).map((t: any, i: number) => {
+                      const maxCount = clicksData.totals[0]?.count || 1;
+                      const pct = Math.round((t.count / maxCount) * 100);
+                      const colors = ["#00e5a0", "#4da0ff", "#f0b90b", "#ff4d6a", "#9b6ade", "#ff9f43", "#00b8d4", "#e91e63"];
+                      const c = colors[i % colors.length];
+                      return (
+                        <div key={t.event}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-[10px] font-mono font-bold" style={{ color: c }}>{t.event}</span>
+                            <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{t.count}</span>
+                          </div>
+                          <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,.04)" }}>
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: c, opacity: 0.6 }} />
+                          </div>
+                          {Object.keys(t.sources || {}).length > 0 && (
+                            <div className="flex gap-2 mt-0.5 flex-wrap">
+                              {Object.entries(t.sources).sort((a: any, b: any) => b[1] - a[1]).map(([src, cnt]: any) => (
+                                <span key={src} className="text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>
+                                  {src}: {cnt}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Peak hours */}
+                <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+                  <div className="text-xs font-bold text-white mb-3">Activity by Hour (SAST)</div>
+                  <div className="flex items-end gap-[2px] h-24">
+                    {Array.from({ length: 24 }, (_, h) => {
+                      const entry = (clicksData.hourly || []).find((x: any) => x.hour === h);
+                      const count = entry?.count || 0;
+                      const maxH = Math.max(...(clicksData.hourly || []).map((x: any) => x.count), 1);
+                      const pct = Math.round((count / maxH) * 100);
+                      return (
+                        <div key={h} className="flex-1 flex flex-col items-center gap-0.5">
+                          <div className="w-full rounded-t" style={{ height: `${Math.max(pct, 2)}%`, background: count > 0 ? `rgba(0,229,160,${0.2 + (pct / 100) * 0.6})` : "rgba(255,255,255,.03)" }} title={`${h}:00 — ${count} events`} />
+                          <span className="text-[7px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>{h}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Top users */}
+                {clicksData.topUsers && clicksData.topUsers.length > 0 && (
+                  <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+                    <div className="text-xs font-bold text-white mb-3">Most Active Users</div>
+                    <div className="flex flex-col gap-2">
+                      {clicksData.topUsers.slice(0, 10).map((u: any, i: number) => (
+                        <div key={u.userId} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold" style={{ color: "rgba(255,255,255,.5)" }}>#{i + 1}</span>
+                            <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,.4)" }}>{u.userId.substring(0, 8)}…</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>{u.actions} actions</span>
+                            <div className="flex gap-1 flex-wrap">
+                              {Object.entries(u.types).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map(([type, cnt]: any) => (
+                                <span key={type} className="text-[8px] font-mono px-1 py-0.5 rounded" style={{ background: "rgba(255,255,255,.04)", color: "rgba(255,255,255,.25)" }}>{type}:{cnt}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

@@ -167,6 +167,7 @@ export default function Dashboard() {
   const analyzeChart = async () => {
     if (!fileObjRef.current) return;
     if (credits && !credits.canScan) { setShowPaywall(true); return; }
+    trackEvent("scan_start", "upload");
     setStage("analyzing"); setProgress(0); setError(null);
     const iv = setInterval(() => { setProgress((p) => p >= 90 ? 90 : p + Math.random() * 8 + 2); }, 300);
     try {
@@ -192,6 +193,7 @@ export default function Dashboard() {
       setScanPaid(true);
       setTimeout(() => {
         setAnalysis(data.analysis); setShareId(data.shareId || null); setStage("result");
+        trackEvent("scan_complete", data.analysis?.pair || "unknown");
         setTimeout(() => {
           setShowResult(true);
           // Auto-show paywall for free users after they see the chart (the hook)
@@ -291,6 +293,7 @@ export default function Dashboard() {
       <Sidebar user={user} credits={credits} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onLoadScan={(scan) => {
         // Load a historical scan into the result view
         if (scan.analysis) {
+          trackEvent("history_load", scan.pair || "unknown");
           setAnalysis(scan.analysis as any);
           setShareId(scan.share_id || null);
           setDataUrl(scan.chart_image_url || null);
@@ -622,7 +625,7 @@ export default function Dashboard() {
               <div className="result-layout flex gap-3" style={{ flexDirection: viewMode === "analysis" ? "column" : "row" }}>
                 {viewMode !== "analysis" && (
                   <div className="result-chart glass overflow-hidden animate-fadeUp relative" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
-                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => showFull ? setFullscreen(true) : setShowPaywall(true)} />
+                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => { if (showFull) { trackEvent("fullscreen_open", "chart"); setFullscreen(true); } else { trackEvent("paywall_trigger", "chart_click"); setShowPaywall(true); } }} />
                     {/* Fullscreen locked badge for free users */}
                     {!showFull && (
                       <div className="absolute bottom-12 right-3 px-2 py-1 rounded-md cursor-pointer" onClick={() => setShowPaywall(true)} style={{ background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.08)" }}>
@@ -1021,7 +1024,7 @@ export default function Dashboard() {
 
                 {/* SCAN AGAIN — Primary action */}
                 <button
-                  onClick={reset}
+                  onClick={() => { trackEvent("scan_again", "result"); reset(); }}
                   className="w-full py-4 rounded-2xl text-sm font-bold cursor-pointer transition-all hover:scale-[1.01]"
                   style={{
                     background: "linear-gradient(135deg,#00e5a0,#00b87d)",
@@ -1157,7 +1160,7 @@ export default function Dashboard() {
             {/* Close / dismiss */}
             <div className="mt-3">
               {showFull && (
-                <button onClick={() => setShowPaywall(false)} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>
+                <button onClick={() => { trackEvent("paywall_close", "button"); setShowPaywall(false); }} className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "rgba(255,255,255,.3)" }}>Close</button>
               )}
               {!showFull && (
                 <button onClick={() => setShowPaywall(false)} className="w-full py-2 text-[10px] cursor-pointer" style={{ background: "none", border: "none", color: "rgba(255,255,255,.12)" }}>continue with limited view</button>
