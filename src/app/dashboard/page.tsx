@@ -271,12 +271,11 @@ export default function Dashboard() {
         {/* ── Dashboard View Toggle ── */}
         <div className="flex items-center gap-1 mx-4 mt-3 p-1 rounded-2xl" style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)", backdropFilter: "blur(20px)" }}>
           {([
-            { id: "scanner", label: "📸 Scanner", color: "#00e5a0" },
-            { id: "signals", label: "📡 Signals", color: "#4da0ff" },
-            { id: "fundamentals", label: "📊 Fundamentals", color: "#f0b90b" },
-            { id: "chat", label: "💬 AI Chat", color: "#a855f7" },
-            // { id: "markets", label: "📈 Live Markets", color: "#3b82f6" }, // Phase 2 — ready but hidden
-          ] as const).map(v => (
+            { id: "scanner", label: "📸 Scanner", color: "#00e5a0", adminOnly: false },
+            { id: "fundamentals", label: "📊 Fundamentals", color: "#f0b90b", adminOnly: false },
+            { id: "signals", label: "📡 Signals", color: "#4da0ff", adminOnly: true },
+            { id: "chat", label: "💬 AI Chat", color: "#a855f7", adminOnly: true },
+          ] as const).filter(v => !v.adminOnly || user?.role === "admin").map(v => (
             <button
               key={v.id}
               onClick={() => setDashView(v.id)}
@@ -292,83 +291,23 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* ── AI SIGNALS VIEW ── */}
-        {dashView === "signals" && (
+        {/* ── AI SIGNALS VIEW — Admin Only ── */}
+        {dashView === "signals" && user?.role === "admin" && (
           <div className="px-4 py-4">
-            {isPaidUser ? (
-              <SignalFeed userTier={userTier} />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(77,160,255,.08)", border: "1px solid rgba(77,160,255,.12)" }}>
-                  <span className="text-3xl">📡</span>
-                </div>
-                <h3 className="text-lg font-bold text-white mb-1">AI Signal Scanner</h3>
-                <p className="text-[12px] text-center mb-4" style={{ color: "rgba(255,255,255,.4)", maxWidth: 280 }}>
-                  Scan any pair with AI-powered technical analysis. Get entry, SL, TP, and smart money insights.
-                </p>
-                <button onClick={() => setShowPaywall(true)} className="px-6 py-3 rounded-xl text-[13px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
-                  Unlock from R79/mo
-                </button>
-                <div className="mt-6 px-4 py-3 rounded-xl text-center" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)", maxWidth: 300 }}>
-                  <div className="text-[11px] font-bold mb-0.5" style={{ color: "#f0b90b" }}>💰 Become an Affiliate</div>
-                  <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Share FXSynapse &amp; earn 20% recurring commission on every referral</div>
-                  <a href="/affiliate" className="text-[10px] font-bold mt-1 inline-block no-underline" style={{ color: "#00e5a0" }}>Learn more →</a>
-                </div>
-              </div>
-            )}
+            <SignalFeed userTier={userTier} />
           </div>
         )}
 
         {/* ── AI FUNDAMENTALS VIEW ── */}
         {dashView === "fundamentals" && (
           <div className="px-4 py-4">
-            {isPaidUser ? (
-              <AIFundamentals userPlan={user?.plan_id || "free"} userRole={user?.role || ""} />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(240,185,11,.08)", border: "1px solid rgba(240,185,11,.12)" }}>
-                  <span className="text-3xl">📊</span>
-                </div>
-                <h3 className="text-lg font-bold text-white mb-1">AI Fundamentals</h3>
-                <p className="text-[12px] text-center mb-4" style={{ color: "rgba(255,255,255,.4)", maxWidth: 280 }}>
-                  AI-powered economic calendar, currency strength analysis, and market briefings.
-                </p>
-                <button onClick={() => setShowPaywall(true)} className="px-6 py-3 rounded-xl text-[13px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
-                  Unlock from R79/mo
-                </button>
-                <div className="mt-6 px-4 py-3 rounded-xl text-center" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)", maxWidth: 300 }}>
-                  <div className="text-[11px] font-bold mb-0.5" style={{ color: "#f0b90b" }}>💰 Become an Affiliate</div>
-                  <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Share FXSynapse &amp; earn 20% recurring commission on every referral</div>
-                  <a href="/affiliate" className="text-[10px] font-bold mt-1 inline-block no-underline" style={{ color: "#00e5a0" }}>Learn more →</a>
-                </div>
-              </div>
-            )}
+            <AIFundamentals userPlan={user?.plan_id || "free"} userRole={user?.role || ""} />
           </div>
         )}
 
-        {/* ── AI CHAT VIEW ── */}
-        {dashView === "chat" && (
-          isPaidUser ? (
-            <AIChat userTier={userTier} />
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 px-4">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(168,85,247,.08)", border: "1px solid rgba(168,85,247,.12)" }}>
-                <span className="text-3xl">🧠</span>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-1">AI Trading Assistant</h3>
-              <p className="text-[12px] text-center mb-4" style={{ color: "rgba(255,255,255,.4)", maxWidth: 280 }}>
-                Ask anything about trading — analysis, strategy, risk management, smart money concepts.
-              </p>
-              <button onClick={() => setShowPaywall(true)} className="px-6 py-3 rounded-xl text-[13px] font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
-                Unlock from R79/mo
-              </button>
-              <div className="mt-6 px-4 py-3 rounded-xl text-center" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.1)", maxWidth: 300 }}>
-                <div className="text-[11px] font-bold mb-0.5" style={{ color: "#f0b90b" }}>💰 Become an Affiliate</div>
-                <div className="text-[10px]" style={{ color: "rgba(255,255,255,.4)" }}>Share FXSynapse &amp; earn 20% recurring commission on every referral</div>
-                <a href="/affiliate" className="text-[10px] font-bold mt-1 inline-block no-underline" style={{ color: "#00e5a0" }}>Learn more →</a>
-              </div>
-            </div>
-          )
+        {/* ── AI CHAT VIEW — Admin Only ── */}
+        {dashView === "chat" && user?.role === "admin" && (
+          <AIChat userTier={userTier} />
         )}
 
         {/* ── LIVE MARKETS VIEW ── */}

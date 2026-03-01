@@ -12,16 +12,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sign in to scan signals." }, { status: 401 });
     }
 
-    // 2. Usage check
-    const usage = await getUserUsage(userId);
-    
-    // Signal scans are paid-only — free users cannot scan
-    if (usage.planId === "free") {
-      return NextResponse.json({
-        error: "Signal scanning requires a paid plan. Upgrade from R79/mo.",
-        upgrade: true,
-      }, { status: 403 });
+    // 2. Admin-only — Signal scanner disabled for regular users to save API costs
+    const { createClient } = await import("@supabase/supabase-js");
+    const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { data: profile } = await service.from("profiles").select("role").eq("id", userId).single();
+    if (profile?.role !== "admin") {
+      return NextResponse.json({ error: "Signal scanner coming soon.", upgrade: true }, { status: 403 });
     }
+
+    // 3. Usage check
+    const usage = await getUserUsage(userId);
     
     if (!usage.canScan) {
       return NextResponse.json({

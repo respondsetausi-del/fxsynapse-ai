@@ -61,6 +61,7 @@ export default function AIFundamentals({ userPlan, userRole }: { userPlan: strin
   const [generating, setGenerating] = useState(false);
 
   const isPaid = userPlan === "pro" || userPlan === "premium" || userRole === "admin";
+  const isAdmin = userRole === "admin";
 
   const fetchCalendar = useCallback(async (range: string) => {
     setLoading(true);
@@ -105,7 +106,7 @@ export default function AIFundamentals({ userPlan, userRole }: { userPlan: strin
   };
 
   useEffect(() => { fetchCalendar(calRange); }, [calRange, fetchCalendar]);
-  useEffect(() => { fetchBrief(); }, [fetchBrief]);
+  useEffect(() => { if (isAdmin) fetchBrief(); else setBriefLoading(false); }, [fetchBrief, isAdmin]);
 
   // Group events by date
   const eventsByDate: Record<string, EconomicEvent[]> = {};
@@ -157,7 +158,7 @@ export default function AIFundamentals({ userPlan, userRole }: { userPlan: strin
             Economic calendar & AI-powered market intelligence
           </p>
         </div>
-        {isPaid && (
+        {isAdmin && (
           <button
             onClick={generateBrief}
             disabled={generating}
@@ -173,7 +174,8 @@ export default function AIFundamentals({ userPlan, userRole }: { userPlan: strin
         )}
       </div>
 
-      {/* ── AI MARKET BRIEF ── */}
+      {/* ── AI MARKET BRIEF — Admin Only ── */}
+      {isAdmin && (
       <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,.06)" }}>
           <div className="flex items-center gap-2">
@@ -318,6 +320,7 @@ export default function AIFundamentals({ userPlan, userRole }: { userPlan: strin
           </div>
         )}
       </div>
+      )}
 
       {/* ── ECONOMIC CALENDAR ── */}
       <div className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>

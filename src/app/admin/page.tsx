@@ -1863,17 +1863,35 @@ export default function AdminDashboard() {
         {/* ═══ TESTS TAB — Trading Terminal ═══ */}
         {tab === "tests" && (
           <div className="space-y-4">
-            {/* ── AI Signal Engine — Claude-Powered Signals ── */}
-            <AISignalEngine />
+            {/* AI Signal Engine — DISABLED to save API costs */}
+            <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📡</span>
+                  <span className="text-sm font-bold text-white">AI Signal Engine</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-1 rounded" style={{ background: "rgba(255,77,106,.1)", color: "#ff4d6a" }}>API DISABLED</span>
+              </div>
+              <p className="text-[11px] mt-2" style={{ color: "rgba(255,255,255,.3)" }}>Signal scanning disabled to save API costs. Use dashboard Signals tab instead.</p>
+            </div>
+
+            {/* AI Voice Assistant — DISABLED to save API costs */}
+            <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎙️</span>
+                  <span className="text-sm font-bold text-white">AI Voice Assistant</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-1 rounded" style={{ background: "rgba(255,77,106,.1)", color: "#ff4d6a" }}>API DISABLED</span>
+              </div>
+              <p className="text-[11px] mt-2" style={{ color: "rgba(255,255,255,.3)" }}>Voice assistant disabled to save API costs.</p>
+            </div>
 
             {/* ── MT5 Trade Executor — Headless Execution ── */}
             <MT5TradeExecutor />
 
             {/* ── Trading Terminal — Charts, Account, Watchlist ── */}
             <TradingTerminal />
-
-            {/* ── AI Voice Assistant ── */}
-            <VoiceAssistant />
 
             {/* ── Symbol Monitor — Live Prices ── */}
             <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>

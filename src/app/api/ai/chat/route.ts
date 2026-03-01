@@ -48,6 +48,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Sign in to chat." }, { status: 401 });
     }
 
+    // Admin-only — AI Chat disabled for regular users to save API costs
+    const { createClient } = await import("@supabase/supabase-js");
+    const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { data: profile } = await service.from("profiles").select("role").eq("id", userId).single();
+    if (profile?.role !== "admin") {
+      return NextResponse.json({ error: "AI Chat is coming soon. Stay tuned!", upgrade: true }, { status: 403 });
+    }
+
     // Usage check
     const usage = await getUserUsage(userId);
     if (!usage.canChat) {

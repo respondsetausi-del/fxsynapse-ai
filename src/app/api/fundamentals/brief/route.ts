@@ -104,14 +104,28 @@ export async function POST(req: NextRequest) {
   try {
     const { session, adminKey } = await req.json();
 
-    // Simple auth — check admin key or cron secret
+    // Auth — must be admin user or cron secret
     const cronSecret = process.env.CRON_SECRET;
-    if (adminKey !== cronSecret && adminKey !== "admin") {
-      // Check if request is from authenticated admin
-      const authHeader = req.headers.get("authorization");
-      if (!authHeader) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    let authorized = false;
+    
+    if (adminKey === cronSecret) {
+      authorized = true;
+    } else {
+      // Check if authenticated admin user
+      try {
+        const { createServerSupabase, createServiceSupabase } = await import("@/lib/supabase/server");
+        const supabase = await createServerSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const service = createServiceSupabase();
+          const { data: profile } = await service.from("profiles").select("role").eq("id", user.id).single();
+          if (profile?.role === "admin") authorized = true;
+        }
+      } catch { /* not authenticated */ }
+    }
+    
+    if (!authorized) {
+      return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
     const briefSession = session || (new Date().getHours() < 14 ? "morning" : "evening");
