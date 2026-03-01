@@ -21,7 +21,7 @@ export async function GET() {
 
     const { data: scans } = await service
       .from("scans")
-      .select("id, pair, timeframe, bias, confidence, created_at")
+      .select("id, pair, timeframe, bias, confidence, created_at, share_id, analysis, chart_image_url")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(historyLimit);

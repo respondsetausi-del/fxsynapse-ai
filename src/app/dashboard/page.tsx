@@ -288,7 +288,18 @@ export default function Dashboard() {
       </div>
 
       {/* Sidebar */}
-      <Sidebar user={user} credits={credits} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar user={user} credits={credits} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onLoadScan={(scan) => {
+        // Load a historical scan into the result view
+        if (scan.analysis) {
+          setAnalysis(scan.analysis as any);
+          setShareId(scan.share_id || null);
+          setDataUrl(scan.chart_image_url || null);
+          setStage("result");
+          setScanPaid(true);
+          setCopied(false);
+          setTimeout(() => setShowResult(true), 100);
+        }
+      }} />
 
       <div className="relative z-[1] min-h-screen flex flex-col">
         {/* Header — Floating Glass */}
@@ -611,7 +622,15 @@ export default function Dashboard() {
               <div className="result-layout flex gap-3" style={{ flexDirection: viewMode === "analysis" ? "column" : "row" }}>
                 {viewMode !== "analysis" && (
                   <div className="result-chart glass overflow-hidden animate-fadeUp relative" style={{ width: viewMode === "chart" ? "100%" : "58%" }}>
-                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => showFull ? setFullscreen(true) : setShowPaywall(true)} />
+                    <AnnotatedChart dataUrl={dataUrl} annotations={A.annotations} chartBounds={A.chart_bounds} isVisible={showResult} onClick={() => showFull ? setFullscreen(true) : setShowPaywall(true)} onCapture={(capturedUrl) => {
+                      if (shareId && capturedUrl) {
+                        fetch("/api/scan/upload-image", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ shareId, imageBase64: capturedUrl }),
+                        }).catch(() => {});
+                      }
+                    }} />
                     {/* Fullscreen locked badge for free users */}
                     {!showFull && (
                       <div className="absolute bottom-12 right-3 px-2 py-1 rounded-md cursor-pointer" onClick={() => setShowPaywall(true)} style={{ background: "rgba(0,0,0,.7)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,.08)" }}>

@@ -9,6 +9,7 @@ interface Props {
   chartBounds?: ChartBounds;
   isVisible: boolean;
   onClick?: () => void;
+  onCapture?: (dataUrl: string) => void;
 }
 
 const LEGEND = [
@@ -18,12 +19,13 @@ const LEGEND = [
   { c: "#b89730", l: "Liquidity / OB" },
 ];
 
-export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVisible, onClick }: Props) {
+export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVisible, onClick, onCapture }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const [prog, setProg] = useState(0);
   const [showAnn, setShowAnn] = useState(true);
+  const capturedRef = useRef(false);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -52,6 +54,20 @@ export default function AnnotatedChart({ dataUrl, annotations, chartBounds, isVi
   }, [dataUrl]);
 
   useAnnotatedCanvas(canvasRef, dataUrl, annotations, dims, prog, showAnn, chartBounds);
+
+  // Capture annotated canvas once annotations are fully drawn
+  useEffect(() => {
+    if (prog >= 1 && onCapture && canvasRef.current && !capturedRef.current) {
+      capturedRef.current = true;
+      // Small delay to ensure final render is committed
+      setTimeout(() => {
+        try {
+          const dataUrl = canvasRef.current?.toDataURL("image/png");
+          if (dataUrl) onCapture(dataUrl);
+        } catch { /* canvas capture can fail cross-origin */ }
+      }, 300);
+    }
+  }, [prog, onCapture]);
 
   return (
     <div ref={boxRef} className="w-full relative">

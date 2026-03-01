@@ -11,6 +11,9 @@ interface ScanRecord {
   bias: string;
   confidence: number;
   created_at: string;
+  share_id?: string;
+  analysis?: Record<string, unknown>;
+  chart_image_url?: string;
 }
 
 interface SidebarProps {
@@ -30,9 +33,10 @@ interface SidebarProps {
   } | null;
   isOpen: boolean;
   onClose: () => void;
+  onLoadScan?: (scan: ScanRecord) => void;
 }
 
-export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ user, credits, isOpen, onClose, onLoadScan }: SidebarProps) {
   const [history, setHistory] = useState<ScanRecord[]>([]);
   const [hiddenCount, setHiddenCount] = useState(0);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -172,7 +176,18 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
             ) : (
               <div className="flex flex-col gap-1.5">
                 {history.map((scan) => (
-                  <div key={scan.id} className="rounded-lg p-2.5 cursor-default transition-all" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)" }}>
+                  <div
+                    key={scan.id}
+                    onClick={() => { if (onLoadScan && scan.analysis) { onLoadScan(scan); onClose(); } }}
+                    className="rounded-lg p-2.5 transition-all"
+                    style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.04)", cursor: scan.analysis ? "pointer" : "default" }}
+                  >
+                    {/* Chart thumbnail */}
+                    {scan.chart_image_url && (
+                      <div className="rounded-md overflow-hidden mb-2" style={{ border: "1px solid rgba(255,255,255,.06)" }}>
+                        <img src={scan.chart_image_url} alt={scan.pair} className="w-full h-[60px] object-cover block" style={{ filter: "brightness(0.8)" }} />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-bold text-white">{scan.pair || "Unknown"}</span>
                       <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{formatDate(scan.created_at)}</span>
@@ -188,6 +203,11 @@ export default function Sidebar({ user, credits, isOpen, onClose }: SidebarProps
                         {scan.confidence}%
                       </span>
                     </div>
+                    {scan.analysis && (
+                      <div className="text-[8px] font-mono mt-1.5" style={{ color: "rgba(0,229,160,.4)" }}>
+                        Tap to view full analysis →
+                      </div>
+                    )}
                   </div>
                 ))}
                 {hiddenCount > 0 && (
