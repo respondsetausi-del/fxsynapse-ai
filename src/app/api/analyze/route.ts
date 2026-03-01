@@ -343,8 +343,22 @@ export async function POST(req: NextRequest) {
     // 7. Deduct credit AFTER successful analysis
     await deductCredit(user.id, creditCheck.source);
 
-    // 8. Record scan + update last_seen_at
-    const scanResult = await recordScan(user.id, creditCheck.source, analysis);
+    // 8. Upload chart image to Supabase Storage for shareable scan pages
+    let chartImageUrl: string | undefined;
+    try {
+      const supabaseService = (await import("@/lib/supabase/server")).createServiceSupabase();
+      const fileName = `charts/${user.id}/${Date.now()}.${file.type.split("/")[1] || "png"}`;
+      const { error: uploadError } = await supabaseService.storage
+        .from("scans")
+        .upload(fileName, Buffer.from(bytes), { contentType: file.type, upsert: false });
+      if (!uploadError) {
+        const { data: urlData } = supabaseService.storage.from("scans").getPublicUrl(fileName);
+        chartImageUrl = urlData?.publicUrl;
+      }
+    } catch { /* Storage upload is best-effort */ }
+
+    // 9. Record scan + update last_seen_at
+    const scanResult = await recordScan(user.id, creditCheck.source, analysis, chartImageUrl);
 
     // 9. Return with updated credit info
     const updatedCredits = await checkCredits(user.id);

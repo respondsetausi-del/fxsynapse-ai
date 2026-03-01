@@ -70,3 +70,21 @@ CREATE POLICY "Admins can view all referral rewards" ON referral_rewards
 -- Allow anyone to read a scan by share_id (the API handles blurring)
 CREATE POLICY "Anyone can view scans by share_id" ON scans 
   FOR SELECT USING (share_id IS NOT NULL);
+
+-- ═══ 7. CREATE STORAGE BUCKET FOR CHART IMAGES ═══
+-- Run this separately if it fails (bucket may already exist):
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('scans', 'scans', true);
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('scans', 'scans', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow public read access to chart images
+CREATE POLICY "Public read chart images" ON storage.objects 
+  FOR SELECT USING (bucket_id = 'scans');
+
+-- Allow authenticated users to upload chart images
+CREATE POLICY "Users can upload chart images" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'scans' 
+    AND auth.role() = 'authenticated'
+  );

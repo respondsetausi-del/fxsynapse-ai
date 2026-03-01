@@ -88,6 +88,14 @@ export default function PublicScanPage() {
           <h1 className="text-2xl font-extrabold text-white mb-1">
             {scan.pair || "Chart"} · {scan.timeframe || "Analysis"}
           </h1>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ background: "rgba(0,229,160,.15)", color: "#00e5a0" }}>
+              {(scan.ownerName || "T")[0]?.toUpperCase()}
+            </div>
+            <span className="text-xs font-mono" style={{ color: "rgba(255,255,255,.4)" }}>
+              by {scan.ownerName || "FXSynapse Trader"}
+            </span>
+          </div>
           <div className="flex items-center justify-center gap-3 mt-2">
             <span className="text-lg">{scan.bias === "Long" ? "↑" : scan.bias === "Short" ? "↓" : "→"}</span>
             <span className="text-xs font-mono px-2.5 py-1 rounded-lg" style={{ background: cc(scan.confidence) + "15", color: cc(scan.confidence), border: `1px solid ${cc(scan.confidence)}30` }}>
@@ -98,6 +106,26 @@ export default function PublicScanPage() {
             {new Date(scan.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           </div>
         </div>
+
+        {/* Chart Screenshot */}
+        {scan.chartImageUrl && (
+          <div className="rounded-2xl overflow-hidden mb-4" style={{ border: "1px solid rgba(255,255,255,.08)" }}>
+            <img
+              src={scan.chartImageUrl}
+              alt={`${scan.pair || "Chart"} ${scan.timeframe || ""} analysis`}
+              className="w-full h-auto block"
+              style={{ maxHeight: 500, objectFit: "contain", background: "#111" }}
+            />
+            <div className="flex items-center justify-between px-3 py-2" style={{ background: "rgba(255,255,255,.02)", borderTop: "1px solid rgba(255,255,255,.04)" }}>
+              <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>
+                AI-annotated chart · {scan.pair}
+              </span>
+              <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>
+                fxsynapse.co.za
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Analysis Cards */}
         <div className="grid grid-cols-2 gap-2 mb-4">

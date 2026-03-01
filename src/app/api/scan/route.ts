@@ -25,6 +25,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Scan not found" }, { status: 404 });
     }
 
+    // Fetch scan owner's name
+    const { data: scanOwner } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", scan.user_id)
+      .single();
+    const ownerName = scanOwner?.full_name || "FXSynapse Trader";
+
     // Check if current user is paid
     let isPaid = false;
     let isOwner = false;
@@ -92,6 +100,7 @@ export async function GET(req: Request) {
         confidence: scan.confidence,
         chartImageUrl: scan.chart_image_url,
         createdAt: scan.created_at,
+        ownerName,
       },
       analysis: publicAnalysis,
       access: showFull ? "full" : "limited",
