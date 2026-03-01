@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceSupabase } from "@/lib/supabase/server";
 
 // Public endpoint — no auth required
-// Returns activity stats for FOMO counters on landing page + dashboard
+// Returns real activity stats from DB
 // Cached for 60s to avoid hammering DB
 let cache: { data: any; ts: number } | null = null;
 const CACHE_TTL = 60_000; // 60 seconds
@@ -25,16 +25,18 @@ export async function GET() {
       service.from("profiles").select("id", { count: "exact", head: true }),
     ]);
 
+    // Real numbers only — no inflation
     const data = {
-      scans_total: (scansTotal.count || 0) + 200, // Seed with base to look active
-      scans_today: (scansToday.count || 0) + 12,
-      scans_hour: (scansHour.count || 0) + 3,
-      traders: (usersTotal.count || 0) + 50,
+      scans_total: scansTotal.count || 0,
+      scans_today: scansToday.count || 0,
+      scans_hour: scansHour.count || 0,
+      traders: usersTotal.count || 0,
     };
 
     cache = { data, ts: Date.now() };
     return NextResponse.json(data);
   } catch {
-    return NextResponse.json({ scans_total: 500, scans_today: 24, scans_hour: 7, traders: 120 });
+    // Honest fallback — show 0 instead of fake numbers
+    return NextResponse.json({ scans_total: 0, scans_today: 0, scans_hour: 0, traders: 0 });
   }
 }

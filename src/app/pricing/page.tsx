@@ -348,6 +348,27 @@ function PricingContent() {
           <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.2)" }}>
             Payments processed securely by Yoco · All prices in ZAR · Cancel anytime
           </p>
+          {/* Payment method badges */}
+          <div className="flex items-center justify-center gap-4 flex-wrap mt-3">
+            {[
+              { label: "VISA", bg: "rgba(26,92,179,.1)", border: "rgba(26,92,179,.15)", color: "#1a5cb3" },
+              { label: "Mastercard", bg: "rgba(235,109,28,.1)", border: "rgba(235,109,28,.15)", color: "#eb6d1c" },
+              { label: "Yoco", bg: "rgba(0,229,160,.06)", border: "rgba(0,229,160,.1)", color: "#00e5a0" },
+            ].map((p) => (
+              <span key={p.label} className="px-2.5 py-1 rounded-lg text-[8px] font-mono font-bold tracking-wider" style={{ background: p.bg, border: `1px solid ${p.border}`, color: p.color }}>{p.label}</span>
+            ))}
+          </div>
+          <div className="flex items-center justify-center gap-3 mt-2">
+            {[
+              { icon: "🔒", text: "256-bit SSL" },
+              { icon: "⚡", text: "Instant activation" },
+              { icon: "🚫", text: "No card for free plan" },
+            ].map((b, i) => (
+              <span key={i} className="flex items-center gap-1 text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>
+                <span>{b.icon}</span>{b.text}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
       <ChatWidget />

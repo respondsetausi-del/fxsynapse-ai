@@ -273,30 +273,55 @@ export default function LandingPage() {
           </G>
         </section>
 
-        {/* ═══ SOCIAL PROOF — Live FOMO Counters ═══ */}
+        {/* ═══ SOCIAL PROOF — Real Stats + Trust ═══ */}
         <section className="text-center" style={{ padding: "0 24px 80px" }}>
           <G className="max-w-2xl mx-auto px-8 py-8" style={{ background: "rgba(255,255,255,.025)" }}>
-            <div className="grid grid-cols-3 gap-6">
-              {[
-                { end: activity.traders, suffix: "+", label: "Active Traders", color: "#00e5a0" },
-                { end: activity.scans_total, suffix: "+", label: "Charts Analyzed", color: "#4da0ff" },
-                { end: 10, suffix: "s", label: "Avg Analysis", color: "#f0b90b", prefix: "<" },
-              ].map((s, i) => (
-                <div key={i} className="text-center">
-                  <div className="text-[32px] font-extrabold" style={{ color: s.color, textShadow: `0 0 40px ${s.color}25` }}>
-                    {s.prefix || ""}<Counter end={s.end} suffix={s.suffix} />
+            {/* Only show counters if there's meaningful data */}
+            {(activity.traders > 0 || activity.scans_total > 0) ? (
+              <div className="grid grid-cols-3 gap-6">
+                {[
+                  activity.traders > 0 ? { end: activity.traders, suffix: "", label: "Traders Joined", color: "#00e5a0" } : null,
+                  activity.scans_total > 0 ? { end: activity.scans_total, suffix: "", label: "Charts Analyzed", color: "#4da0ff" } : null,
+                  { end: 10, suffix: "s", label: "Avg Analysis", color: "#f0b90b", prefix: "<" },
+                ].filter(Boolean).map((s: any, i) => (
+                  <div key={i} className="text-center">
+                    <div className="text-[32px] font-extrabold" style={{ color: s.color, textShadow: `0 0 40px ${s.color}25` }}>
+                      {s.prefix || ""}<Counter end={s.end} suffix={s.suffix} />
+                    </div>
+                    <div className="text-[10px] font-mono mt-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.25)" }}>{s.label}</div>
                   </div>
-                  <div className="text-[10px] font-mono mt-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.25)" }}>{s.label}</div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-2">
+                <div className="text-[32px] font-extrabold" style={{ color: "#f0b90b", textShadow: "0 0 40px rgba(240,185,11,.25)" }}>
+                  {"<"}<Counter end={10} suffix="s" />
                 </div>
-              ))}
-            </div>
+                <div className="text-[10px] font-mono mt-1.5 tracking-wider" style={{ color: "rgba(255,255,255,.25)" }}>AI Analysis Time</div>
+              </div>
+            )}
+
             {/* Live activity pulse */}
             {activity.scans_hour > 0 && (
               <div className="flex items-center justify-center gap-2 mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,.04)" }}>
                 <div className="w-2 h-2 rounded-full" style={{ background: "#00e5a0", boxShadow: "0 0 8px #00e5a0", animation: "pulse 2s infinite" }} />
-                <span className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>{activity.scans_hour} charts scanned in the last hour</span>
+                <span className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.35)" }}>{activity.scans_hour} chart{activity.scans_hour !== 1 ? "s" : ""} scanned in the last hour</span>
               </div>
             )}
+
+            {/* Trust & Security Strip */}
+            <div className="flex items-center justify-center gap-4 flex-wrap mt-5 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,.04)" }}>
+              {[
+                { icon: "🔒", text: "256-bit SSL" },
+                { icon: "💳", text: "Visa & Mastercard" },
+                { icon: "⚡", text: "Instant activation" },
+                { icon: "🚫", text: "No card for free plan" },
+              ].map((b, i) => (
+                <span key={i} className="flex items-center gap-1.5 text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>
+                  <span>{b.icon}</span>{b.text}
+                </span>
+              ))}
+            </div>
           </G>
         </section>
 
@@ -462,6 +487,20 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+
+          {/* Payment trust strip */}
+          <div className="flex items-center justify-center gap-5 flex-wrap mt-8 max-w-lg mx-auto">
+            {[
+              { label: "VISA", bg: "rgba(26,92,179,.1)", border: "rgba(26,92,179,.15)", color: "#1a5cb3" },
+              { label: "Mastercard", bg: "rgba(235,109,28,.1)", border: "rgba(235,109,28,.15)", color: "#eb6d1c" },
+              { label: "Yoco", bg: "rgba(0,229,160,.06)", border: "rgba(0,229,160,.1)", color: "#00e5a0" },
+            ].map((p) => (
+              <span key={p.label} className="px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold tracking-wider" style={{ background: p.bg, border: `1px solid ${p.border}`, color: p.color }}>{p.label}</span>
+            ))}
+          </div>
+          <div className="text-center mt-3">
+            <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>All payments processed securely by Yoco · 256-bit SSL encryption</span>
+          </div>
         </section>
 
         {/* ═══ CTA ═══ */}
@@ -484,11 +523,11 @@ export default function LandingPage() {
                   </div>
                   <span className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Trusted by traders across Africa</span>
                 </div>
-                {/* FOMO counter */}
+                {/* Social proof */}
                 <div className="flex items-center justify-center gap-2 mt-4 px-4 py-2 rounded-full mx-auto" style={{ background: "rgba(240,185,11,.04)", border: "1px solid rgba(240,185,11,.06)", width: "fit-content" }}>
                   <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#f0b90b", animation: "pulse 2s infinite" }} />
                   <span className="text-[10px] font-mono" style={{ color: "rgba(240,185,11,.6)" }}>
-                    {activity.traders > 0 ? `${activity.traders}+ traders already using FXSynapse AI` : "Join traders already using FXSynapse AI"}
+                    {activity.traders > 5 ? `${activity.traders} traders already using FXSynapse AI` : "Trusted by traders across Africa"}
                   </span>
                 </div>
               </div>
