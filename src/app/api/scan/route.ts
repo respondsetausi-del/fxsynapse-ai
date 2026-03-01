@@ -30,8 +30,8 @@ export async function GET(req: Request) {
     let isOwner = false;
     
     try {
-      const { createClient } = await import("@/lib/supabase/server");
-      const client = await createClient();
+      const { createServerSupabase } = await import("@/lib/supabase/server");
+      const client = await createServerSupabase();
       const { data: { user } } = await client.auth.getUser();
       
       if (user) {

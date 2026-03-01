@@ -85,8 +85,8 @@ export async function GET(req: Request) {
     const authHeader = req.headers.get("cookie") || "";
     
     // Get current user from auth
-    const { createClient } = await import("@/lib/supabase/server");
-    const client = await createClient();
+    const { createServerSupabase } = await import("@/lib/supabase/server");
+    const client = await createServerSupabase();
     const { data: { user } } = await client.auth.getUser();
     
     if (!user) {
