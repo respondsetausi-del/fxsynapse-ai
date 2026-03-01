@@ -61,7 +61,8 @@ export default function LandingPage() {
   const [chartDrawn, setChartDrawn] = useState(false);
   const [heroWord, setHeroWord] = useState(0);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
-  const [activity, setActivity] = useState({ scans_total: 500, scans_today: 24, scans_hour: 7, traders: 120 });
+  const [activity, setActivity] = useState({ scans_total: 0, scans_today: 0, scans_hour: 0, traders: 0 });
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const BL = "https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/";
 
   const heroWords = ["buy.", "sell.", "take profit.", "set your stop."];
@@ -89,6 +90,27 @@ export default function LandingPage() {
   const bc = (s: string) => trackEvent("broker_click", s);
   const sc = (s: string) => trackEvent("signup_click", s);
   const dp = () => { setShowBrokerPopup(false); trackEvent("broker_popup_dismissed"); };
+
+  // Guest checkout — direct to Yoco without signup
+  const handleGuestCheckout = async (type: "subscription" | "topup", id: string) => {
+    setCheckoutLoading(id);
+    trackEvent("guest_checkout_click", id);
+    try {
+      const res = await fetch("/api/payments/guest-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(type === "subscription" ? { type, planId: id } : { type, packId: id }),
+      });
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        setCheckoutLoading(null);
+      }
+    } catch {
+      setCheckoutLoading(null);
+    }
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "#050507" }}>
@@ -477,15 +499,54 @@ export default function LandingPage() {
                       </div>
                     ))}
                   </div>
-                  <Link href={`/pricing?plan=${plan.id}`} className="block w-full py-3.5 rounded-2xl text-[13px] font-bold no-underline text-center transition-all hover:scale-[1.02]" style={{
+                  <button onClick={() => handleGuestCheckout("subscription", plan.id)} disabled={checkoutLoading === plan.id} className="block w-full py-3.5 rounded-2xl text-[13px] font-bold cursor-pointer text-center transition-all hover:scale-[1.02]" style={{
                     background: plan.popular ? "linear-gradient(135deg,#00e5a0,#00b87d)" : "rgba(255,255,255,.06)",
                     color: plan.popular ? "#050507" : "#fff",
                     border: plan.popular ? "none" : "1px solid rgba(255,255,255,.08)",
                     boxShadow: plan.popular ? "0 6px 25px rgba(0,229,160,.3)" : "none",
-                  }}>{plan.cta}</Link>
+                    opacity: checkoutLoading === plan.id ? 0.6 : 1,
+                  }}>{checkoutLoading === plan.id ? "Redirecting to checkout…" : plan.cta}</button>
                 </G>
               </div>
             ))}
+          </div>
+
+          {/* ── Credit Packs — one-time top-ups ── */}
+          <div className="max-w-2xl mx-auto mt-10">
+            <div className="text-center mb-5">
+              <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#f0b90b" }}>OR PAY PER SCAN</span>
+              <h3 className="text-[18px] font-bold text-white mt-1" style={{ letterSpacing: "-0.5px" }}>Credit Packs — No subscription needed</h3>
+              <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>Buy once, use anytime. Credits never expire.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { id: "pack_5", credits: 5, price: "R49", perScan: "R9.80" },
+                { id: "pack_12", credits: 12, price: "R99", perScan: "R8.25", popular: true },
+                { id: "pack_30", credits: 30, price: "R199", perScan: "R6.63" },
+              ].map((pack) => (
+                <G key={pack.id} className={`p-5 text-center relative ${pack.popular ? "ring-1 ring-[rgba(240,185,11,.2)]" : ""}`}
+                  glow={pack.popular ? "rgba(240,185,11,.06)" : ""}>
+                  {pack.popular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[8px] font-bold font-mono" style={{ background: "rgba(240,185,11,.15)", color: "#f0b90b", border: "1px solid rgba(240,185,11,.2)" }}>BEST VALUE</div>}
+                  <div className="text-[24px] font-extrabold text-white">{pack.credits}</div>
+                  <div className="text-[10px] font-mono mb-2" style={{ color: "rgba(255,255,255,.3)" }}>scans</div>
+                  <div className="text-[20px] font-bold mb-1" style={{ color: pack.popular ? "#f0b90b" : "#fff" }}>{pack.price}</div>
+                  <div className="text-[9px] font-mono mb-3" style={{ color: "rgba(255,255,255,.25)" }}>{pack.perScan}/scan</div>
+                  <button
+                    onClick={() => handleGuestCheckout("topup", pack.id)}
+                    disabled={checkoutLoading === pack.id}
+                    className="w-full py-2.5 rounded-xl text-[11px] font-bold cursor-pointer transition-all hover:scale-[1.02]"
+                    style={{
+                      background: pack.popular ? "rgba(240,185,11,.15)" : "rgba(255,255,255,.06)",
+                      border: `1px solid ${pack.popular ? "rgba(240,185,11,.2)" : "rgba(255,255,255,.08)"}`,
+                      color: pack.popular ? "#f0b90b" : "#fff",
+                      opacity: checkoutLoading === pack.id ? 0.6 : 1,
+                    }}
+                  >
+                    {checkoutLoading === pack.id ? "Redirecting…" : "Buy Credits"}
+                  </button>
+                </G>
+              ))}
+            </div>
           </div>
 
           {/* Payment trust strip */}

@@ -16,6 +16,10 @@ function SignupContent() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/dashboard";
   const refCode = searchParams.get("ref") || null;
+  const isPaid = searchParams.get("paid") === "true";
+  const guestToken = searchParams.get("token") || null;
+  const paidType = searchParams.get("type") || null;
+  const paidPlan = searchParams.get("plan") || null;
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +55,17 @@ function SignupContent() {
       }).catch(() => {});
     }
 
+    // Link guest payment to new user
+    if (isPaid && guestToken && data.user?.id) {
+      try {
+        await fetch("/api/payments/link-guest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: data.user.id, guestToken }),
+        });
+      } catch { /* linking is best-effort, webhook fallback exists */ }
+    }
+
     // Auto sign-in after signup — honor redirect param
     if (data.session) {
       window.location.href = redirectTo;
@@ -79,10 +94,22 @@ function SignupContent() {
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", boxShadow: "0 4px 20px rgba(0,229,160,.3)" }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12C2 12 5 4 12 4C19 4 22 12 22 12"/><path d="M2 12C2 12 5 20 12 20C19 20 22 12 22 12"/><circle cx="12" cy="12" r="3"/></svg>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: "'Outfit',sans-serif" }}>Create your account</h1>
+          <h1 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: "'Outfit',sans-serif" }}>
+            {isPaid ? "Payment successful! Create your account" : "Create your account"}
+          </h1>
           <p className="text-sm" style={{ color: "rgba(255,255,255,.5)" }}>
-            {refCode ? "You've been referred! Get 1 free scan per day" : "Get 1 free chart scan every day — no card needed"}
+            {isPaid
+              ? "Complete signup to activate your plan instantly"
+              : refCode ? "You've been referred! Get 1 free scan per day" : "Get 1 free chart scan every day — no card needed"}
           </p>
+          {isPaid && (
+            <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(0,229,160,.08)", border: "1px solid rgba(0,229,160,.15)" }}>
+              <span className="text-xs">✅</span>
+              <span className="text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>
+                {paidType === "subscription" ? `${(paidPlan || "").charAt(0).toUpperCase() + (paidPlan || "").slice(1)} plan paid` : "Credit pack paid"} — just create your account
+              </span>
+            </div>
+          )}
           {refCode && (
             <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(0,229,160,.08)", border: "1px solid rgba(0,229,160,.15)" }}>
               <span className="text-xs">🎁</span>
@@ -110,7 +137,7 @@ function SignupContent() {
             </div>
             {error && <div className="px-3 py-2 rounded-lg text-xs font-mono" style={{ background: "rgba(255,77,106,.08)", border: "1px solid rgba(255,77,106,.2)", color: "#ff4d6a" }}>{error}</div>}
             <button type="submit" disabled={loading} className="w-full py-3 rounded-xl text-sm font-bold cursor-pointer mt-1" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", border: "none", color: "#0a0b0f", boxShadow: "0 4px 20px rgba(0,229,160,.3)", opacity: loading ? 0.6 : 1 }}>
-              {loading ? "Creating account..." : "Create Account"}
+              {loading ? "Creating account..." : isPaid ? "Create Account & Activate Plan" : "Create Account"}
             </button>
           </form>
         </div>
