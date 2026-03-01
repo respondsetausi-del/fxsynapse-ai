@@ -44,9 +44,10 @@ const FEATURES = [
 ];
 
 const PLANS = [
-  { name: "Basic", price: "R79", period: "/mo", scans: "5/day", features: ["5 chart scans/day", "Full analysis + levels", "Entry, SL, TP & R:R", "S/R + Order blocks"], cta: "Get Basic" },
-  { name: "Starter", price: "R199", period: "/mo", scans: "15/day", features: ["15 chart scans/day", "Full analysis + levels", "AI reasoning on scans", "S/R + Order blocks"], cta: "Get Starter", popular: true },
-  { name: "Pro", price: "R349", period: "/mo", scans: "50/day", features: ["50 chart scans/day", "Full smart money analysis", "AI reasoning on scans", "AI fundamentals access"], cta: "Get Pro" },
+  { name: "Basic", price: "R79", period: "/mo", scans: "5", features: ["5 chart scans/day", "Full analysis + levels", "Entry, SL, TP & R:R", "S/R + Order blocks"], cta: "Get Basic", id: "basic" },
+  { name: "Starter", price: "R199", period: "/mo", scans: "15", features: ["15 chart scans/day", "Full analysis + levels", "AI reasoning on scans", "S/R + Order blocks"], cta: "Get Starter", popular: true, id: "starter" },
+  { name: "Pro", price: "R349", period: "/mo", scans: "50", features: ["50 chart scans/day", "Full smart money analysis", "AI reasoning on scans", "AI fundamentals access"], cta: "Get Pro", id: "pro" },
+  { name: "Unlimited", price: "R499", period: "/mo", scans: "∞", features: ["Unlimited chart scans", "Full smart money + AI reasoning", "AI fundamentals access", "Everything included"], cta: "Get Unlimited", id: "unlimited" },
 ];
 
 // ═══ Glass component ═══
@@ -426,7 +427,7 @@ export default function LandingPage() {
             <h2 className="text-[32px] font-extrabold text-white mt-3 mb-2" style={{ letterSpacing: "-2px" }}>Start free. Scale when ready.</h2>
             <p className="text-sm" style={{ color: "rgba(255,255,255,.35)" }}>1 free scan to try — then pick a plan that fits your trading</p>
           </div>
-          <div className="max-w-[900px] mx-auto grid md:grid-cols-3 gap-6">
+          <div className="max-w-[1100px] mx-auto grid md:grid-cols-4 gap-5">
             {PLANS.map((plan, i) => (
               <div key={plan.name} style={{ transition: "all .8s cubic-bezier(.16,1,.3,1)", transitionDelay: `${i * 120}ms`, opacity: sec5.vis ? 1 : 0, transform: sec5.vis ? "translateY(0) scale(1)" : "translateY(40px) scale(.95)" }}>
                 <G className={`p-7 relative group cursor-default mag-lift glass-shimmer ${plan.popular ? "ring-1 ring-[rgba(0,229,160,.2)]" : ""}`}
@@ -439,7 +440,7 @@ export default function LandingPage() {
                     <span className="text-sm font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{plan.period}</span>
                   </div>
                   <div className="text-[11px] font-mono mb-5 px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5" style={{ background: "rgba(77,160,255,.06)", color: "#4da0ff", border: "1px solid rgba(77,160,255,.1)" }}>
-                    <span className="font-bold">{plan.scans}</span> scans/month
+                    <span className="font-bold">{plan.scans}</span> scans per day
                   </div>
                   <div className="flex flex-col gap-2.5 mb-6">
                     {plan.features.map((f, j) => (
@@ -451,7 +452,7 @@ export default function LandingPage() {
                       </div>
                     ))}
                   </div>
-                  <Link href="/pricing" className="block w-full py-3.5 rounded-2xl text-[13px] font-bold no-underline text-center transition-all hover:scale-[1.02]" style={{
+                  <Link href={`/pricing?plan=${plan.id}`} className="block w-full py-3.5 rounded-2xl text-[13px] font-bold no-underline text-center transition-all hover:scale-[1.02]" style={{
                     background: plan.popular ? "linear-gradient(135deg,#00e5a0,#00b87d)" : "rgba(255,255,255,.06)",
                     color: plan.popular ? "#050507" : "#fff",
                     border: plan.popular ? "none" : "1px solid rgba(255,255,255,.08)",
