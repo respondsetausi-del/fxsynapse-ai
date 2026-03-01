@@ -2,30 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { activatePayment, verifyAndActivate } from "@/lib/payment-activate";
+import { verifyAndActivate } from "@/lib/payment-activate";
 
 /**
  * Payment Activation — Layer 2 (success page polling)
- * 
- * SAFE approach:
- * 1. Check if webhook already activated it → return "activated"
- * 2. Try Yoco API verification → activate ONLY if Yoco says "completed"
- * 3. Otherwise keep polling — webhook will handle it
- * 
- * We do NOT blindly auto-activate. Users can type /payment/success in URL bar.
+ *
+ * Called by /payment/success every 2s after redirect from Yoco.
+ *
+ * FLOW:
+ *   1. Check if profile already shows active subscription → done
+ *   2. Check if a recently completed payment exists → done
+ *   3. Find pending payment → verify with Yoco API → activate if confirmed
+ *   4. Not confirmed yet → tell client to keep polling
+ *
+ * NEVER blindly activates. Only two paths to activation:
+ *   - Webhook already did it (checks 1 & 2)
+ *   - Yoco API confirms "completed" (check 3)
  */
+
+function log(action: string, data: Record<string, unknown>) {
+  console.log(JSON.stringify({ ts: new Date().toISOString(), sys: "ACTIVATE", action, ...data }));
+}
+
 export async function POST(req: NextRequest) {
   try {
     const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll(); },
-          setAll(cookiesToSet) { try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {} },
-        },
-      }
+      { cookies: { getAll() { return cookieStore.getAll(); }, setAll(c) { try { c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {} } } }
     );
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -39,27 +44,23 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // ─── Check 1: Already active (webhook beat us) ───
+    // ─── Check 1: Profile already active (webhook beat us) ───
     const { data: profile } = await service
       .from("profiles")
-      .select("plan_id, subscription_status, credits_balance")
+      .select("plan_id, subscription_status")
       .eq("id", user.id)
       .single();
 
     if (profile?.subscription_status === "active" && profile?.plan_id && profile.plan_id !== "free") {
-      return NextResponse.json({
-        status: "activated",
-        plan: profile.plan_id,
-        type: "subscription",
-        method: "webhook_processed",
-      });
+      log("ALREADY_ACTIVE", { userId: user.id, plan: profile.plan_id });
+      return NextResponse.json({ status: "activated", plan: profile.plan_id, type: "subscription", method: "webhook_processed" });
     }
 
-    // ─── Check 2: Recently completed payment ───
+    // ─── Check 2: Recently completed payment (webhook processed) ───
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: recentCompleted } = await service
       .from("payments")
-      .select("*")
+      .select("plan_id, type, credits_amount")
       .eq("user_id", user.id)
       .eq("status", "completed")
       .gte("completed_at", tenMinAgo)
@@ -68,18 +69,20 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (recentCompleted) {
+      log("RECENTLY_COMPLETED", { userId: user.id, plan: recentCompleted.plan_id, type: recentCompleted.type });
       return NextResponse.json({
         status: "activated",
         plan: recentCompleted.plan_id,
         type: recentCompleted.type,
+        credits: recentCompleted.credits_amount,
         method: "webhook_processed",
       });
     }
 
-    // ─── Check 3: Pending payment — try Yoco API verification ───
+    // ─── Check 3: Find pending payment → verify with Yoco ───
     const { data: pendingPayment } = await service
       .from("payments")
-      .select("*")
+      .select("id, yoco_checkout_id, plan_id, type, created_at")
       .eq("user_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: false })
@@ -87,16 +90,19 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (!pendingPayment) {
+      log("NO_PENDING", { userId: user.id, attempt });
       return NextResponse.json({ status: "no_pending_payment" });
     }
 
-    const paymentAge = Date.now() - new Date(pendingPayment.created_at).getTime();
     const checkoutId = pendingPayment.yoco_checkout_id;
+    const paymentAge = Date.now() - new Date(pendingPayment.created_at).getTime();
 
-    // Try Yoco API — only activate if Yoco confirms "completed"
+    // Only verify if we have a checkout ID
     if (checkoutId) {
+      log("VERIFYING", { userId: user.id, paymentId: pendingPayment.id, checkoutId, attempt });
       const verified = await verifyAndActivate(pendingPayment.id, checkoutId);
       if (verified) {
+        log("VERIFIED_OK", { userId: user.id, paymentId: pendingPayment.id });
         return NextResponse.json({
           status: "activated",
           plan: pendingPayment.plan_id,
@@ -106,7 +112,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Not verified yet — tell client to keep polling (webhook will handle it)
+    // Not confirmed yet — keep polling
+    log("STILL_PENDING", { userId: user.id, paymentId: pendingPayment.id, attempt, ageMs: paymentAge });
     return NextResponse.json({
       status: paymentAge > 5 * 60 * 1000 ? "processing_delayed" : "processing",
       message: attempt < 5
@@ -115,7 +122,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error("[ACTIVATE] Error:", error);
+    console.error(JSON.stringify({ ts: new Date().toISOString(), sys: "ACTIVATE", action: "ERROR", error: String(error) }));
     return NextResponse.json({ error: "Failed to check payment status" }, { status: 500 });
   }
 }

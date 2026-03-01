@@ -4,10 +4,15 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { activatePayment } from "@/lib/payment-activate";
 
 /**
- * Yoco Webhook — Layer 1 (instant)
- * 
- * This is the primary activation path. Yoco sends payment.succeeded
- * events here. We match the payment record and activate via shared function.
+ * Yoco Webhook — Layer 1 (instant activation)
+ *
+ * RULES:
+ *   1. REQUIRE YOCO_WEBHOOK_SECRET — reject everything if missing
+ *   2. Verify HMAC-SHA256 signature with timing-safe comparison
+ *   3. Only process payment.succeeded events
+ *   4. Match ONLY by yoco_checkout_id — NO fallback by userId
+ *   5. ALWAYS return 200 (even on error) to prevent Yoco retries
+ *   6. activatePayment() handles idempotency atomically
  */
 
 function getService() {
@@ -17,21 +22,32 @@ function getService() {
   );
 }
 
+function log(level: "info" | "warn" | "error", action: string, data: Record<string, unknown>) {
+  const entry = { ts: new Date().toISOString(), sys: "WEBHOOK", action, ...data };
+  if (level === "error") console.error(JSON.stringify(entry));
+  else if (level === "warn") console.warn(JSON.stringify(entry));
+  else console.log(JSON.stringify(entry));
+}
+
 function verifySignature(rawBody: string, signature: string | null): boolean {
   const secret = process.env.YOCO_WEBHOOK_SECRET;
+
+  // HARD BLOCK if secret not configured
   if (!secret) {
-    console.error("[WEBHOOK] CRITICAL: YOCO_WEBHOOK_SECRET not set — rejecting");
-    return false; // BLOCK if not configured — never pass silently
-  }
-  if (!signature) {
-    console.warn("[WEBHOOK] No signature header in request");
+    log("error", "NO_WEBHOOK_SECRET", { message: "YOCO_WEBHOOK_SECRET env var missing — all webhooks rejected" });
     return false;
   }
-  const expected = createHmac("sha256", secret).update(rawBody).digest("base64");
+
+  if (!signature) {
+    log("warn", "NO_SIGNATURE_HEADER", {});
+    return false;
+  }
+
   try {
+    const expected = createHmac("sha256", secret).update(rawBody).digest("base64");
     return timingSafeEqual(Buffer.from(signature, "utf8"), Buffer.from(expected, "utf8"));
   } catch {
-    return false; // Different lengths = not matching
+    return false;
   }
 }
 
@@ -39,8 +55,10 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("webhook-signature") || req.headers.get("x-webhook-signature");
 
+  // ─── Signature verification ───
   if (!verifySignature(rawBody, signature)) {
-    console.error("[WEBHOOK] Invalid signature — rejecting");
+    log("error", "SIGNATURE_INVALID", { hasSignature: !!signature });
+    // Return 401 for invalid signatures — Yoco should NOT retry these
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -49,72 +67,50 @@ export async function POST(req: NextRequest) {
     const eventType = body.type;
     const payload = body.payload || body.data || {};
 
-    console.log(`[WEBHOOK] Event: ${eventType}`, JSON.stringify(body, null, 2));
+    log("info", "EVENT_RECEIVED", { eventType, checkoutId: payload.checkoutId || payload.checkout_id });
 
-    // Only process successful payments
+    // ─── Only process payment.succeeded ───
     if (eventType !== "payment.succeeded") {
-      console.log(`[WEBHOOK] Ignoring event type: ${eventType}`);
-      return NextResponse.json({ received: true });
+      log("info", "EVENT_IGNORED", { eventType });
+      return NextResponse.json({ received: true, processed: false });
     }
 
-    const supabase = getService();
-
-    // Extract identifiers
+    // ─── Extract checkout ID (the ONLY matching key) ───
     const checkoutId = payload.checkoutId || payload.checkout_id || payload.metadata?.checkoutId;
-    const metadata = payload.metadata || {};
-    const userId = metadata.userId;
 
-    console.log(`[WEBHOOK] checkoutId=${checkoutId}, userId=${userId}`);
-
-    // ─── Find matching payment record ───
-
-    let payment = null;
-
-    // Strategy 1: Match by checkoutId (most reliable)
-    if (checkoutId) {
-      const { data } = await supabase
-        .from("payments")
-        .select("*")
-        .eq("yoco_checkout_id", checkoutId)
-        .in("status", ["pending", "completed"])
-        .single();
-      payment = data;
+    if (!checkoutId) {
+      log("error", "NO_CHECKOUT_ID", { payload: JSON.stringify(payload).slice(0, 500) });
+      return NextResponse.json({ received: true, processed: false, reason: "no_checkout_id_in_payload" });
     }
 
-    // Strategy 2: Match by userId + amount (safer fallback)
-    if (!payment && userId) {
-      const payloadAmount = payload.amount || payload.amountInCents;
-      let query = supabase
-        .from("payments")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      
-      // If webhook includes amount, match on it too (prevents wrong plan activation)
-      if (payloadAmount) {
-        query = query.eq("amount_cents", payloadAmount);
-      }
+    // ─── Find payment by checkout ID ONLY (no fallback) ───
+    const supabase = getService();
+    const { data: payment, error } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("yoco_checkout_id", checkoutId)
+      .single();
 
-      const { data } = await query.single();
-      payment = data;
-    }
-
-    if (!payment) {
-      console.warn("[WEBHOOK] No matching payment found", { checkoutId, userId });
+    if (error || !payment) {
+      log("error", "PAYMENT_NOT_FOUND", { checkoutId });
       return NextResponse.json({ received: true, processed: false, reason: "no_matching_payment" });
     }
 
-    // ─── Activate via shared function (idempotent) ───
+    // ─── Activate (atomic + idempotent) ───
     const result = await activatePayment(payment.id, "webhook");
 
-    console.log(`[WEBHOOK] Result:`, result);
+    log("info", "ACTIVATION_RESULT", {
+      paymentId: payment.id,
+      success: result.success,
+      alreadyCompleted: result.alreadyCompleted,
+      checkoutId,
+    });
+
     return NextResponse.json({ received: true, processed: true, ...result });
 
   } catch (error) {
-    console.error("[WEBHOOK] Error:", error);
-    // ALWAYS return 200 — prevent Yoco retries that could cause double-activation
-    return NextResponse.json({ received: true, error: "internal_processing_error" });
+    log("error", "WEBHOOK_EXCEPTION", { error: String(error) });
+    // ALWAYS 200 — never trigger Yoco retries after we've read the payload
+    return NextResponse.json({ received: true, error: "internal_error" });
   }
 }

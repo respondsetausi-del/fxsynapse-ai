@@ -1,13 +1,21 @@
 /**
- * Payment Activation — Single Source of Truth
- * 
- * This module handles ALL payment activations. Every path that activates
- * a payment goes through activatePayment() to prevent inconsistencies.
- * 
- * Used by:
- * - Webhook (Layer 1: instant)
- * - Success page polling (Layer 2: auto-activate if webhook missed)
- * - Cron sweep (Layer 3: catches anything that fell through)
+ * Payment Activation — Single Source of Truth (v2 Hardened)
+ *
+ * LIFECYCLE:
+ *   pending → completed   (success)
+ *   pending → expired     (checkout abandoned / timed out)
+ *   pending → failed      (card declined / admin revert)
+ *   completed → (terminal, never changes)
+ *
+ * IDEMPOTENCY:
+ *   Uses conditional UPDATE (WHERE status = 'pending') as atomic lock.
+ *   If two processes race, only one can transition pending→completed.
+ *   The loser sees 0 rows updated and returns alreadyCompleted: true.
+ *
+ * CALLERS:
+ *   Layer 1: Webhook           (instant, 0-5s)
+ *   Layer 2: Success page poll (user-driven, Yoco API verify)
+ *   Layer 3: Cron sweep        (2x daily, catches stragglers)
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -25,60 +33,82 @@ export interface ActivationResult {
   success: boolean;
   alreadyCompleted: boolean;
   method: string;
+  paymentId?: string;
   error?: string;
 }
 
+// ─── Structured log ───
+function log(level: "info" | "warn" | "error", action: string, data: Record<string, unknown>) {
+  const entry = { ts: new Date().toISOString(), sys: "PAY", action, ...data };
+  if (level === "error") console.error(JSON.stringify(entry));
+  else if (level === "warn") console.warn(JSON.stringify(entry));
+  else console.log(JSON.stringify(entry));
+}
+
 /**
- * Activate a payment — marks it completed and updates user profile.
- * Idempotent: calling multiple times on same payment is safe.
+ * Activate a payment — marks completed, updates profile.
+ * ATOMIC: WHERE status='pending' prevents race conditions.
  */
 export async function activatePayment(
   paymentId: string,
-  method: string // "webhook" | "auto_verify" | "success_page" | "cron_sweep" | "admin"
+  method: string
 ): Promise<ActivationResult> {
   const supabase = getService();
 
-  // 1. Get payment record
+  // 1. Fetch payment
   const { data: payment, error: fetchErr } = await supabase
-    .from("payments")
-    .select("*")
-    .eq("id", paymentId)
-    .single();
+    .from("payments").select("*").eq("id", paymentId).single();
 
   if (fetchErr || !payment) {
-    return { success: false, alreadyCompleted: false, method, error: "Payment not found" };
+    log("error", "ACTIVATE_NOT_FOUND", { paymentId, method });
+    return { success: false, alreadyCompleted: false, method, paymentId, error: "Payment not found" };
   }
 
-  // 2. Idempotency — already completed
+  // 2. Already completed — idempotent return
   if (payment.status === "completed") {
-    console.log(`[ACTIVATE] Payment ${paymentId} already completed — skipping (${method})`);
-    return { success: true, alreadyCompleted: true, method };
+    log("info", "ACTIVATE_IDEMPOTENT", { paymentId, method });
+    return { success: true, alreadyCompleted: true, method, paymentId };
   }
 
-  // 3. Mark payment completed
-  const { error: updateErr } = await supabase.from("payments").update({
-    status: "completed",
-    completed_at: new Date().toISOString(),
-    metadata: { ...(payment.metadata || {}), activation_method: method },
-  }).eq("id", paymentId);
-
-  if (updateErr) {
-    console.error(`[ACTIVATE] Failed to update payment ${paymentId}:`, updateErr);
-    return { success: false, alreadyCompleted: false, method, error: updateErr.message };
+  // 3. Only from "pending"
+  if (payment.status !== "pending") {
+    log("warn", "ACTIVATE_WRONG_STATUS", { paymentId, method, status: payment.status });
+    return { success: false, alreadyCompleted: false, method, paymentId, error: `Cannot activate: ${payment.status}` };
   }
 
-  const userId = payment.user_id;
-  const paymentType = payment.type;
+  // 4. ATOMIC transition: pending → completed
+  const now = new Date().toISOString();
+  const { data: updated, error: updateErr } = await supabase
+    .from("payments")
+    .update({
+      status: "completed",
+      completed_at: now,
+      metadata: { ...(payment.metadata || {}), activation_method: method, activated_at: now },
+    })
+    .eq("id", paymentId)
+    .eq("status", "pending")  // ATOMIC LOCK
+    .select("id")
+    .single();
 
-  // 4. Activate subscription or credits
-  if (paymentType === "subscription") {
+  if (updateErr || !updated) {
+    log("info", "ACTIVATE_RACE_LOST", { paymentId, method });
+    return { success: true, alreadyCompleted: true, method, paymentId };
+  }
+
+  log("info", "ACTIVATE_OK", {
+    paymentId, method, userId: payment.user_id,
+    type: payment.type, plan: payment.plan_id, amount: payment.amount_cents,
+  });
+
+  // 5. Apply to profile
+  if (payment.type === "subscription") {
     const planId = payment.plan_id || payment.metadata?.planId;
     const period = payment.metadata?.period || "monthly";
     const months = parseInt(payment.metadata?.months || "1");
     const expiry = new Date();
     expiry.setMonth(expiry.getMonth() + months);
 
-    const { error: profileErr } = await supabase.from("profiles").update({
+    const { error } = await supabase.from("profiles").update({
       plan_id: planId,
       subscription_status: "active",
       subscription_expires_at: expiry.toISOString(),
@@ -90,177 +120,127 @@ export async function activatePayment(
       daily_scans_reset_at: new Date().toISOString(),
       daily_chats_used: 0,
       daily_chats_reset_at: new Date().toISOString(),
-    }).eq("id", userId);
+    }).eq("id", payment.user_id);
 
-    if (profileErr) {
-      console.error(`[ACTIVATE] Profile update failed for ${userId}:`, profileErr);
-      return { success: false, alreadyCompleted: false, method, error: profileErr.message };
-    }
+    if (error) log("error", "PROFILE_UPDATE_FAIL", { paymentId, error: error.message });
+    else log("info", "SUBSCRIPTION_ON", { userId: payment.user_id, planId, period, months, expires: expiry.toISOString() });
 
-    console.log(`[ACTIVATE] ✅ Subscription activated: user=${userId}, plan=${planId}, period=${period}, months=${months}, method=${method}`);
-
-    // Send emails (non-blocking)
-    sendActivationEmails(supabase, userId, planId, period, payment.amount_cents).catch(console.error);
-
-  } else if (paymentType === "credits" || paymentType === "topup") {
-    const creditsAmount = payment.credits_amount || parseInt(payment.metadata?.credits || "0");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("credits_balance")
-      .eq("id", userId)
-      .single();
-
-    if (profile && creditsAmount > 0) {
-      await supabase.from("profiles").update({
-        credits_balance: (profile.credits_balance || 0) + creditsAmount,
-      }).eq("id", userId);
-
-      await supabase.from("credit_transactions").insert({
-        user_id: userId,
-        amount: creditsAmount,
-        type: "purchase",
-        description: `Purchased ${creditsAmount} credits (${method})`,
-      });
-
-      console.log(`[ACTIVATE] ✅ Credits added: user=${userId}, credits=${creditsAmount}, method=${method}`);
+  } else if (payment.type === "credits" || payment.type === "topup") {
+    const credits = payment.credits_amount || parseInt(payment.metadata?.credits || "0");
+    if (credits > 0) {
+      const { data: profile } = await supabase.from("profiles").select("credits_balance").eq("id", payment.user_id).single();
+      if (profile) {
+        await supabase.from("profiles").update({ credits_balance: (profile.credits_balance || 0) + credits }).eq("id", payment.user_id);
+        await supabase.from("credit_transactions").insert({ user_id: payment.user_id, amount: credits, type: "purchase", description: `Purchased ${credits} credits (${method})` });
+        log("info", "CREDITS_ADDED", { userId: payment.user_id, credits, method });
+      }
     }
   }
 
-  // 5. Affiliate commission (non-blocking)
-  if (userId && payment.amount_cents) {
-    processAffiliateCommission(userId, paymentId, payment.amount_cents).catch(err => {
-      console.error(`[ACTIVATE] Affiliate commission error (non-blocking):`, err);
-    });
+  // 6. Side effects (non-blocking)
+  sendActivationEmails(supabase, payment).catch(e => log("error", "EMAIL_FAIL", { paymentId, e: String(e) }));
+  if (payment.user_id && payment.amount_cents) {
+    processAffiliateCommission(payment.user_id, paymentId, payment.amount_cents).catch(e => log("error", "AFF_FAIL", { paymentId, e: String(e) }));
   }
 
-  return { success: true, alreadyCompleted: false, method };
+  return { success: true, alreadyCompleted: false, method, paymentId };
+}
+
+async function sendActivationEmails(supabase: ReturnType<typeof getService>, payment: any) {
+  const { data: profile } = await supabase.from("profiles").select("email").eq("id", payment.user_id).single();
+  if (!profile?.email) return;
+  const names: Record<string, string> = { basic: "Basic", starter: "Starter", pro: "Pro", unlimited: "Unlimited" };
+  const prices: Record<string, string> = { basic: "R79", starter: "R199", pro: "R349", unlimited: "R499" };
+  const planId = payment.plan_id || "unknown";
+  const pName = names[planId] || planId;
+  const pPrice = payment.metadata?.period === "yearly" ? `${prices[planId]}/mo (yearly)` : (prices[planId] || `R${(payment.amount_cents || 0) / 100}`);
+  await sendPaymentSuccessToUser(profile.email, pName, pPrice).catch(() => {});
+  await sendPaymentNotificationToAdmin(profile.email, pName, pPrice).catch(() => {});
 }
 
 /**
- * Try to verify a pending payment via Yoco API, then activate if confirmed.
- * Returns true if payment was activated.
+ * Verify via Yoco API → activate if confirmed.
  */
 export async function verifyAndActivate(paymentId: string, checkoutId: string): Promise<boolean> {
   const yocoKey = process.env.YOCO_SECRET_KEY;
   if (!yocoKey || !checkoutId) return false;
 
   try {
-    const res = await fetch(
-      `https://payments.yoco.com/api/checkouts/${checkoutId}`,
-      { headers: { Authorization: `Bearer ${yocoKey}` } }
-    );
-
-    if (!res.ok) return false;
+    const res = await fetch(`https://payments.yoco.com/api/checkouts/${checkoutId}`, {
+      headers: { Authorization: `Bearer ${yocoKey}` },
+    });
+    if (!res.ok) { log("warn", "YOCO_VERIFY_HTTP", { paymentId, checkoutId, status: res.status }); return false; }
 
     const checkout = await res.json();
-    const status = (checkout.status || "").toLowerCase();
+    const yocoStatus = (checkout.status || "").toLowerCase();
+    log("info", "YOCO_VERIFY", { paymentId, checkoutId, yocoStatus });
 
-    // "completed" from Yoco = definitely paid
-    if (status === "completed") {
+    if (yocoStatus === "completed") {
       const result = await activatePayment(paymentId, "auto_verify");
       return result.success;
     }
-
     return false;
   } catch (err) {
-    console.error(`[VERIFY] Error checking checkout ${checkoutId}:`, err);
+    log("error", "YOCO_VERIFY_ERR", { paymentId, checkoutId, err: String(err) });
     return false;
   }
 }
 
 /**
- * Sweep all pending payments and try to activate them.
- * Called by cron or admin. Handles rate limiting.
+ * Sweep pending payments — expire stale, verify & activate valid.
  */
 export async function sweepPendingPayments(): Promise<{
-  checked: number;
-  activated: number;
+  checked: number; activated: number; expired: number;
   results: Array<{ id: string; status: string; reason?: string }>;
 }> {
   const supabase = getService();
   const yocoKey = process.env.YOCO_SECRET_KEY;
 
   const { data: pending } = await supabase
-    .from("payments")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    .from("payments").select("*").eq("status", "pending").order("created_at", { ascending: false });
 
-  if (!pending || pending.length === 0) {
-    return { checked: 0, activated: 0, results: [] };
-  }
+  if (!pending?.length) return { checked: 0, activated: 0, expired: 0, results: [] };
 
+  log("info", "SWEEP_START", { count: pending.length });
   const results: Array<{ id: string; status: string; reason?: string }> = [];
-  let activated = 0;
+  let activated = 0, expiredCount = 0;
 
-  for (const payment of pending) {
-    const checkoutId = payment.yoco_checkout_id;
+  for (const p of pending) {
+    const age = Date.now() - new Date(p.created_at).getTime();
 
-    // Skip very recent payments (< 2 min) — give webhook a chance
-    const age = Date.now() - new Date(payment.created_at).getTime();
-    if (age < 2 * 60 * 1000) {
-      results.push({ id: payment.id, status: "too_recent", reason: "< 2 minutes old" });
-      continue;
-    }
+    // < 2 min: give webhook a chance
+    if (age < 2 * 60 * 1000) { results.push({ id: p.id, status: "too_recent" }); continue; }
 
-    // Skip very old payments (> 1h) — Yoco checkouts expire in ~30min
+    // > 1h: expire (Yoco checkouts die ~30min)
     if (age > 60 * 60 * 1000) {
-      await supabase.from("payments").update({ status: "expired" }).eq("id", payment.id);
-      results.push({ id: payment.id, status: "expired", reason: "> 24 hours old" });
+      await supabase.from("payments").update({
+        status: "expired",
+        metadata: { ...(p.metadata || {}), expired_by: "sweep", expired_at: new Date().toISOString() },
+      }).eq("id", p.id).eq("status", "pending");
+      expiredCount++;
+      results.push({ id: p.id, status: "expired", reason: `${Math.round(age / 60000)}m old` });
       continue;
     }
 
-    if (!checkoutId) {
-      results.push({ id: payment.id, status: "skipped", reason: "no checkout ID" });
-      continue;
-    }
-
-    if (!yocoKey) {
-      results.push({ id: payment.id, status: "skipped", reason: "no YOCO_SECRET_KEY" });
+    if (!p.yoco_checkout_id || !yocoKey) {
+      results.push({ id: p.id, status: "skipped", reason: !p.yoco_checkout_id ? "no_checkout_id" : "no_yoco_key" });
       continue;
     }
 
     try {
-      const verified = await verifyAndActivate(payment.id, checkoutId);
-      if (verified) {
+      if (await verifyAndActivate(p.id, p.yoco_checkout_id)) {
         activated++;
-        results.push({ id: payment.id, status: "activated" });
+        results.push({ id: p.id, status: "activated" });
       } else {
-        results.push({ id: payment.id, status: "not_verified", reason: "Yoco status not completed" });
+        results.push({ id: p.id, status: "not_completed" });
       }
     } catch (err) {
-      results.push({ id: payment.id, status: "error", reason: String(err) });
+      results.push({ id: p.id, status: "error", reason: String(err) });
     }
 
-    // Rate limit — 300ms between Yoco API calls
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 300)); // rate limit
   }
 
-  console.log(`[SWEEP] Done: ${pending.length} checked, ${activated} activated`);
-  return { checked: pending.length, activated, results };
+  log("info", "SWEEP_DONE", { checked: pending.length, activated, expired: expiredCount });
+  return { checked: pending.length, activated, expired: expiredCount, results };
 }
-
-// ─── Helpers ───
-
-async function sendActivationEmails(
-  supabase: ReturnType<typeof getService>,
-  userId: string,
-  planId: string,
-  period: string,
-  amountCents: number
-) {
-  const { data: profile } = await supabase.from("profiles").select("email").eq("id", userId).single();
-  if (!profile?.email) return;
-
-  const planNames: Record<string, string> = { basic: "Basic", starter: "Starter", pro: "Pro", unlimited: "Unlimited" };
-  const planPrices: Record<string, string> = { basic: "R79", starter: "R199", pro: "R349", unlimited: "R499" };
-  const pName = planNames[planId] || planId;
-  const pPrice = period === "yearly" ? `${planPrices[planId]}/mo (yearly)` : (planPrices[planId] || `R${(amountCents || 0) / 100}`);
-
-  sendPaymentSuccessToUser(profile.email, pName, pPrice).catch(console.error);
-  sendPaymentNotificationToAdmin(profile.email, pName, pPrice).catch(console.error);
-}
-// deploy 1772196602
-
-// deployed Fri Feb 27 13:11:47 UTC 2026
