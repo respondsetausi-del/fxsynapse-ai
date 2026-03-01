@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ChatWidget from "@/components/ChatWidget";
 import { TIERS, CREDIT_PACKS, getAllPaidTiers, type TierId } from "@/lib/tier-config";
+import { type CurrencyInfo, DEFAULT_CURRENCY, convertPrice } from "@/lib/currency";
 
 function PricingContent() {
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
@@ -12,6 +13,7 @@ function PricingContent() {
   const [user, setUser] = useState<boolean>(false);
   const [subStatus, setSubStatus] = useState<string | null>(null);
   const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
+  const [userCurrency, setUserCurrency] = useState<CurrencyInfo>(DEFAULT_CURRENCY);
   const supabase = createClient();
   const inFlight = useRef(false);
   const searchParams = useSearchParams();
@@ -33,6 +35,13 @@ function PricingContent() {
       }
     })();
   }, [supabase]);
+
+  // Geo detection for currency localization
+  useEffect(() => {
+    fetch("/api/geo").then(r => r.json()).then(d => {
+      if (d.currency) setUserCurrency({ code: d.currency.code, symbol: d.currency.symbol, name: d.currency.name, rateFromZAR: d.currency.rate, flag: d.currency.flag, paymentMethods: d.currency.paymentMethods });
+    }).catch(() => {});
+  }, []);
 
   const handleSubscribe = async (planId: string) => {
     if (inFlight.current) return;
@@ -188,6 +197,11 @@ function PricingContent() {
                   </span>
                   <span className="text-xs font-mono" style={{ color: "rgba(255,255,255,.35)" }}>/month</span>
                 </div>
+                {userCurrency.code !== "ZAR" && (
+                  <div className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.3)" }}>
+                    ≈ {convertPrice(getDisplayPrice(tier), userCurrency)}/mo
+                  </div>
+                )}
                 {/* Daily price anchor */}
                 <div className="text-[10px] font-mono mt-1" style={{ color: "rgba(255,255,255,.2)" }}>
                   That&apos;s R{dailyPrice(tier)}/day
@@ -307,6 +321,9 @@ function PricingContent() {
                 <div className="text-2xl font-extrabold text-white">{pack.credits}</div>
                 <div className="text-xs font-mono mb-2" style={{ color: "rgba(255,255,255,.35)" }}>scans</div>
                 <div className="text-lg font-bold mb-1" style={{ color: "#4da0ff" }}>R{pack.price}</div>
+                {userCurrency.code !== "ZAR" && (
+                  <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>≈ {convertPrice(pack.price, userCurrency)}</div>
+                )}
                 <div className="text-[10px] font-mono mb-3" style={{ color: "rgba(255,255,255,.3)" }}>{pack.perScan}/scan</div>
                 <button
                   onClick={() => handleTopup(pack.id)}
@@ -346,17 +363,23 @@ function PricingContent() {
             </button>
           ) : null}
           <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.2)" }}>
-            Payments processed securely by Yoco · All prices in ZAR · Cancel anytime
+            {userCurrency.code !== "ZAR"
+              ? `Payments processed securely by Yoco · Charged in ZAR · ${userCurrency.flag} ${userCurrency.code} prices are approximate · Cancel anytime`
+              : "Payments processed securely by Yoco · All prices in ZAR · Cancel anytime"}
           </p>
           {/* Payment method badges */}
           <div className="flex items-center justify-center gap-4 flex-wrap mt-3">
-            {[
-              { label: "VISA", bg: "rgba(26,92,179,.1)", border: "rgba(26,92,179,.15)", color: "#1a5cb3" },
-              { label: "Mastercard", bg: "rgba(235,109,28,.1)", border: "rgba(235,109,28,.15)", color: "#eb6d1c" },
-              { label: "Yoco", bg: "rgba(0,229,160,.06)", border: "rgba(0,229,160,.1)", color: "#00e5a0" },
-            ].map((p) => (
-              <span key={p.label} className="px-2.5 py-1 rounded-lg text-[8px] font-mono font-bold tracking-wider" style={{ background: p.bg, border: `1px solid ${p.border}`, color: p.color }}>{p.label}</span>
-            ))}
+            {(() => {
+              const badgeStyles: Record<string, { bg: string; border: string; color: string }> = {
+                VISA: { bg: "rgba(26,92,179,.1)", border: "rgba(26,92,179,.15)", color: "#1a5cb3" },
+                Mastercard: { bg: "rgba(235,109,28,.1)", border: "rgba(235,109,28,.15)", color: "#eb6d1c" },
+                Yoco: { bg: "rgba(0,229,160,.06)", border: "rgba(0,229,160,.1)", color: "#00e5a0" },
+              };
+              return userCurrency.paymentMethods.map((m) => {
+                const s = badgeStyles[m] || badgeStyles.VISA;
+                return <span key={m} className="px-2.5 py-1 rounded-lg text-[8px] font-mono font-bold tracking-wider" style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}>{m}</span>;
+              });
+            })()}
           </div>
           <div className="flex items-center justify-center gap-3 mt-2">
             {[

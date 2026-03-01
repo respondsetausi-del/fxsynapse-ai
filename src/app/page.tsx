@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState, useRef, useCallback } from "react";
 import ChatWidget from "@/components/ChatWidget";
+import { type CurrencyInfo, DEFAULT_CURRENCY, convertPrice } from "@/lib/currency";
 
 // ═══ Scroll-triggered visibility hook ═══
 function useReveal(threshold = 0.15) {
@@ -63,6 +64,7 @@ export default function LandingPage() {
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [activity, setActivity] = useState({ scans_total: 0, scans_today: 0, scans_hour: 0, traders: 0 });
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [userCurrency, setUserCurrency] = useState<CurrencyInfo>(DEFAULT_CURRENCY);
   const BL = "https://track.deriv.com/_oJ-a7wvPzFJB4VdSfJsOp2Nd7ZgqdRLk/1/";
 
   const heroWords = ["buy.", "sell.", "take profit.", "set your stop."];
@@ -90,6 +92,10 @@ export default function LandingPage() {
     if (ref) { localStorage.setItem("fxs_ref", ref); localStorage.setItem("fxs_ref_at", Date.now().toString()); fetch("/api/affiliate/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refCode: ref }) }).catch(() => {}); trackEvent("affiliate_click", ref); }
     // Fetch live activity for FOMO counters
     fetch("/api/activity").then(r => r.json()).then(d => setActivity(d)).catch(() => {});
+    // Fetch geo for currency localization
+    fetch("/api/geo").then(r => r.json()).then(d => {
+      if (d.currency) setUserCurrency({ code: d.currency.code, symbol: d.currency.symbol, name: d.currency.name, rateFromZAR: d.currency.rate, flag: d.currency.flag, paymentMethods: d.currency.paymentMethods });
+    }).catch(() => {});
   }, [trackEvent]);
 
   // Rotating hero words
@@ -697,6 +703,11 @@ export default function LandingPage() {
                     <span className="text-[34px] font-extrabold" style={{ color: plan.popular ? "#00e5a0" : "#fff", letterSpacing: "-1px" }}>{plan.price}</span>
                     <span className="text-sm font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{plan.period}</span>
                   </div>
+                  {userCurrency.code !== "ZAR" && (
+                    <div className="text-[10px] font-mono mb-1" style={{ color: "rgba(255,255,255,.3)" }}>
+                      ≈ {convertPrice(parseInt(plan.price.replace("R", "")), userCurrency)}/mo
+                    </div>
+                  )}
                   <div className="text-[11px] font-mono mb-5 px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5" style={{ background: "rgba(77,160,255,.06)", color: "#4da0ff", border: "1px solid rgba(77,160,255,.1)" }}>
                     <span className="font-bold">{plan.scans}</span> scans per day
                   </div>
@@ -741,6 +752,9 @@ export default function LandingPage() {
                   <div className="text-[24px] font-extrabold text-white">{pack.credits}</div>
                   <div className="text-[10px] font-mono mb-2" style={{ color: "rgba(255,255,255,.3)" }}>scans</div>
                   <div className="text-[20px] font-bold mb-1" style={{ color: pack.popular ? "#f0b90b" : "#fff" }}>{pack.price}</div>
+                  {userCurrency.code !== "ZAR" && (
+                    <div className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>≈ {convertPrice(parseInt(pack.price.replace("R", "")), userCurrency)}</div>
+                  )}
                   <div className="text-[9px] font-mono mb-3" style={{ color: "rgba(255,255,255,.25)" }}>{pack.perScan}/scan</div>
                   <button
                     onClick={() => handleGuestCheckout("topup", pack.id)}
@@ -762,16 +776,24 @@ export default function LandingPage() {
 
           {/* Payment trust strip */}
           <div className="flex items-center justify-center gap-5 flex-wrap mt-8 max-w-lg mx-auto">
-            {[
-              { label: "VISA", bg: "rgba(26,92,179,.1)", border: "rgba(26,92,179,.15)", color: "#1a5cb3" },
-              { label: "Mastercard", bg: "rgba(235,109,28,.1)", border: "rgba(235,109,28,.15)", color: "#eb6d1c" },
-              { label: "Yoco", bg: "rgba(0,229,160,.06)", border: "rgba(0,229,160,.1)", color: "#00e5a0" },
-            ].map((p) => (
-              <span key={p.label} className="px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold tracking-wider" style={{ background: p.bg, border: `1px solid ${p.border}`, color: p.color }}>{p.label}</span>
-            ))}
+            {(() => {
+              const badgeStyles: Record<string, { bg: string; border: string; color: string }> = {
+                VISA: { bg: "rgba(26,92,179,.1)", border: "rgba(26,92,179,.15)", color: "#1a5cb3" },
+                Mastercard: { bg: "rgba(235,109,28,.1)", border: "rgba(235,109,28,.15)", color: "#eb6d1c" },
+                Yoco: { bg: "rgba(0,229,160,.06)", border: "rgba(0,229,160,.1)", color: "#00e5a0" },
+              };
+              return userCurrency.paymentMethods.map((m) => {
+                const s = badgeStyles[m] || badgeStyles.VISA;
+                return <span key={m} className="px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold tracking-wider" style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}>{m}</span>;
+              });
+            })()}
           </div>
           <div className="text-center mt-3">
-            <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>All payments processed securely by Yoco · 256-bit SSL encryption</span>
+            <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,.15)" }}>
+              {userCurrency.code !== "ZAR"
+                ? `All payments in ZAR · ${userCurrency.flag} Prices shown in ${userCurrency.code} are approximate · 256-bit SSL`
+                : "All payments processed securely by Yoco · 256-bit SSL encryption"}
+            </span>
           </div>
         </section>
 
