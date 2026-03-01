@@ -71,6 +71,14 @@ export default function LandingPage() {
   const sec1 = useReveal(); const sec2 = useReveal(); const sec3 = useReveal();
   const sec4 = useReveal(); const sec5 = useReveal(); const sec6 = useReveal();
   const sec7 = useReveal();
+  const guestScanRef = useRef<HTMLDivElement>(null);
+  const guestFileRef = useRef<HTMLInputElement>(null);
+
+  // Guest scan state
+  const [guestStage, setGuestStage] = useState<"idle" | "uploading" | "analyzing" | "result" | "error">("idle");
+  const [guestAnalysis, setGuestAnalysis] = useState<any>(null);
+  const [guestError, setGuestError] = useState("");
+  const [guestDataUrl, setGuestDataUrl] = useState<string | null>(null);
 
   const getVisitorId = () => { if (typeof window === "undefined") return null; let v = localStorage.getItem("fxs_vid"); if (!v) { v = crypto.randomUUID(); localStorage.setItem("fxs_vid", v); } return v; };
   const trackEvent = useCallback((t: string, s?: string) => { fetch("/api/tracking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_type: t, source: s, visitor_id: getVisitorId() }) }).catch(() => {}); }, []);
@@ -112,6 +120,45 @@ export default function LandingPage() {
     }
   };
 
+  // Guest scan — analyze without signup
+  const handleGuestScan = async (file: File) => {
+    setGuestStage("analyzing");
+    setGuestError("");
+    trackEvent("guest_scan_start");
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => setGuestDataUrl(e.target?.result as string);
+    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/analyze/guest", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setGuestError(data.error || "Analysis failed");
+        setGuestStage("error");
+        trackEvent("guest_scan_error", data.guestLimited ? "rate_limited" : "error");
+        return;
+      }
+
+      setGuestAnalysis(data.analysis);
+      setGuestStage("result");
+      trackEvent("guest_scan_complete", data.analysis?.pair || "unknown");
+    } catch {
+      setGuestError("Network error. Please try again.");
+      setGuestStage("error");
+    }
+  };
+
+  const scrollToGuestScan = () => {
+    guestScanRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Auto-click file input after scroll
+    setTimeout(() => guestFileRef.current?.click(), 600);
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "#050507" }}>
       {/* ═══ AMBIENT — Layered depth ═══ */}
@@ -137,7 +184,7 @@ export default function LandingPage() {
             <a href={BL} target="_blank" rel="noopener noreferrer" onClick={() => bc("nav")} className="hidden sm:flex text-[11px] font-semibold no-underline px-3 py-1.5 rounded-xl items-center gap-1.5 transition-all hover:scale-105" style={{ background: "rgba(240,185,11,.08)", border: "1px solid rgba(240,185,11,.1)", color: "#f0b90b" }}>📈 Trade</a>
             <Link href="/pricing" className="hidden sm:block text-[11px] font-semibold no-underline px-3 py-1.5 rounded-xl" style={{ color: "rgba(255,255,255,.45)" }}>Pricing</Link>
             <Link href="/login" className="text-[11px] font-semibold no-underline px-4 py-2 rounded-xl transition-all hover:bg-white/10" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)", color: "#fff" }}>Sign In</Link>
-            <Link href="/login" onClick={() => sc("nav")} className="text-[11px] font-bold no-underline px-5 py-2 rounded-xl transition-all hover:scale-105" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 2px 14px rgba(0,229,160,.3)" }}>Try Free →</Link>
+            <button onClick={() => { sc("nav"); scrollToGuestScan(); }} className="text-[11px] font-bold px-5 py-2 rounded-xl transition-all hover:scale-105 cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 2px 14px rgba(0,229,160,.3)", border: "none" }}>Try Free →</button>
           </div>
         </nav>
 
@@ -182,13 +229,13 @@ export default function LandingPage() {
 
           <div style={{ transition: "all 1.2s cubic-bezier(.16,1,.3,1)", transitionDelay: ".55s", opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(30px)" }}>
             <div className="flex items-center gap-3 mb-4">
-              <Link href="/login" onClick={() => sc("hero")} className="group no-underline px-9 py-4 rounded-2xl text-[15px] font-bold relative overflow-hidden transition-all hover:scale-[1.03]" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 6px 35px rgba(0,229,160,.35), inset 0 1px 0 rgba(255,255,255,.2)" }}>
-                <span className="relative z-[1]">Try Free — It&apos;s Instant</span>
+              <button onClick={() => { sc("hero"); scrollToGuestScan(); }} className="group px-9 py-4 rounded-2xl text-[15px] font-bold relative overflow-hidden transition-all hover:scale-[1.03] cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 6px 35px rgba(0,229,160,.35), inset 0 1px 0 rgba(255,255,255,.2)", border: "none" }}>
+                <span className="relative z-[1]">Try Free — No Signup</span>
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "linear-gradient(135deg,#00f5b0,#00c88d)" }} />
-              </Link>
+              </button>
               <Link href="/login" className="no-underline px-8 py-4 rounded-2xl text-[15px] font-semibold transition-all hover:bg-white/[.08]" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff", backdropFilter: "blur(20px)" }}>Sign In</Link>
             </div>
-            <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>No card required • 1 free scan/day • Plans from R79/mo</p>
+            <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>No card required • No signup needed • Instant AI analysis</p>
           </div>
 
           {/* Platform trust bar */}
@@ -293,6 +340,169 @@ export default function LandingPage() {
               <span className="text-[9px] font-mono tracking-wider" style={{ color: "rgba(255,255,255,.15)" }}>AI-ANNOTATED</span>
             </div>
           </G>
+        </section>
+
+        {/* ═══ GUEST SCAN — Try before signup ═══ */}
+        <section ref={guestScanRef} id="try-scan" style={{ padding: "0 24px 80px" }}>
+          <div className="max-w-[820px] mx-auto">
+            <div className="text-center mb-8">
+              <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#00e5a0" }}>TRY IT NOW</span>
+              <h2 className="text-[28px] font-extrabold text-white mt-3 mb-2" style={{ letterSpacing: "-1.5px" }}>Scan your chart — no signup needed</h2>
+              <p className="text-sm max-w-md mx-auto" style={{ color: "rgba(255,255,255,.4)", lineHeight: 1.7 }}>Upload any chart screenshot and see AI analysis instantly. Free, once per day.</p>
+            </div>
+
+            {guestStage === "idle" && (
+              <G className="max-w-lg mx-auto p-8 text-center cursor-pointer group" glow="rgba(0,229,160,.04)"
+                onClick={() => guestFileRef.current?.click()}>
+                <input
+                  ref={guestFileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleGuestScan(f);
+                  }}
+                />
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110" style={{ background: "rgba(0,229,160,.08)", border: "1px solid rgba(0,229,160,.15)" }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00e5a0" strokeWidth="2" strokeLinecap="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
+                <p className="text-[15px] font-semibold text-white mb-1">Drop your chart screenshot here</p>
+                <p className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,.3)" }}>PNG, JPG or WebP • Max 10MB • Any pair, any timeframe</p>
+                <div className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[12px] font-bold transition-all group-hover:scale-105" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
+                  📸 Upload Chart
+                </div>
+              </G>
+            )}
+
+            {guestStage === "analyzing" && (
+              <G className="max-w-lg mx-auto p-8 text-center" glow="rgba(0,229,160,.06)">
+                {guestDataUrl && <img src={guestDataUrl} alt="Your chart" className="w-full rounded-xl mb-5 opacity-60" style={{ maxHeight: 280, objectFit: "contain" }} />}
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#00e5a0", borderTopColor: "transparent" }} />
+                  <span className="text-[14px] font-semibold text-white">AI is analyzing your chart…</span>
+                </div>
+                <div className="flex items-center justify-center gap-4 mt-4">
+                  {["Detecting patterns", "Finding levels", "Calculating R:R"].map((step, i) => (
+                    <span key={step} className="text-[9px] font-mono px-2 py-1 rounded-lg" style={{
+                      background: "rgba(0,229,160,.06)", color: "#00e5a0",
+                      animation: `pulse 1.5s ${i * 0.4}s infinite`,
+                    }}>{step}</span>
+                  ))}
+                </div>
+              </G>
+            )}
+
+            {guestStage === "result" && guestAnalysis && (
+              <G className="max-w-2xl mx-auto overflow-hidden" glow="rgba(0,229,160,.05)">
+                {/* Chart image */}
+                {guestDataUrl && (
+                  <div className="relative">
+                    <img src={guestDataUrl} alt="Analyzed chart" className="w-full" style={{ maxHeight: 320, objectFit: "contain", background: "#0a0b0f" }} />
+                    <div className="absolute top-3 left-3 flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold" style={{ background: "rgba(0,0,0,.7)", color: "#00e5a0", backdropFilter: "blur(10px)" }}>{guestAnalysis.pair || "Chart"}</span>
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono" style={{ background: "rgba(0,0,0,.7)", color: "#4da0ff", backdropFilter: "blur(10px)" }}>{guestAnalysis.timeframe || ""}</span>
+                    </div>
+                  </div>
+                )}
+                <div className="p-6">
+                  {/* Bias + Confidence */}
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="px-4 py-2 rounded-xl text-[14px] font-bold" style={{
+                      background: guestAnalysis.bias === "Long" ? "rgba(0,229,160,.1)" : guestAnalysis.bias === "Short" ? "rgba(255,77,106,.1)" : "rgba(255,255,255,.05)",
+                      color: guestAnalysis.bias === "Long" ? "#00e5a0" : guestAnalysis.bias === "Short" ? "#ff4d6a" : "#fff",
+                      border: `1px solid ${guestAnalysis.bias === "Long" ? "rgba(0,229,160,.2)" : guestAnalysis.bias === "Short" ? "rgba(255,77,106,.2)" : "rgba(255,255,255,.08)"}`,
+                    }}>
+                      {guestAnalysis.bias === "Long" ? "📈" : guestAnalysis.bias === "Short" ? "📉" : "➡️"} {guestAnalysis.bias || "Neutral"}
+                    </span>
+                    <span className="px-3 py-2 rounded-xl text-[12px] font-mono font-bold" style={{
+                      background: "rgba(77,160,255,.08)",
+                      color: (guestAnalysis.confidence || 0) >= 70 ? "#00e5a0" : "#f0b90b",
+                      border: "1px solid rgba(77,160,255,.12)",
+                    }}>{guestAnalysis.confidence || 0}% confidence</span>
+                  </div>
+
+                  {/* Visible: Trend + Structure */}
+                  <div className="grid grid-cols-2 gap-4 mb-5">
+                    <div className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+                      <div className="text-[9px] font-mono font-bold mb-1" style={{ color: "rgba(255,255,255,.3)" }}>TREND</div>
+                      <p className="text-[12px] text-white leading-relaxed">{guestAnalysis.trend || "—"}</p>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+                      <div className="text-[9px] font-mono font-bold mb-1" style={{ color: "rgba(255,255,255,.3)" }}>STRUCTURE</div>
+                      <p className="text-[12px] text-white leading-relaxed">{guestAnalysis.structure || "—"}</p>
+                    </div>
+                  </div>
+
+                  {/* Visible: Support + Resistance */}
+                  {(guestAnalysis.support || guestAnalysis.resistance) && (
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      <div className="p-3 rounded-xl" style={{ background: "rgba(0,229,160,.03)", border: "1px solid rgba(0,229,160,.08)" }}>
+                        <div className="text-[9px] font-mono font-bold mb-1" style={{ color: "#00e5a0" }}>SUPPORT</div>
+                        <p className="text-[13px] font-mono font-bold text-white">{guestAnalysis.support || "—"}</p>
+                      </div>
+                      <div className="p-3 rounded-xl" style={{ background: "rgba(255,77,106,.03)", border: "1px solid rgba(255,77,106,.08)" }}>
+                        <div className="text-[9px] font-mono font-bold mb-1" style={{ color: "#ff4d6a" }}>RESISTANCE</div>
+                        <p className="text-[13px] font-mono font-bold text-white">{guestAnalysis.resistance || "—"}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LOCKED: Entry, SL, TP, R:R — blurred with CTA */}
+                  <div className="relative rounded-xl overflow-hidden mb-5" style={{ background: "rgba(255,255,255,.025)", border: "1px solid rgba(255,255,255,.06)" }}>
+                    <div className="grid grid-cols-4 gap-3 p-4" style={{ filter: "blur(8px)", pointerEvents: "none", userSelect: "none" }}>
+                      {[
+                        { label: "ENTRY", value: "1.2345", color: "#4da0ff" },
+                        { label: "STOP LOSS", value: "1.2280", color: "#ff4d6a" },
+                        { label: "TAKE PROFIT", value: "1.2450", color: "#00e5a0" },
+                        { label: "R:R", value: "1:2.4", color: "#f0b90b" },
+                      ].map((l) => (
+                        <div key={l.label} className="text-center p-2">
+                          <div className="text-[8px] font-mono font-bold mb-1" style={{ color: l.color }}>{l.label}</div>
+                          <div className="text-[16px] font-mono font-bold text-white">{l.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Overlay CTA */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ background: "rgba(10,11,15,.6)", backdropFilter: "blur(2px)" }}>
+                      <span className="text-[10px] font-mono mb-2" style={{ color: "rgba(255,255,255,.5)" }}>🔒 Entry, SL, TP & R:R are locked</span>
+                      <Link href="/signup" className="no-underline px-5 py-2.5 rounded-xl text-[12px] font-bold transition-all hover:scale-105" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 4px 15px rgba(0,229,160,.3)" }}>
+                        Create Free Account to Unlock
+                      </Link>
+                      <span className="text-[9px] font-mono mt-1.5" style={{ color: "rgba(255,255,255,.25)" }}>1 full scan per day • No card needed</span>
+                    </div>
+                  </div>
+
+                  {/* Try again or signup */}
+                  <div className="flex gap-3">
+                    <button onClick={() => { setGuestStage("idle"); setGuestAnalysis(null); setGuestDataUrl(null); }} className="flex-1 py-3 rounded-xl text-[12px] font-semibold cursor-pointer transition-all hover:scale-[1.01]" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", color: "#fff" }}>
+                      Scan Another Chart
+                    </button>
+                    <Link href="/signup" className="flex-1 py-3 rounded-xl text-[12px] font-bold no-underline text-center transition-all hover:scale-[1.01]" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      Sign Up Free — Unlock Full Analysis
+                    </Link>
+                  </div>
+                </div>
+              </G>
+            )}
+
+            {guestStage === "error" && (
+              <G className="max-w-lg mx-auto p-8 text-center">
+                <div className="text-[24px] mb-3">⚠️</div>
+                <p className="text-[14px] text-white font-semibold mb-2">{guestError}</p>
+                <div className="flex gap-3 justify-center mt-4">
+                  <button onClick={() => { setGuestStage("idle"); setGuestError(""); }} className="px-5 py-2.5 rounded-xl text-[12px] font-semibold cursor-pointer" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)", color: "#fff" }}>
+                    Try Again
+                  </button>
+                  <Link href="/signup" className="px-5 py-2.5 rounded-xl text-[12px] font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507" }}>
+                    Sign Up for Daily Scans
+                  </Link>
+                </div>
+              </G>
+            )}
+          </div>
         </section>
 
         {/* ═══ SOCIAL PROOF — Real Stats + Trust ═══ */}
@@ -573,9 +783,9 @@ export default function LandingPage() {
                 <div className="text-4xl mb-4">⚡</div>
                 <h2 className="text-[26px] font-extrabold text-white mb-3" style={{ letterSpacing: "-1.5px" }}>See what AI sees in your chart</h2>
                 <p className="text-[14px] mb-8" style={{ color: "rgba(255,255,255,.38)", lineHeight: 1.7 }}>Upload any chart. Get your entry, TP & SL in 10 seconds. No card required.</p>
-                <Link href="/login" onClick={() => sc("cta")} className="inline-block no-underline px-10 py-4.5 rounded-2xl text-[15px] font-bold transition-all hover:scale-[1.03]" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 8px 40px rgba(0,229,160,.35), inset 0 1px 0 rgba(255,255,255,.2)", padding: "18px 40px" }}>
-                  Get Your Free Scan →
-                </Link>
+                <button onClick={() => { sc("cta"); scrollToGuestScan(); }} className="inline-block px-10 rounded-2xl text-[15px] font-bold transition-all hover:scale-[1.03] cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#050507", boxShadow: "0 8px 40px rgba(0,229,160,.35), inset 0 1px 0 rgba(255,255,255,.2)", padding: "18px 40px", border: "none" }}>
+                  Try Free — Scan Your Chart →
+                </button>
                 <div className="flex items-center justify-center gap-3 mt-5">
                   <div className="flex -space-x-2">
                     {["🇿🇦", "🇳🇬", "🇬🇧", "🇰🇪"].map((f, i) => (
