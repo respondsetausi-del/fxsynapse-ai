@@ -35,7 +35,7 @@ function PricingContent() {
   }, [supabase]);
 
   const handleSubscribe = async (planId: string) => {
-    if (inFlight.current) return; // Block rapid double-clicks
+    if (inFlight.current) return;
     if (!user) { window.location.href = "/signup?redirect=/pricing"; return; }
     if (planId === currentPlan && subStatus === "active") return;
     inFlight.current = true;
@@ -73,10 +73,17 @@ function PricingContent() {
 
   const isCurrentActive = (planId: string) => planId === currentPlan && subStatus === "active";
   const getDisplayPrice = (tier: typeof paidTiers[0]) => billing === "yearly" ? tier.yearlyMonthly : tier.monthlyPrice;
+
   const getCtaText = (tier: typeof paidTiers[0]) => {
     if (isCurrentActive(tier.id)) return "Current Plan";
-    if (loading === tier.id) return "Loading...";
+    if (loading === tier.id) return "Redirecting to secure checkout\u2026";
     return `Get ${tier.name}`;
+  };
+
+  // Daily price anchors
+  const dailyPrice = (tier: typeof paidTiers[0]) => {
+    const mp = getDisplayPrice(tier);
+    return (mp / 30).toFixed(0);
   };
 
   return (
@@ -111,22 +118,41 @@ function PricingContent() {
         {/* Paywall Gate Banner */}
         {isGated && (
           <div className="max-w-lg mx-auto mb-8 rounded-xl px-5 py-4 text-center" style={{ background: "rgba(240,185,11,.06)", border: "1px solid rgba(240,185,11,.15)" }}>
-            <div className="text-lg font-bold text-white mb-1">Choose your plan to continue</div>
-            <div className="text-xs" style={{ color: "rgba(255,255,255,.45)" }}>Unlock AI-powered chart analysis, smart money signals, and more</div>
+            <div className="text-lg font-bold text-white mb-1">Upgrade to unlock full analysis</div>
+            <div className="text-xs" style={{ color: "rgba(255,255,255,.45)" }}>See every level, entry, stop loss, and take profit — unblurred</div>
           </div>
         )}
 
-        {/* Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-white mb-2" style={{ fontFamily: "'Outfit',sans-serif" }}>
-            Choose Your Plan
+        {/* ═══ HERO — Step 3 ═══ */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-3 leading-tight" style={{ fontFamily: "'Outfit',sans-serif" }}>
+            Know where to enter, stop, and take profit.
           </h1>
-          <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,.5)" }}>
-            AI chart analysis • Smart money signals • Trade like the institutions
+          <p className="text-sm mb-5 max-w-md mx-auto" style={{ color: "rgba(255,255,255,.5)" }}>
+            Upload any chart screenshot. Get AI analysis with levels drawn in seconds.
           </p>
 
+          {!user && (
+            <Link href="/signup" className="inline-block px-6 py-3 rounded-xl text-sm font-bold no-underline mb-4" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+              Start Free — 1 Scan/Day
+            </Link>
+          )}
+
+          {/* Trust Strip */}
+          <div className="flex items-center justify-center gap-4 flex-wrap mt-3">
+            {[
+              { icon: "🔒", text: "Secure Yoco checkout" },
+              { icon: "⚡", text: "Activates instantly" },
+              { icon: "↩️", text: "Cancel anytime" },
+            ].map((t) => (
+              <span key={t.text} className="text-[10px] font-mono flex items-center gap-1.5" style={{ color: "rgba(255,255,255,.3)" }}>
+                <span>{t.icon}</span>{t.text}
+              </span>
+            ))}
+          </div>
+
           {/* Billing Toggle */}
-          <div className="inline-flex items-center rounded-xl p-1" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
+          <div className="inline-flex items-center rounded-xl p-1 mt-6" style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
             <button onClick={() => setBilling("monthly")} className="px-5 py-2 rounded-lg text-xs font-bold cursor-pointer transition-all"
               style={{ background: billing === "monthly" ? "rgba(0,229,160,.1)" : "transparent", color: billing === "monthly" ? "#00e5a0" : "rgba(255,255,255,.4)" }}>
               Monthly
@@ -139,8 +165,8 @@ function PricingContent() {
           </div>
         </div>
 
-        {/* Plan Cards */}
-        <div className="grid md:grid-cols-4 gap-3 mb-14">
+        {/* ═══ PLAN CARDS — Step 2: Starter highlighted ═══ */}
+        <div className="grid md:grid-cols-4 gap-3 mb-10">
           {paidTiers.map((tier) => (
             <div key={tier.id} className="rounded-2xl p-5 relative transition-all" style={{
               background: tier.popular ? "rgba(0,229,160,.04)" : "rgba(255,255,255,.02)",
@@ -162,16 +188,20 @@ function PricingContent() {
                   </span>
                   <span className="text-xs font-mono" style={{ color: "rgba(255,255,255,.35)" }}>/month</span>
                 </div>
+                {/* Daily price anchor */}
+                <div className="text-[10px] font-mono mt-1" style={{ color: "rgba(255,255,255,.2)" }}>
+                  That&apos;s R{dailyPrice(tier)}/day
+                </div>
                 {billing === "yearly" && (
-                  <div className="mt-1">
-                    <span className="text-[10px] font-mono line-through" style={{ color: "rgba(255,255,255,.2)" }}>R{tier.monthlyPrice}/mo</span>
-                    <span className="text-[10px] font-mono font-bold ml-2" style={{ color: "#00e5a0" }}>Save R{tier.yearlySavings}/yr</span>
-                  </div>
-                )}
-                {billing === "yearly" && (
-                  <div className="text-[10px] font-mono mt-1" style={{ color: "rgba(255,255,255,.25)" }}>
-                    Billed R{tier.yearlyPrice} once per year
-                  </div>
+                  <>
+                    <div className="mt-1">
+                      <span className="text-[10px] font-mono line-through" style={{ color: "rgba(255,255,255,.2)" }}>R{tier.monthlyPrice}/mo</span>
+                      <span className="text-[10px] font-mono font-bold ml-2" style={{ color: "#00e5a0" }}>Save R{tier.yearlySavings}/yr</span>
+                    </div>
+                    <div className="text-[10px] font-mono mt-0.5" style={{ color: "rgba(255,255,255,.2)" }}>
+                      Billed R{tier.yearlyPrice} once per year
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -186,6 +216,7 @@ function PricingContent() {
                 ))}
               </ul>
 
+              {/* CTA Button */}
               <button
                 onClick={() => handleSubscribe(tier.id)}
                 disabled={isCurrentActive(tier.id) || loading === tier.id}
@@ -199,6 +230,13 @@ function PricingContent() {
               >
                 {getCtaText(tier)}
               </button>
+
+              {/* Step 5 — Checkout reinforcement micro-copy */}
+              {!isCurrentActive(tier.id) && (
+                <p className="text-center text-[9px] font-mono mt-2" style={{ color: "rgba(255,255,255,.18)" }}>
+                  Secure payment · Instant access
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -206,57 +244,53 @@ function PricingContent() {
         {/* Free Tier Note */}
         <div className="max-w-md mx-auto mb-10 text-center">
           <div className="rounded-xl px-5 py-3" style={{ background: "rgba(255,255,255,.02)", border: "1px solid rgba(255,255,255,.06)" }}>
-            <div className="text-xs font-bold text-white mb-1">🆓 Free Plan Available</div>
+            <div className="text-xs font-bold text-white mb-1">Free Plan</div>
             <div className="text-[10px]" style={{ color: "rgba(255,255,255,.35)" }}>
-              1 chart scan/day • Signal previews (blurred details) • 3 AI chat messages/day
+              1 chart scan per day · Blurred entry/SL/TP details · No card required
             </div>
           </div>
         </div>
 
-        {/* Comparison Table */}
+        {/* ═══ COMPARISON TABLE — Step 4: Only differing features ═══ */}
         <div className="max-w-4xl mx-auto mb-14">
-          <h2 className="text-xl font-bold text-white text-center mb-6">Compare All Plans</h2>
+          <h2 className="text-xl font-bold text-white text-center mb-2">What&apos;s different between plans</h2>
+          <p className="text-[10px] font-mono text-center mb-5" style={{ color: "rgba(255,255,255,.25)" }}>
+            All paid plans include full chart analysis, levels drawn on your screenshot, and entry/SL/TP.
+          </p>
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,.06)" }}>
             {[
-              { feature: "AI Chart Scans", free: "1/day", basic: "5/day", starter: "15/day", pro: "50/day", unlimited: "∞" },
-              { feature: "AI Chat Messages", free: "3/day", basic: "15/day", starter: "30/day", pro: "100/day", unlimited: "∞" },
-              { feature: "Signal Details", free: "🔒", basic: "B+C", starter: "B+C + A delayed", pro: "All instant", unlimited: "All + Priority" },
-              { feature: "Smart Money", free: "🔒", basic: "S/R + OBs", starter: "S/R + OBs", pro: "Full SMC", unlimited: "Full SMC" },
-              { feature: "AI Reasoning", free: "—", basic: "—", starter: "✓", pro: "✓", unlimited: "✓" },
-              { feature: "Voice Assistant", free: "—", basic: "—", starter: "—", pro: "✓", unlimited: "✓" },
-              { feature: "AI Fundamentals", free: "—", basic: "—", starter: "—", pro: "✓", unlimited: "✓" },
-              { feature: "Morning Briefing", free: "Headline", basic: "Full", starter: "Full", pro: "Full", unlimited: "Full" },
-              { feature: "Signal Track Record", free: "—", basic: "—", starter: "—", pro: "✓", unlimited: "✓" },
-              { feature: "Custom Watchlist", free: "—", basic: "—", starter: "—", pro: "5 pairs", unlimited: "15 pairs" },
-              { feature: "Trade Journal", free: "—", basic: "—", starter: "—", pro: "—", unlimited: "✓" },
-              { feature: "Priority Support", free: "—", basic: "—", starter: "—", pro: "—", unlimited: "✓" },
+              { feature: "Chart Scans", basic: "5/day", starter: "15/day", pro: "50/day", unlimited: "Unlimited" },
+              { feature: "AI Chat", basic: "15/day", starter: "30/day", pro: "100/day", unlimited: "Unlimited" },
+              { feature: "Smart Money", basic: "S/R + OBs", starter: "S/R + OBs", pro: "Full SMC", unlimited: "Full SMC" },
+              { feature: "AI Reasoning", basic: "—", starter: "✓", pro: "✓", unlimited: "✓" },
+              { feature: "Voice Assistant", basic: "—", starter: "—", pro: "✓", unlimited: "✓" },
+              { feature: "AI Fundamentals", basic: "—", starter: "—", pro: "✓", unlimited: "✓" },
             ].map((row, i) => (
-              <div key={i} className="flex items-center px-4 py-2.5 gap-1" style={{ background: i % 2 === 0 ? "rgba(255,255,255,.01)" : "transparent", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+              <div key={i} className="flex items-center px-4 py-3 gap-1" style={{ background: i % 2 === 0 ? "rgba(255,255,255,.015)" : "transparent", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
                 <span className="flex-1 text-[11px] font-medium" style={{ color: "rgba(255,255,255,.55)", minWidth: 120 }}>{row.feature}</span>
-                <span className="w-14 text-center text-[10px] font-mono" style={{ color: "rgba(255,255,255,.25)" }}>{row.free}</span>
-                <span className="w-14 text-center text-[10px] font-mono" style={{ color: "#4da0ff" }}>{row.basic}</span>
-                <span className="w-14 text-center text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>{row.starter}</span>
-                <span className="w-14 text-center text-[10px] font-mono font-bold" style={{ color: "#f59e0b" }}>{row.pro}</span>
-                <span className="w-14 text-center text-[10px] font-mono font-bold" style={{ color: "#a855f7" }}>{row.unlimited}</span>
+                <span className="w-16 text-center text-[10px] font-mono" style={{ color: "#4da0ff" }}>{row.basic}</span>
+                <span className="w-16 text-center text-[10px] font-mono font-bold" style={{ color: "#00e5a0" }}>{row.starter}</span>
+                <span className="w-16 text-center text-[10px] font-mono" style={{ color: "#f59e0b" }}>{row.pro}</span>
+                <span className="w-16 text-center text-[10px] font-mono" style={{ color: "#a855f7" }}>{row.unlimited}</span>
               </div>
             ))}
-            <div className="flex items-center px-4 py-1.5" style={{ background: "rgba(255,255,255,.02)" }}>
+            {/* Column labels */}
+            <div className="flex items-center px-4 py-2" style={{ background: "rgba(255,255,255,.02)" }}>
               <span className="flex-1" />
-              <span className="w-14 text-center text-[8px] font-mono" style={{ color: "rgba(255,255,255,.2)" }}>Free</span>
-              <span className="w-14 text-center text-[8px] font-mono" style={{ color: "rgba(77,160,255,.4)" }}>Basic</span>
-              <span className="w-14 text-center text-[8px] font-mono" style={{ color: "rgba(0,229,160,.4)" }}>Starter</span>
-              <span className="w-14 text-center text-[8px] font-mono" style={{ color: "rgba(245,158,11,.4)" }}>Pro</span>
-              <span className="w-14 text-center text-[8px] font-mono" style={{ color: "rgba(168,85,247,.4)" }}>Unlimited</span>
+              <span className="w-16 text-center text-[8px] font-mono font-bold" style={{ color: "rgba(77,160,255,.5)" }}>R{billing === "yearly" ? TIERS.basic.yearlyMonthly : TIERS.basic.monthlyPrice}</span>
+              <span className="w-16 text-center text-[8px] font-mono font-bold" style={{ color: "rgba(0,229,160,.5)" }}>R{billing === "yearly" ? TIERS.starter.yearlyMonthly : TIERS.starter.monthlyPrice}</span>
+              <span className="w-16 text-center text-[8px] font-mono font-bold" style={{ color: "rgba(245,158,11,.5)" }}>R{billing === "yearly" ? TIERS.pro.yearlyMonthly : TIERS.pro.monthlyPrice}</span>
+              <span className="w-16 text-center text-[8px] font-mono font-bold" style={{ color: "rgba(168,85,247,.5)" }}>R{billing === "yearly" ? TIERS.unlimited.yearlyMonthly : TIERS.unlimited.monthlyPrice}</span>
             </div>
           </div>
         </div>
 
-        {/* Credit Packs */}
+        {/* ═══ CREDIT PACKS ═══ */}
         <div className="max-w-xl mx-auto mb-10">
           <div className="text-center mb-6">
             <h2 className="text-xl font-bold text-white mb-1">Need Extra Scans?</h2>
             <p className="text-xs" style={{ color: "rgba(255,255,255,.4)" }}>
-              Buy credit packs for chart scans. No subscription needed. Credits never expire.
+              Buy credit packs. No subscription needed. Credits never expire.
             </p>
           </div>
 
@@ -286,27 +320,36 @@ function PricingContent() {
                     opacity: loading === pack.id ? 0.6 : 1,
                   }}
                 >
-                  {loading === pack.id ? "Loading..." : "Buy Credits"}
+                  {loading === pack.id ? "Redirecting to secure checkout\u2026" : "Buy Credits"}
                 </button>
               </div>
             ))}
           </div>
-          <p className="text-center text-[9px] font-mono mt-3" style={{ color: "rgba(255,255,255,.2)" }}>
-            Credit packs are for chart scans only. Signal access requires a subscription.
-          </p>
         </div>
 
-        {/* R199 value prop */}
+        {/* ═══ VALUE ANCHOR — Step 6 ═══ */}
         <div className="max-w-md mx-auto mb-10 rounded-xl p-5 text-center" style={{ background: "rgba(0,229,160,.03)", border: "1px solid rgba(0,229,160,.1)" }}>
-          <div className="text-sm font-bold text-white mb-2">R199 is less than one bad trade.</div>
+          <div className="text-sm font-bold text-white mb-2">R199/month is less than one poorly timed entry.</div>
           <div className="text-[11px] leading-relaxed" style={{ color: "rgba(255,255,255,.4)" }}>
-            The average trader loses R500+ on a single wrong entry. FXSynapse AI helps you avoid those losses with institutional-grade analysis and smart money detection. Pay R199 once, save thousands.
+            The average retail trader loses R500+ on a single bad entry. One correct level pays for your plan.
           </div>
         </div>
 
-        <p className="text-center text-[10px] font-mono mt-8" style={{ color: "rgba(255,255,255,.2)" }}>
-          Payments securely processed by Yoco. All prices in ZAR. Cancel anytime.
-        </p>
+        {/* ═══ FINAL CTA ═══ */}
+        <div className="text-center mb-8">
+          {!user ? (
+            <Link href="/signup" className="inline-block px-6 py-3 rounded-xl text-sm font-bold no-underline" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f" }}>
+              Start Free — 1 Scan/Day
+            </Link>
+          ) : currentPlan === "free" || !currentPlan ? (
+            <button onClick={() => handleSubscribe("starter")} className="px-6 py-3 rounded-xl text-sm font-bold cursor-pointer" style={{ background: "linear-gradient(135deg,#00e5a0,#00b87d)", color: "#0a0b0f", border: "none" }}>
+              {loading === "starter" ? "Redirecting to secure checkout\u2026" : "Get Starter — R199/mo"}
+            </button>
+          ) : null}
+          <p className="text-[10px] font-mono mt-3" style={{ color: "rgba(255,255,255,.2)" }}>
+            Payments processed securely by Yoco · All prices in ZAR · Cancel anytime
+          </p>
+        </div>
       </div>
       <ChatWidget />
     </div>

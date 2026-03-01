@@ -44,9 +44,9 @@ const FEATURES = [
 ];
 
 const PLANS = [
-  { name: "Starter", price: "R79", period: "/mo", scans: "50", features: ["50 scans/month", "Full annotations", "Trade setups", "S/R levels & zones", "Scan history"], cta: "Get Starter" },
-  { name: "Pro", price: "R149", period: "/mo", scans: "100", features: ["100 scans/month", "Full annotations", "Trade setups", "AI News & Fundamentals", "Confluence grading", "Full history"], cta: "Get Pro", popular: true },
-  { name: "Premium", price: "R299", period: "/mo", scans: "∞", features: ["Unlimited scans", "All Pro features", "AI Fundamentals", "Priority processing", "Priority support"], cta: "Go Premium" },
+  { name: "Basic", price: "R79", period: "/mo", scans: "5/day", features: ["5 chart scans/day", "Full analysis + levels", "AI chat (15/day)", "S/R + Order blocks"], cta: "Get Basic" },
+  { name: "Starter", price: "R199", period: "/mo", scans: "15/day", features: ["15 chart scans/day", "Full analysis + levels", "AI chat (30/day)", "AI reasoning on scans", "Smart money basics"], cta: "Get Starter", popular: true },
+  { name: "Pro", price: "R349", period: "/mo", scans: "50/day", features: ["50 chart scans/day", "Full smart money analysis", "AI chat (100/day)", "Voice assistant", "Full fundamentals"], cta: "Get Pro" },
 ];
 
 // ═══ Glass component ═══
