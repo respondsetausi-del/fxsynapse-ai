@@ -352,8 +352,8 @@ export default function LandingPage() {
             </div>
 
             {guestStage === "idle" && (
-              <G className="max-w-lg mx-auto p-8 text-center cursor-pointer group" glow="rgba(0,229,160,.04)"
-                onClick={() => guestFileRef.current?.click()}>
+              <div onClick={() => guestFileRef.current?.click()} className="cursor-pointer">
+              <G className="max-w-lg mx-auto p-8 text-center group" glow="rgba(0,229,160,.04)">
                 <input
                   ref={guestFileRef}
                   type="file"
@@ -375,6 +375,7 @@ export default function LandingPage() {
                   📸 Upload Chart
                 </div>
               </G>
+              </div>
             )}
 
             {guestStage === "analyzing" && (
